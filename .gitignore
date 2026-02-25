@@ -1,0 +1,40 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
+# Game server data (generated at runtime)
+game-server/data/
+backups/*.tar.gz
+
+# Node (frontend - future)
+node_modules/
+frontend/dist/
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
