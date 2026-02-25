@@ -6,7 +6,9 @@ RUN apk add --no-cache \
     supervisor \
     curl \
     libpq-dev \
-    linux-headers
+    linux-headers \
+    nodejs \
+    npm
 
 # Install PHP extensions
 RUN docker-php-ext-install \
@@ -30,8 +32,15 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
+# Copy package files and install + build frontend
+COPY package.json package-lock.json ./
+RUN npm ci
+
 # Copy application code
 COPY . .
+
+# Build frontend assets
+RUN npm run build
 
 # Generate optimized autoload
 RUN composer dump-autoload --optimize --no-dev

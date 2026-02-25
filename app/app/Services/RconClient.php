@@ -8,11 +8,7 @@ class RconClient
 {
     private const SERVERDATA_AUTH = 3;
 
-    private const SERVERDATA_AUTH_RESPONSE = 2;
-
     private const SERVERDATA_EXECCOMMAND = 2;
-
-    private const SERVERDATA_RESPONSE_VALUE = 0;
 
     private $socket = null;
 
@@ -54,6 +50,7 @@ class RconClient
         if ($connected === false) {
             $error = socket_strerror(socket_last_error($this->socket));
             $this->close();
+
             throw new RuntimeException("Failed to connect to RCON at {$this->host}:{$this->port}: {$error}");
         }
 
@@ -105,6 +102,7 @@ class RconClient
 
         if ($response === null || $response['id'] === -1) {
             $this->close();
+
             throw new RuntimeException('RCON authentication failed');
         }
 
@@ -137,6 +135,9 @@ class RconClient
         }
     }
 
+    /**
+     * @return array{id: int, type: int, body: string}|null
+     */
     private function readPacket(): ?array
     {
         $sizeData = $this->readBytes(4);

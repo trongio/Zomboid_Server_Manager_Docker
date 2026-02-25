@@ -17,6 +17,9 @@ class DockerManager
         $this->baseUrl = 'http://localhost';
     }
 
+    /**
+     * @return array{exists: bool, running: bool, status: string, started_at?: string|null, finished_at?: string|null, restart_count?: int}
+     */
     public function getContainerStatus(): array
     {
         $response = $this->request('GET', "/containers/{$this->containerName}/json");
@@ -66,6 +69,9 @@ class DockerManager
         return $response !== null;
     }
 
+    /**
+     * @return string[]
+     */
     public function getContainerLogs(int $tail = 100, ?string $since = null): array
     {
         $query = [
@@ -90,6 +96,9 @@ class DockerManager
         return $this->parseLogOutput($response);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     private function request(string $method, string $path, array $options = []): ?array
     {
         try {
@@ -157,18 +166,19 @@ class DockerManager
         }
     }
 
+    /**
+     * @return string[]
+     */
     private function parseLogOutput(string $raw): array
     {
         $lines = [];
-
-        // Docker multiplexed log stream: 8-byte header per frame
         $offset = 0;
         $length = strlen($raw);
 
         while ($offset < $length) {
             if ($offset + 8 > $length) {
-                // Remaining data is less than header, treat as plain text
                 $lines = array_merge($lines, array_filter(explode("\n", substr($raw, $offset))));
+
                 break;
             }
 
@@ -183,8 +193,8 @@ class DockerManager
             $frameSize = $header['size'];
 
             if ($offset + 8 + $frameSize > $length) {
-                // Incomplete frame, take what we can
                 $lines[] = trim(substr($raw, $offset + 8));
+
                 break;
             }
 

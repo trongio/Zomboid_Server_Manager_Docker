@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Http\Controllers\Controller;
 use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
-class HealthController extends Controller
+class HealthController
 {
     public function __invoke(RconClient $rcon): JsonResponse
     {
