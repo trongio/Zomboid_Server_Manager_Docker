@@ -3,48 +3,50 @@ services:
   # PZ Game Server — Dedicated server via SteamCMD
   # ---------------------------------------------------------------------------
   game-server:
-    image: renegademaster/zomboid-dedicated-server:latest
+    image: ghcr.io/joyfui/project-zomboid-server-docker-arm64:latest
     container_name: ${GAME_SERVER_CONTAINER_NAME:-pz-game-server}
     restart: unless-stopped
+    stdin_open: true
+    tty: true
     environment:
-      ADMIN_PASSWORD: ${PZ_ADMIN_PASSWORD:?PZ_ADMIN_PASSWORD is required}
-      ADMIN_USERNAME: ${PZ_ADMIN_USERNAME:-admin}
-      AUTOSAVE_INTERVAL: ${PZ_AUTOSAVE_INTERVAL:-15}
-      BIND_IP: "0.0.0.0"
-      DEFAULT_PORT: ${PZ_GAME_PORT:-16261}
-      GAME_VERSION: ${PZ_STEAM_BRANCH:-public}
-      GC_CONFIG: ${PZ_GC_CONFIG:-ZGC}
-      MAP_NAMES: ${PZ_MAP_NAMES:-Muldraugh, KY}
-      MAX_PLAYERS: ${PZ_MAX_PLAYERS:-16}
-      MAX_RAM: ${PZ_MAX_RAM:-4096m}
-      MOD_NAMES: ${PZ_MOD_IDS:-}
-      MOD_WORKSHOP_IDS: ${PZ_WORKSHOP_IDS:-}
-      PAUSE_ON_EMPTY: ${PZ_PAUSE_ON_EMPTY:-true}
-      PUBLIC_SERVER: ${PZ_PUBLIC_SERVER:-true}
-      RCON_PASSWORD: ${PZ_RCON_PASSWORD:?PZ_RCON_PASSWORD is required}
-      RCON_PORT: ${PZ_RCON_PORT:-27015}
-      SERVER_NAME: ${PZ_SERVER_NAME:-ZomboidServer}
-      SERVER_PASSWORD: ${PZ_SERVER_PASSWORD:-}
-      STEAM_VAC: ${PZ_STEAM_VAC:-true}
-      UDP_PORT: ${PZ_DIRECT_PORT:-16262}
-      USE_STEAM: "true"
+      SERVERNAME: ${PZ_SERVER_NAME:-ZomboidServer}
       TZ: ${TZ:-Asia/Tbilisi}
+      # Passed through for configure-server.sh
+      PZ_ADMIN_PASSWORD: ${PZ_ADMIN_PASSWORD:-admin}
+      PZ_SERVER_PASSWORD: ${PZ_SERVER_PASSWORD:-}
+      PZ_MAX_PLAYERS: ${PZ_MAX_PLAYERS:-16}
+      PZ_GAME_PORT: ${PZ_GAME_PORT:-16261}
+      PZ_DIRECT_PORT: ${PZ_DIRECT_PORT:-16262}
+      PZ_RCON_PORT: ${PZ_RCON_PORT:-27015}
+      PZ_RCON_PASSWORD: ${PZ_RCON_PASSWORD:-changeme}
+      PZ_MAP_NAMES: ${PZ_MAP_NAMES:-Muldraugh, KY}
+      PZ_MOD_IDS: ${PZ_MOD_IDS:-}
+      PZ_WORKSHOP_IDS: ${PZ_WORKSHOP_IDS:-}
+      PZ_PAUSE_ON_EMPTY: ${PZ_PAUSE_ON_EMPTY:-true}
+      PZ_PUBLIC_SERVER: ${PZ_PUBLIC_SERVER:-true}
+      PZ_STEAM_VAC: ${PZ_STEAM_VAC:-true}
+      PZ_AUTOSAVE_INTERVAL: ${PZ_AUTOSAVE_INTERVAL:-15}
+      PZ_MAX_RAM: ${PZ_MAX_RAM:-4096m}
+      PZ_GC_CONFIG: ${PZ_GC_CONFIG:-ZGC}
+      PZ_STEAM_BRANCH: ${PZ_STEAM_BRANCH:-public}
     ports:
       - "${PZ_GAME_PORT:-16261}:${PZ_GAME_PORT:-16261}/udp"
       - "${PZ_DIRECT_PORT:-16262}:${PZ_DIRECT_PORT:-16262}/udp"
       # RCON port intentionally NOT published — internal Docker network only
+    entrypoint: ["/bin/bash", "/home/steam/entrypoint.sh"]
     volumes:
-      - zomboid-server:/home/steam/ZomboidDedicatedServer
+      - zomboid-server:/home/steam/pzserver
       - zomboid-data:/home/steam/Zomboid
-      - ./game-server/edit_server_config.py:/home/steam/edit_server_config.py:ro
+      - ./game-server/configure-server.sh:/home/steam/configure-server.sh:ro
+      - ./game-server/entrypoint.sh:/home/steam/entrypoint.sh:ro
     networks:
       - zomboid-net
     healthcheck:
-      test: ["CMD-SHELL", "ss -uln | grep -q ':${PZ_GAME_PORT:-16261}'"]
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q '[p]roject-zomboid\\|[z]omboid.*java\\|[j]ava.*zomboid'"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 120s
+      retries: 5
+      start_period: 600s
 
   # ---------------------------------------------------------------------------
   # Laravel Application — API + Web Dashboard

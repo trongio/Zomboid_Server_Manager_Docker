@@ -6,6 +6,7 @@ RUN apk add --no-cache \
     supervisor \
     curl \
     libpq-dev \
+    sqlite-dev \
     linux-headers \
     nodejs \
     npm
@@ -13,6 +14,7 @@ RUN apk add --no-cache \
 # Install PHP extensions
 RUN docker-php-ext-install \
     pdo_pgsql \
+    pdo_sqlite \
     sockets \
     pcntl \
     opcache
@@ -39,11 +41,16 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-# Build frontend assets
-RUN npm run build
-
-# Generate optimized autoload
+# Generate autoload BEFORE npm build (Wayfinder plugin needs artisan)
 RUN composer dump-autoload --optimize --no-dev
+
+# Build frontend assets
+# Wayfinder plugin runs `php artisan wayfinder:generate` which needs APP_KEY
+# and a working DB driver. Use SQLite stub + temp key for build only.
+RUN APP_KEY=base64:dGVtcG9yYXJ5LWJ1aWxkLWtleS1mb3ItZG9ja2VyMTIzNA== \
+    DB_CONNECTION=sqlite \
+    DB_DATABASE=":memory:" \
+    npm run build
 
 # Set permissions
 RUN chown -R www-data:www-data storage bootstrap/cache \
