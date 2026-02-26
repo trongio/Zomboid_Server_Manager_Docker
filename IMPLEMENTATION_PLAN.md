@@ -268,12 +268,12 @@ Zomboid/
 
 ### Acceptance Criteria
 
-- [ ] Player list returns accurate data matching connected players
-- [ ] All RCON player commands execute and return confirmation
-- [ ] Kick/ban include reason in server-side logs
-- [ ] All player actions are audit-logged
-- [ ] Endpoints return appropriate errors when player is not online
-- [ ] `additem` with valid PZ item IDs works (tested with `Base.Axe`)
+- [x] Player list returns accurate data matching connected players
+- [x] All RCON player commands execute and return confirmation
+- [x] Kick/ban include reason in server-side logs
+- [x] All player actions are audit-logged
+- [x] Endpoints return appropriate errors when player is not online
+- [x] `additem` with valid PZ item IDs works (tested with `Base.Axe`)
 
 ---
 
@@ -567,7 +567,7 @@ php artisan scribe:generate
 | Phase 3 — Database + Audit | DONE | AuditLog model+migration, AuditLogger service, AuditApiActions middleware, GET /api/audit endpoint, 13 tests |
 | Phase 4 — Server Control | DONE | 7 endpoints, RestartGameServer job, graceful stop, countdown restart, 22 tests |
 | Phase 5 — Config Management | DONE | ServerIniParser, SandboxLuaParser, 4 config endpoints, round-trip tests, 27 tests |
-| Phase 6 — Player Management | NOT STARTED | |
+| Phase 6 — Player Management | DONE | 10 endpoints, kick/ban/unban/setaccess/teleport/additem/addxp/godmode, 22 tests |
 | Phase 7 — Mod Management | NOT STARTED | |
 | Phase 8 — MVP Testing & Docs | NOT STARTED | |
 | Phase 9 — Backup System | NOT STARTED | |

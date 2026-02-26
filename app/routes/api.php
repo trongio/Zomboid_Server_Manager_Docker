@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ConfigController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\ServerController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -31,4 +32,15 @@ Route::middleware(['auth.apikey', 'audit'])->group(function () {
     Route::patch('/config/server', [ConfigController::class, 'updateServer']);
     Route::get('/config/sandbox', [ConfigController::class, 'showSandbox']);
     Route::patch('/config/sandbox', [ConfigController::class, 'updateSandbox']);
+
+    Route::get('/players', [PlayerController::class, 'index']);
+    Route::get('/players/{name}', [PlayerController::class, 'show']);
+    Route::post('/players/{name}/kick', [PlayerController::class, 'kick']);
+    Route::post('/players/{name}/ban', [PlayerController::class, 'ban']);
+    Route::delete('/players/{name}/ban', [PlayerController::class, 'unban']);
+    Route::post('/players/{name}/setaccess', [PlayerController::class, 'setAccessLevel']);
+    Route::post('/players/{name}/teleport', [PlayerController::class, 'teleport']);
+    Route::post('/players/{name}/additem', [PlayerController::class, 'addItem']);
+    Route::post('/players/{name}/addxp', [PlayerController::class, 'addXp']);
+    Route::post('/players/{name}/godmode', [PlayerController::class, 'godmode']);
 });
