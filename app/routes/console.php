@@ -14,6 +14,8 @@ Schedule::job(new CreateBackupJob(BackupType::Scheduled))
         }
     });
 
+Schedule::command('pz:sync-accounts')->everyFiveMinutes();
+
 Schedule::job(new CreateBackupJob(BackupType::Daily))
     ->dailyAt('04:00')
     ->when(function () {

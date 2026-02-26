@@ -13,7 +13,7 @@ export default function Register() {
     return (
         <AuthLayout
             title="Create an account"
-            description="Enter your details below to create your account"
+            description="Your account will also be your game server login"
         >
             <Head title="Register" />
             <Form
@@ -26,34 +26,42 @@ export default function Register() {
                     <>
                         <div className="grid gap-6">
                             <div className="grid gap-2">
-                                <Label htmlFor="name">Name</Label>
+                                <Label htmlFor="username">Username</Label>
                                 <Input
-                                    id="name"
+                                    id="username"
                                     type="text"
                                     required
                                     autoFocus
                                     tabIndex={1}
-                                    autoComplete="name"
-                                    name="name"
-                                    placeholder="Full name"
+                                    autoComplete="username"
+                                    name="username"
+                                    placeholder="Username"
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Letters, numbers, and underscores only. This will be your game server username.
+                                </p>
                                 <InputError
-                                    message={errors.name}
-                                    className="mt-2"
+                                    message={errors.username}
+                                    className="mt-1"
                                 />
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
+                                <Label htmlFor="email">
+                                    Email address{' '}
+                                    <span className="text-muted-foreground">(optional)</span>
+                                </Label>
                                 <Input
                                     id="email"
                                     type="email"
-                                    required
                                     tabIndex={2}
                                     autoComplete="email"
                                     name="email"
                                     placeholder="email@example.com"
                                 />
+                                <p className="text-xs text-muted-foreground">
+                                    Required for password reset. You can add it later.
+                                </p>
                                 <InputError message={errors.email} />
                             </div>
 

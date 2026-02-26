@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PortalController;
 use App\Http\Controllers\StatusController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
@@ -11,6 +12,10 @@ Route::inertia('/', 'welcome', [
 ])->name('home');
 
 Route::get('status', StatusController::class)->name('status');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('portal', PortalController::class)->name('portal');
+});
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

@@ -40,8 +40,20 @@ export default function Profile({
                     <Heading
                         variant="small"
                         title="Profile information"
-                        description="Update your name and email address"
+                        description="Update your display name and email address"
                     />
+
+                    <div className="grid gap-2">
+                        <Label>Username</Label>
+                        <Input
+                            value={auth.user.username}
+                            disabled
+                            className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Your username cannot be changed. It is linked to your game server account.
+                        </p>
+                    </div>
 
                     <Form
                         {...ProfileController.update.form()}
@@ -53,7 +65,7 @@ export default function Profile({
                         {({ processing, recentlySuccessful, errors }) => (
                             <>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="name">Name</Label>
+                                    <Label htmlFor="name">Display name</Label>
 
                                     <Input
                                         id="name"
@@ -62,7 +74,7 @@ export default function Profile({
                                         name="name"
                                         required
                                         autoComplete="name"
-                                        placeholder="Full name"
+                                        placeholder="Display name"
                                     />
 
                                     <InputError
@@ -72,17 +84,19 @@ export default function Profile({
                                 </div>
 
                                 <div className="grid gap-2">
-                                    <Label htmlFor="email">Email address</Label>
+                                    <Label htmlFor="email">
+                                        Email address{' '}
+                                        <span className="text-muted-foreground">(optional)</span>
+                                    </Label>
 
                                     <Input
                                         id="email"
                                         type="email"
                                         className="mt-1 block w-full"
-                                        defaultValue={auth.user.email}
+                                        defaultValue={auth.user.email ?? ''}
                                         name="email"
-                                        required
-                                        autoComplete="username"
-                                        placeholder="Email address"
+                                        autoComplete="email"
+                                        placeholder="email@example.com"
                                     />
 
                                     <InputError
@@ -92,6 +106,7 @@ export default function Profile({
                                 </div>
 
                                 {mustVerifyEmail &&
+                                    auth.user.email &&
                                     auth.user.email_verified_at === null && (
                                         <div>
                                             <p className="-mt-4 text-sm text-muted-foreground">
