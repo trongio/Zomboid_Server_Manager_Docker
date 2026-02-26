@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuditLogController;
+use App\Http\Controllers\Api\ConfigController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ServerController;
 use Illuminate\Http\Request;
@@ -25,4 +26,9 @@ Route::middleware(['auth.apikey', 'audit'])->group(function () {
     Route::post('/server/save', [ServerController::class, 'save']);
     Route::post('/server/broadcast', [ServerController::class, 'broadcast']);
     Route::get('/server/logs', [ServerController::class, 'logs']);
+
+    Route::get('/config/server', [ConfigController::class, 'showServer']);
+    Route::patch('/config/server', [ConfigController::class, 'updateServer']);
+    Route::get('/config/sandbox', [ConfigController::class, 'showSandbox']);
+    Route::patch('/config/sandbox', [ConfigController::class, 'updateSandbox']);
 });

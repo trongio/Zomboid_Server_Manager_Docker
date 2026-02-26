@@ -238,12 +238,12 @@ Zomboid/
 
 ### Acceptance Criteria
 
-- [ ] INI parser handles PZ's semicolon-separated list format (Mods=, WorkshopItems=, Map=)
-- [ ] Lua parser handles nested SandboxVars structure including ZombieLore sub-table
-- [ ] Config reads return valid JSON matching actual file contents
-- [ ] Config patches update only specified fields, leave others untouched
-- [ ] All config changes are audit-logged with before/after values
-- [ ] Response indicates `restart_required: true` when server needs restart
+- [x] INI parser handles PZ's semicolon-separated list format (Mods=, WorkshopItems=, Map=)
+- [x] Lua parser handles nested SandboxVars structure including ZombieLore sub-table
+- [x] Config reads return valid JSON matching actual file contents
+- [x] Config patches update only specified fields, leave others untouched
+- [x] All config changes are audit-logged with before/after values
+- [x] Response indicates `restart_required: true` when server needs restart
 
 ---
 
@@ -566,7 +566,7 @@ php artisan scribe:generate
 | Phase 2 — Laravel + RCON | DONE | React/Inertia starter kit, RconClient, DockerManager, ApiKeyAuth, health endpoint |
 | Phase 3 — Database + Audit | DONE | AuditLog model+migration, AuditLogger service, AuditApiActions middleware, GET /api/audit endpoint, 13 tests |
 | Phase 4 — Server Control | DONE | 7 endpoints, RestartGameServer job, graceful stop, countdown restart, 22 tests |
-| Phase 5 — Config Management | NOT STARTED | |
+| Phase 5 — Config Management | DONE | ServerIniParser, SandboxLuaParser, 4 config endpoints, round-trip tests, 27 tests |
 | Phase 6 — Player Management | NOT STARTED | |
 | Phase 7 — Mod Management | NOT STARTED | |
 | Phase 8 — MVP Testing & Docs | NOT STARTED | |
