@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\AuditLogger;
 use App\Services\DockerManager;
 use App\Services\RconClient;
 use Carbon\CarbonImmutable;
@@ -27,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
                 timeout: $config['timeout'],
             );
         });
+
+        $this->app->singleton(AuditLogger::class);
 
         $this->app->singleton(DockerManager::class, function ($app) {
             $config = $app['config']['zomboid.docker'];

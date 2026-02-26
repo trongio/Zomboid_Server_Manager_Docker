@@ -185,11 +185,11 @@ Zomboid/
 
 ### Acceptance Criteria
 
-- [ ] `php artisan migrate` runs without errors on fresh DB
-- [ ] `php artisan migrate:rollback` rolls back cleanly
-- [ ] Audit log records created for every admin API call
-- [ ] Audit log stores: who did what, to what target, with what details, from what IP, when
-- [ ] `GET /api/audit` returns paginated audit log entries (admin only)
+- [x] `php artisan migrate` runs without errors on fresh DB
+- [x] `php artisan migrate:rollback` rolls back cleanly
+- [x] Audit log records created for every admin API call
+- [x] Audit log stores: who did what, to what target, with what details, from what IP, when
+- [x] `GET /api/audit` returns paginated audit log entries (admin only)
 
 ---
 
@@ -564,7 +564,7 @@ php artisan scribe:generate
 |---|---|---|
 | Phase 1 — Docker Infrastructure | DONE | docker-compose.yml, .env.example, networking verified |
 | Phase 2 — Laravel + RCON | DONE | React/Inertia starter kit, RconClient, DockerManager, ApiKeyAuth, health endpoint |
-| Phase 3 — Database + Audit | NOT STARTED | |
+| Phase 3 — Database + Audit | DONE | AuditLog model+migration, AuditLogger service, AuditApiActions middleware, GET /api/audit endpoint, 13 tests |
 | Phase 4 — Server Control | NOT STARTED | |
 | Phase 5 — Config Management | NOT STARTED | |
 | Phase 6 — Player Management | NOT STARTED | |
