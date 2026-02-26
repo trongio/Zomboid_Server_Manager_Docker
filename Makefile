@@ -73,7 +73,7 @@ migrate: db-backup
 	$(COMPOSE) exec app php artisan migrate --force
 
 test:
-	$(COMPOSE) exec app php artisan test
+	$(COMPOSE) exec app php artisan test --parallel
 
 exec:
 	$(COMPOSE) exec app $(CMD)
