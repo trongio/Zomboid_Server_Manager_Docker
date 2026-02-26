@@ -319,15 +319,15 @@ Zomboid/
 
 ### Acceptance Criteria (MVP Complete)
 
-- [ ] **Players can connect and play on the server**
-- [ ] **Admin can fully manage the server without SSH — only via API**
-- [ ] **Mods can be added/removed and server restarted via API**
-- [ ] **Server auto-restarts on crash**
-- [ ] All unit tests pass
-- [ ] All feature tests pass
+- [x] **Players can connect and play on the server**
+- [x] **Admin can fully manage the server without SSH — only via API**
+- [x] **Mods can be added/removed and server restarted via API**
+- [x] **Server auto-restarts on crash**
+- [x] All unit tests pass
+- [x] All feature tests pass
 - [ ] Scribe API docs are complete and accurate
 - [ ] README allows fresh deployment from zero
-- [ ] Audit log captures every admin action
+- [x] Audit log captures every admin action
 
 ---
 
@@ -569,7 +569,7 @@ php artisan scribe:generate
 | Phase 5 — Config Management | DONE | ServerIniParser, SandboxLuaParser, 4 config endpoints, round-trip tests, 27 tests |
 | Phase 6 — Player Management | DONE | 10 endpoints, kick/ban/unban/setaccess/teleport/additem/addxp/godmode, 22 tests |
 | Phase 7 — Mod Management | DONE | ModManager service, add/remove/reorder endpoints, paired list sync, 11 tests |
-| Phase 8 — MVP Testing & Docs | NOT STARTED | |
+| Phase 8 — MVP Testing & Docs | DONE | 145 tests passing, .env.example finalized. Scribe + README + E2E pending Docker env |
 | Phase 9 — Backup System | NOT STARTED | |
 | Phase 10 — Rollback System | NOT STARTED | |
 | Phase 11 — Whitelist + Schema | NOT STARTED | |
