@@ -293,12 +293,12 @@ Zomboid/
 
 ### Acceptance Criteria
 
-- [ ] Mods added appear in both `WorkshopItems=` and `Mods=` with semicolons
-- [ ] Mods removed are cleaned from both lines
-- [ ] Mod order can be rearranged for dependency management
-- [ ] Map mods update the `Map=` field correctly
-- [ ] After mod changes + restart, mods are downloaded/loaded
-- [ ] All mod changes are audit-logged
+- [x] Mods added appear in both `WorkshopItems=` and `Mods=` with semicolons
+- [x] Mods removed are cleaned from both lines
+- [x] Mod order can be rearranged for dependency management
+- [x] Map mods update the `Map=` field correctly
+- [x] After mod changes + restart, mods are downloaded/loaded
+- [x] All mod changes are audit-logged
 
 ---
 
@@ -568,7 +568,7 @@ php artisan scribe:generate
 | Phase 4 — Server Control | DONE | 7 endpoints, RestartGameServer job, graceful stop, countdown restart, 22 tests |
 | Phase 5 — Config Management | DONE | ServerIniParser, SandboxLuaParser, 4 config endpoints, round-trip tests, 27 tests |
 | Phase 6 — Player Management | DONE | 10 endpoints, kick/ban/unban/setaccess/teleport/additem/addxp/godmode, 22 tests |
-| Phase 7 — Mod Management | NOT STARTED | |
+| Phase 7 — Mod Management | DONE | ModManager service, add/remove/reorder endpoints, paired list sync, 11 tests |
 | Phase 8 — MVP Testing & Docs | NOT STARTED | |
 | Phase 9 — Backup System | NOT STARTED | |
 | Phase 10 — Rollback System | NOT STARTED | |

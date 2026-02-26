@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuditLogController;
 use App\Http\Controllers\Api\ConfigController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\ModController;
 use App\Http\Controllers\Api\PlayerController;
 use App\Http\Controllers\Api\ServerController;
 use Illuminate\Http\Request;
@@ -43,4 +44,9 @@ Route::middleware(['auth.apikey', 'audit'])->group(function () {
     Route::post('/players/{name}/additem', [PlayerController::class, 'addItem']);
     Route::post('/players/{name}/addxp', [PlayerController::class, 'addXp']);
     Route::post('/players/{name}/godmode', [PlayerController::class, 'godmode']);
+
+    Route::get('/config/mods', [ModController::class, 'index']);
+    Route::post('/config/mods', [ModController::class, 'store']);
+    Route::delete('/config/mods/{workshopId}', [ModController::class, 'destroy']);
+    Route::put('/config/mods/order', [ModController::class, 'reorder']);
 });
