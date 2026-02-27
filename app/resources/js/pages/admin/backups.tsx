@@ -1,8 +1,6 @@
 import { Deferred, Head, router } from '@inertiajs/react';
 import { Archive, Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { fetchAction } from '@/lib/fetch-action';
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +15,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import AppLayout from '@/layouts/app-layout';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BackupEntry, BreadcrumbItem } from '@/types';
 
 type PaginatedBackups = {
@@ -131,10 +131,10 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
                                     {backups.data.map((backup) => (
                                         <div
                                             key={backup.id}
-                                            className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-3"
+                                            className="flex flex-col gap-2 rounded-lg border border-border/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                                         >
                                             <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2">
                                                     <span className="truncate font-medium text-sm">{backup.filename}</span>
                                                     <Badge className={`text-xs ${typeColors[backup.type] ?? ''}`}>
                                                         {backup.type}
@@ -145,7 +145,7 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
                                                     {backup.notes && <> &middot; {backup.notes}</>}
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-1.5 ml-4">
+                                            <div className="flex items-center gap-1.5 sm:ml-4">
                                                 <Button
                                                     variant="outline"
                                                     size="sm"

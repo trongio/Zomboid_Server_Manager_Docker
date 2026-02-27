@@ -1,8 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { AlertTriangle, ChevronDown, Eye, EyeOff, Save, Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { fetchAction } from '@/lib/fetch-action';
-import AppLayout from '@/layouts/app-layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,14 +9,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import AppLayout from '@/layouts/app-layout';
 import {
     groupSettings,
     SANDBOX_GROUP_ORDER,
     SANDBOX_META,
     SERVER_INI_GROUP_ORDER,
-    SERVER_INI_META,
-    type SettingMeta,
+    SERVER_INI_META
+    
 } from '@/lib/config-metadata';
+import type {SettingMeta} from '@/lib/config-metadata';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 
 type ConfigProps = {
@@ -261,7 +262,7 @@ function ConfigSection({
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h2 className="text-lg font-semibold">{title}</h2>
                     <p className="text-sm text-muted-foreground">{description}</p>

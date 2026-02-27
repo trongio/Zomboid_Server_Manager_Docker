@@ -12,8 +12,6 @@ import {
     Weight,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { fetchAction } from '@/lib/fetch-action';
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,6 +33,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 import type {
     DeliveryEntry,
@@ -127,7 +127,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
     const items = inventory?.items ?? [];
 
     const filteredItems = useMemo(() => {
-        let result = items.filter(
+        const result = items.filter(
             (item) =>
                 item.name.toLowerCase().includes(filter.toLowerCase()) ||
                 item.full_type.toLowerCase().includes(filter.toLowerCase()) ||
@@ -294,7 +294,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                             {filteredItems.length} of {items.length} items
                                         </CardDescription>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                         <div className="relative">
                                             <Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
                                             <Input
@@ -310,7 +310,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                                 setSortBy(v as 'name' | 'category' | 'condition')
                                             }
                                         >
-                                            <SelectTrigger className="w-[140px]">
+                                            <SelectTrigger className="w-full sm:w-[140px]">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -420,10 +420,10 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                                 {deliveries.pending.map((entry) => (
                                                     <div
                                                         key={entry.id}
-                                                        className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-2.5"
+                                                        className="flex flex-col gap-1.5 rounded-lg border border-border/50 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <Circle className="size-2 fill-yellow-500 text-yellow-500" />
+                                                            <Circle className="size-2 shrink-0 fill-yellow-500 text-yellow-500" />
                                                             <span className="text-sm font-medium">
                                                                 {entry.action === 'give'
                                                                     ? 'Give'
@@ -447,11 +447,11 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                                 {deliveries.results.map((result) => (
                                                     <div
                                                         key={result.id}
-                                                        className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-2.5"
+                                                        className="flex flex-col gap-1.5 rounded-lg border border-border/50 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <Circle
-                                                                className={`size-2 ${
+                                                                className={`size-2 shrink-0 ${
                                                                     result.status === 'delivered'
                                                                         ? 'fill-green-500 text-green-500'
                                                                         : 'fill-red-500 text-red-500'

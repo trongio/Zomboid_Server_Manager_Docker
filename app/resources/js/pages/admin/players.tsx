@@ -1,9 +1,6 @@
 import { Deferred, Head, Link, router, usePoll } from '@inertiajs/react';
 import { Backpack, Ban, Circle, Clock, ShieldCheck, Skull, UserX } from 'lucide-react';
 import { useState } from 'react';
-import { fetchAction } from '@/lib/fetch-action';
-import AppLayout from '@/layouts/app-layout';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +21,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import AppLayout from '@/layouts/app-layout';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 
 type Player = { name: string };
@@ -99,13 +99,13 @@ export default function Players({ players, registeredUsers }: { players: Player[
                                 {players.map((player) => (
                                     <div
                                         key={player.name}
-                                        className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-3"
+                                        className="flex flex-col gap-2 rounded-lg border border-border/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                                     >
                                         <div className="flex items-center gap-3">
                                             <Circle className="size-2 fill-green-500 text-green-500" />
                                             <span className="font-medium">{player.name}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             <Button variant="outline" size="sm" asChild>
                                                 <Link href={`/admin/players/${player.name}/inventory`}>
                                                     <Backpack className="mr-1.5 size-3.5" />
@@ -179,7 +179,7 @@ export default function Players({ players, registeredUsers }: { players: Player[
                                     {registeredUsers.map((user) => (
                                         <div
                                             key={user.id}
-                                            className="flex items-center justify-between rounded-lg border border-border/50 px-4 py-3"
+                                            className="flex flex-col gap-2 rounded-lg border border-border/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                                         >
                                             <div className="flex items-center gap-3">
                                                 <Circle
@@ -190,7 +190,7 @@ export default function Players({ players, registeredUsers }: { players: Player[
                                                     {user.role.replace('_', ' ')}
                                                 </Badge>
                                             </div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
                                                 {user.stats && (
                                                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                                         <span className="flex items-center gap-1" title="Zombie kills">

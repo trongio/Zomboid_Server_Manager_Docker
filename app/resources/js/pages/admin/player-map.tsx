@@ -2,7 +2,6 @@ import { Head, router, usePoll } from '@inertiajs/react';
 import { Ban, Circle, Loader2, ShieldCheck, UserX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PzMap from '@/components/pz-map';
-import { fetchAction } from '@/lib/fetch-action';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +23,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 import type { MapConfig, PlayerMarker } from '@/types/server';
 
@@ -102,14 +102,14 @@ export default function PlayerMap({ markers, mapConfig, hasTiles, tileProgress }
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Player Map" />
             <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Player Map</h1>
                         <p className="text-muted-foreground">
                             {counts.total} players tracked
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="text-sm">
                             <Circle className="mr-1.5 size-2 fill-green-500 text-green-500" />
                             {counts.online} Online
@@ -128,9 +128,9 @@ export default function PlayerMap({ markers, mapConfig, hasTiles, tileProgress }
                 </div>
 
                 <Card className="isolate flex-1">
-                    <CardContent className="relative h-[500px] p-0 lg:h-[600px]">
+                    <CardContent className="relative h-[350px] p-0 sm:h-[500px] lg:h-[600px]">
                         {!hasTiles && tileProgress?.generating && (
-                            <div className="absolute top-2 left-1/2 z-[1000] w-72 -translate-x-1/2 rounded-lg border bg-background/90 px-4 py-3 shadow-sm backdrop-blur-sm">
+                            <div className="absolute top-2 left-1/2 z-[1000] w-64 -translate-x-1/2 rounded-lg border bg-background/90 px-4 py-3 shadow-sm backdrop-blur-sm sm:w-72">
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     <Loader2 className="size-4 animate-spin text-primary" />
                                     Generating map tiles...

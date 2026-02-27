@@ -1,13 +1,11 @@
 import { Deferred, Head, router } from '@inertiajs/react';
 import { Filter, ScrollText } from 'lucide-react';
 import { useState } from 'react';
-import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
     Select,
     SelectContent,
@@ -15,6 +13,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import AppLayout from '@/layouts/app-layout';
 import type { AuditEntry, BreadcrumbItem } from '@/types';
 
 type PaginatedLogs = {
@@ -82,8 +82,8 @@ export default function Audit({
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex flex-wrap items-end gap-4">
-                            <div className="min-w-[160px] space-y-1.5">
+                        <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                            <div className="space-y-1.5">
                                 <Label className="text-xs">Action</Label>
                                 <Select
                                     value={localFilters.action || '__all__'}
@@ -102,7 +102,7 @@ export default function Audit({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="min-w-[140px] space-y-1.5">
+                            <div className="space-y-1.5">
                                 <Label className="text-xs">Actor</Label>
                                 <Input
                                     value={localFilters.actor}
@@ -110,7 +110,7 @@ export default function Audit({
                                     placeholder="All actors"
                                 />
                             </div>
-                            <div className="min-w-[140px] space-y-1.5">
+                            <div className="space-y-1.5">
                                 <Label className="text-xs">From</Label>
                                 <Input
                                     type="date"
@@ -118,7 +118,7 @@ export default function Audit({
                                     onChange={(e) => setLocalFilters((f) => ({ ...f, from: e.target.value }))}
                                 />
                             </div>
-                            <div className="min-w-[140px] space-y-1.5">
+                            <div className="space-y-1.5">
                                 <Label className="text-xs">To</Label>
                                 <Input
                                     type="date"
