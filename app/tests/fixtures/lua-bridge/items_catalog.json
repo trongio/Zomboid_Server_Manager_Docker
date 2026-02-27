@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "timestamp": "2026-01-15T14:30:00",
+  "item_count": 8,
+  "items": [
+    {
+      "full_type": "Base.Axe",
+      "name": "Axe",
+      "category": "Weapon",
+      "icon_name": "Item_Axe"
+    },
+    {
+      "full_type": "Base.Pistol",
+      "name": "Pistol",
+      "category": "Weapon",
+      "icon_name": "Item_Pistol"
+    },
+    {
+      "full_type": "Base.Bandage",
+      "name": "Bandage",
+      "category": "Medical",
+      "icon_name": "Item_Bandage"
+    },
+    {
+      "full_type": "Base.WaterBottleFull",
+      "name": "Water Bottle (Full)",
+      "category": "Water",
+      "icon_name": "Item_WaterBottleFull"
+    },
+    {
+      "full_type": "Base.Hammer",
+      "name": "Hammer",
+      "category": "Weapon",
+      "icon_name": "Item_Hammer"
+    },
+    {
+      "full_type": "Base.Nails",
+      "name": "Nails",
+      "category": "Material",
+      "icon_name": "Item_Nails"
+    },
+    {
+      "full_type": "Farming.HandShovel",
+      "name": "Trowel",
+      "category": "Farming",
+      "icon_name": "Item_HandShovel"
+    },
+    {
+      "full_type": "Base.Shotgun",
+      "name": "Shotgun",
+      "category": "Weapon",
+      "icon_name": "Item_Shotgun"
+    }
+  ]
+}

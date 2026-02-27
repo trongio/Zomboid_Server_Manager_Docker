@@ -96,6 +96,7 @@ return [
         'delivery_queue' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/delivery_queue.json',
         'delivery_results' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/delivery_results.json',
         'players_live' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/players_live.json',
+        'items_catalog' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/items_catalog.json',
     ],
 
     /*
