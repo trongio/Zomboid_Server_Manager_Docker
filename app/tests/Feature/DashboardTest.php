@@ -4,6 +4,7 @@ use App\Models\AuditLog;
 use App\Models\Backup;
 use App\Models\User;
 use App\Services\DockerManager;
+use App\Services\GameStateReader;
 use App\Services\RconClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -150,5 +151,74 @@ it('handles offline server gracefully on dashboard', function () {
     $response->assertInertia(fn ($page) => $page
         ->component('dashboard')
         ->where('server.online', false)
+        ->where('game_state', null)
+    );
+});
+
+it('includes game state when server is online and data exists', function () {
+    mockDashboardDocker();
+    mockDashboardRcon(['players' => "Players connected (0):\n"]);
+
+    $gameState = [
+        'time' => [
+            'year' => 1993,
+            'month' => 7,
+            'day' => 9,
+            'hour' => 14,
+            'minute' => 30,
+            'day_of_year' => 190,
+            'is_night' => false,
+            'formatted' => '14:30',
+            'date' => '1993-07-09',
+        ],
+        'season' => 'summer',
+        'weather' => [
+            'temperature' => 28.5,
+            'condition' => 'clear',
+            'rain_intensity' => 0.0,
+            'fog_intensity' => 0.0,
+            'wind_intensity' => 0.15,
+            'snow_intensity' => 0.0,
+            'is_raining' => false,
+            'is_foggy' => false,
+            'is_snowing' => false,
+        ],
+        'exported_at' => '2026-02-27T14:30:00Z',
+    ];
+
+    $reader = Mockery::mock(GameStateReader::class);
+    $reader->shouldReceive('getGameState')->andReturn($gameState);
+    app()->instance(GameStateReader::class, $reader);
+
+    $user = User::factory()->admin()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('dashboard')
+        ->has('game_state')
+        ->where('game_state.season', 'summer')
+        ->where('game_state.time.hour', 14)
+        ->where('game_state.weather.temperature', 28.5)
+    );
+});
+
+it('returns null game state when server is online but file missing', function () {
+    mockDashboardDocker();
+    mockDashboardRcon(['players' => "Players connected (0):\n"]);
+
+    $reader = Mockery::mock(GameStateReader::class);
+    $reader->shouldReceive('getGameState')->andReturn(null);
+    app()->instance(GameStateReader::class, $reader);
+
+    $user = User::factory()->admin()->create();
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertOk();
+    $response->assertInertia(fn ($page) => $page
+        ->component('dashboard')
+        ->where('game_state', null)
     );
 });

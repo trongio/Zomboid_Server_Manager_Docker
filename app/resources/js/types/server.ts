@@ -39,8 +39,36 @@ export type BackupSummary = {
     total_size_human: string;
 };
 
+export type GameState = {
+    time: {
+        year: number;
+        month: number;
+        day: number;
+        hour: number;
+        minute: number;
+        day_of_year: number;
+        is_night: boolean;
+        formatted: string;
+        date: string;
+    };
+    season: 'spring' | 'summer' | 'autumn' | 'winter';
+    weather: {
+        temperature: number;
+        rain_intensity: number;
+        fog_intensity: number;
+        wind_intensity: number;
+        snow_intensity: number;
+        is_raining: boolean;
+        is_foggy: boolean;
+        is_snowing: boolean;
+        condition: 'clear' | 'rain' | 'heavy_rain' | 'fog' | 'snow' | 'night';
+    } | null;
+    exported_at: string;
+};
+
 export type DashboardData = {
     server: ServerStatus;
+    game_state: GameState | null;
     recent_audit: AuditEntry[];
     backup_summary: BackupSummary;
 };

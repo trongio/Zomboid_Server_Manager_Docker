@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { GameStateWidget } from '@/components/game-state-widget';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem, DashboardData } from '@/types';
 import { dashboard } from '@/routes';
@@ -30,12 +31,13 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 export default function Dashboard({
     server,
+    game_state,
     recent_audit,
     backup_summary,
 }: DashboardData) {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-    usePoll(5000, { only: ['server'] });
+    usePoll(5000, { only: ['server', 'game_state'] });
 
     async function serverAction(action: string) {
         setActionLoading(action);
@@ -108,6 +110,9 @@ export default function Dashboard({
                         )}
                     </div>
                 </div>
+
+                {/* Game State Widget */}
+                {server.online && <GameStateWidget gameState={game_state} />}
 
                 {/* Stats Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

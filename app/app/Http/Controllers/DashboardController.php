@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Backup;
 use App\Services\DockerManager;
+use App\Services\GameStateReader;
 use App\Services\RconClient;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ class DashboardController extends Controller
     public function __construct(
         private readonly RconClient $rcon,
         private readonly DockerManager $docker,
+        private readonly GameStateReader $gameStateReader,
     ) {}
 
     public function __invoke(): Response
@@ -89,8 +91,11 @@ class DashboardController extends Controller
             'total_size_human' => $this->formatBytes($totalSizeBytes),
         ];
 
+        $gameState = $online ? $this->gameStateReader->getGameState() : null;
+
         return Inertia::render('dashboard', [
             'server' => $server,
+            'game_state' => $gameState,
             'recent_audit' => Inertia::defer(fn () => $recentAudit),
             'backup_summary' => Inertia::defer(fn () => $backupSummary),
         ]);

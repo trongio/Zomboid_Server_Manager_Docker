@@ -7,6 +7,7 @@ require("ZM_InventoryExporter")
 require("ZM_DeliveryQueue")
 require("ZM_PlayerTracker")
 require("ZM_ItemCatalog")
+require("ZM_GameState")
 
 print("[ZomboidManager] Initializing server-side bridge mod...")
 
@@ -35,7 +36,7 @@ local function onEveryTenMinutes()
     ZM_PlayerTracker.exportPositions()
 end
 
---- EveryOneMinute — check delivery queue + update live positions
+--- EveryOneMinute — check delivery queue + update live positions + game state
 local function onEveryOneMinute()
     local processed = ZM_DeliveryQueue.process()
     if processed > 0 then
@@ -44,6 +45,9 @@ local function onEveryOneMinute()
 
     -- Export player positions every minute for near-real-time map updates
     ZM_PlayerTracker.exportPositions()
+
+    -- Export game state (time, weather, season)
+    ZM_GameState.export()
 end
 
 --- OnServerStarted — export item catalog once on server boot
@@ -62,4 +66,4 @@ Events.EveryTenMinutes.Add(onEveryTenMinutes)
 Events.EveryOneMinute.Add(onEveryOneMinute)
 Events.OnServerStarted.Add(onServerStarted)
 
-print("[ZomboidManager] Event hooks registered: OnCreatePlayer, EveryTenMinutes, EveryOneMinute, OnServerStarted")
+print("[ZomboidManager] Event hooks registered: OnCreatePlayer, EveryTenMinutes, EveryOneMinute, OnServerStarted, GameState")
