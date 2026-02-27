@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PlayerStat;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OnlinePlayersReader;
@@ -25,17 +26,30 @@ class PlayerController extends Controller
         $onlineNames = $this->onlinePlayers->getOnlineUsernames();
         $onlinePlayers = array_map(fn ($name) => ['name' => $name], $onlineNames);
 
+        $statsMap = PlayerStat::query()
+            ->get()
+            ->keyBy('username');
+
         $registeredUsers = User::query()
             ->select('id', 'username', 'role', 'created_at')
             ->orderBy('username')
             ->get()
-            ->map(fn (User $user) => [
-                'id' => $user->id,
-                'username' => $user->username,
-                'role' => $user->role->value,
-                'isOnline' => in_array($user->username, $onlineNames),
-                'createdAt' => $user->created_at->toISOString(),
-            ]);
+            ->map(function (User $user) use ($onlineNames, $statsMap) {
+                $stats = $statsMap->get($user->username);
+
+                return [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'role' => $user->role->value,
+                    'isOnline' => in_array($user->username, $onlineNames),
+                    'createdAt' => $user->created_at->toISOString(),
+                    'stats' => $stats ? [
+                        'zombie_kills' => $stats->zombie_kills,
+                        'hours_survived' => $stats->hours_survived,
+                        'profession' => $stats->profession,
+                    ] : null,
+                ];
+            });
 
         return Inertia::render('admin/players', [
             'players' => $onlinePlayers,

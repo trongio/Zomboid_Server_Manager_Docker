@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Backup;
 use App\Services\DockerManager;
 use App\Services\GameStateReader;
+use App\Services\PlayerStatsService;
 use App\Services\RconClient;
 use Carbon\Carbon;
 use Inertia\Inertia;
@@ -17,6 +18,7 @@ class DashboardController extends Controller
         private readonly RconClient $rcon,
         private readonly DockerManager $docker,
         private readonly GameStateReader $gameStateReader,
+        private readonly PlayerStatsService $playerStatsService,
     ) {}
 
     public function __invoke(): Response
@@ -98,6 +100,10 @@ class DashboardController extends Controller
             'game_state' => $gameState,
             'recent_audit' => Inertia::defer(fn () => $recentAudit),
             'backup_summary' => Inertia::defer(fn () => $backupSummary),
+            'leaderboard' => Inertia::defer(fn () => [
+                'kills' => $this->playerStatsService->getLeaderboard('zombie_kills', 5),
+                'survival' => $this->playerStatsService->getLeaderboard('hours_survived', 5),
+            ]),
         ]);
     }
 

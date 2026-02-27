@@ -98,6 +98,7 @@ return [
         'players_live' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/players_live.json',
         'items_catalog' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/items_catalog.json',
         'game_state' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/game_state.json',
+        'player_stats' => env('LUA_BRIDGE_PATH', '/lua-bridge').'/player_stats.json',
     ],
 
     /*

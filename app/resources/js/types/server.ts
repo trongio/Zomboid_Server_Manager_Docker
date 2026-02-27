@@ -66,11 +66,24 @@ export type GameState = {
     exported_at: string;
 };
 
+export type PlayerStatEntry = {
+    username: string;
+    zombie_kills: number;
+    hours_survived: number;
+    profession: string | null;
+};
+
+export type Leaderboard = {
+    kills: PlayerStatEntry[];
+    survival: PlayerStatEntry[];
+};
+
 export type DashboardData = {
     server: ServerStatus;
     game_state: GameState | null;
     recent_audit: AuditEntry[];
     backup_summary: BackupSummary;
+    leaderboard: Leaderboard;
 };
 
 export type StatusPageData = {

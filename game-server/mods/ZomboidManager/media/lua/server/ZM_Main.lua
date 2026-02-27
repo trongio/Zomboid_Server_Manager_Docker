@@ -8,6 +8,7 @@ require("ZM_DeliveryQueue")
 require("ZM_PlayerTracker")
 require("ZM_ItemCatalog")
 require("ZM_GameState")
+require("ZM_PlayerStats")
 
 print("[ZomboidManager] Initializing server-side bridge mod...")
 
@@ -34,6 +35,12 @@ local function onEveryTenMinutes()
 
     -- Export player positions
     ZM_PlayerTracker.exportPositions()
+
+    -- Export player stats (kills, hours, skills)
+    local statsCount = ZM_PlayerStats.exportAll()
+    if statsCount > 0 then
+        print("[ZomboidManager] Exported stats for " .. statsCount .. " players")
+    end
 end
 
 --- EveryOneMinute — check delivery queue + update live positions + game state

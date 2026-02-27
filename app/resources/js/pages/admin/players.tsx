@@ -1,5 +1,5 @@
 import { Deferred, Head, Link, router, usePoll } from '@inertiajs/react';
-import { Backpack, Ban, Circle, ShieldCheck, UserX } from 'lucide-react';
+import { Backpack, Ban, Circle, Clock, ShieldCheck, Skull, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { fetchAction } from '@/lib/fetch-action';
 import AppLayout from '@/layouts/app-layout';
@@ -34,6 +34,11 @@ type RegisteredUser = {
     role: string;
     isOnline: boolean;
     createdAt: string;
+    stats: {
+        zombie_kills: number;
+        hours_survived: number;
+        profession: string | null;
+    } | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -186,6 +191,21 @@ export default function Players({ players, registeredUsers }: { players: Player[
                                                 </Badge>
                                             </div>
                                             <div className="flex items-center gap-2">
+                                                {user.stats && (
+                                                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1" title="Zombie kills">
+                                                            <Skull className="size-3" />
+                                                            {user.stats.zombie_kills.toLocaleString()}
+                                                        </span>
+                                                        <span className="flex items-center gap-1" title="Hours survived">
+                                                            <Clock className="size-3" />
+                                                            {user.stats.hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h
+                                                        </span>
+                                                        {user.stats.profession && (
+                                                            <span className="capitalize">{user.stats.profession}</span>
+                                                        )}
+                                                    </div>
+                                                )}
                                                 <span className="text-sm text-muted-foreground">
                                                     Joined {new Date(user.createdAt).toLocaleDateString()}
                                                 </span>

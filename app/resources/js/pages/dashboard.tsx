@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GameStateWidget } from '@/components/game-state-widget';
+import { Leaderboard } from '@/components/leaderboard';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem, DashboardData } from '@/types';
 import { dashboard } from '@/routes';
@@ -34,6 +35,7 @@ export default function Dashboard({
     game_state,
     recent_audit,
     backup_summary,
+    leaderboard,
 }: DashboardData) {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -285,6 +287,30 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Leaderboard */}
+                <Deferred data="leaderboard" fallback={
+                    <Card>
+                        <CardHeader>
+                            <Skeleton className="h-6 w-32" />
+                            <Skeleton className="mt-1 h-4 w-40" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-6 sm:grid-cols-2">
+                                {Array.from({ length: 2 }).map((_, col) => (
+                                    <div key={col} className="space-y-2">
+                                        <Skeleton className="h-4 w-28" />
+                                        {Array.from({ length: 5 }).map((_, i) => (
+                                            <Skeleton key={i} className="h-6 w-full" />
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                }>
+                    <Leaderboard data={leaderboard} />
+                </Deferred>
             </div>
         </AppLayout>
     );
