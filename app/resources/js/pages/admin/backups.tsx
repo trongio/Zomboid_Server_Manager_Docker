@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -14,6 +15,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import AppLayout from '@/layouts/app-layout';
 import { fetchAction } from '@/lib/fetch-action';
@@ -31,6 +39,17 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Backups', href: '/admin/backups' },
 ];
 
+const COUNTDOWN_OPTIONS = [
+    { value: '0', label: 'Immediately' },
+    { value: '60', label: '1 minute' },
+    { value: '120', label: '2 minutes' },
+    { value: '300', label: '5 minutes' },
+    { value: '600', label: '10 minutes' },
+    { value: '900', label: '15 minutes' },
+    { value: '1800', label: '30 minutes' },
+    { value: '3600', label: '60 minutes' },
+] as const;
+
 const typeColors: Record<string, string> = {
     manual: 'bg-blue-500/10 text-blue-500',
     scheduled: 'bg-green-500/10 text-green-500',
@@ -44,28 +63,53 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
     const [rollbackTarget, setRollbackTarget] = useState<BackupEntry | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<BackupEntry | null>(null);
     const [notes, setNotes] = useState('');
+    const [notifyPlayers, setNotifyPlayers] = useState(false);
+    const [backupMessage, setBackupMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [rollbackCountdown, setRollbackCountdown] = useState('0');
+    const [rollbackMessage, setRollbackMessage] = useState('');
 
     async function createBackup() {
         setLoading(true);
+        const data: Record<string, unknown> = { notes: notes || null };
+        if (notifyPlayers) {
+            data.notify_players = true;
+            if (backupMessage.trim()) {
+                data.message = backupMessage.trim();
+            }
+        }
         await fetchAction('/admin/backups', {
-            data: { notes: notes || null },
+            data,
             successMessage: 'Backup created',
         });
         setLoading(false);
         setShowCreate(false);
         setNotes('');
+        setNotifyPlayers(false);
+        setBackupMessage('');
         router.reload();
     }
 
     async function rollback(backup: BackupEntry) {
         setLoading(true);
+        const countdown = parseInt(rollbackCountdown, 10);
+        const data: Record<string, unknown> = { confirm: true };
+        if (countdown > 0) {
+            data.countdown = countdown;
+            if (rollbackMessage.trim()) {
+                data.message = rollbackMessage.trim();
+            }
+        }
         await fetchAction(`/admin/backups/${backup.id}/rollback`, {
-            data: { confirm: true },
-            successMessage: `Rolled back to ${backup.filename}`,
+            data,
+            successMessage: countdown > 0
+                ? `Rollback scheduled in ${countdown} seconds`
+                : `Rolled back to ${backup.filename}`,
         });
         setLoading(false);
         setRollbackTarget(null);
+        setRollbackCountdown('0');
+        setRollbackMessage('');
         router.reload();
     }
 
@@ -199,14 +243,38 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
                             Create a manual backup of the current server state.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-2">
-                        <Label htmlFor="backup-notes">Notes (optional)</Label>
-                        <Input
-                            id="backup-notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="e.g. Before mod update"
-                        />
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="backup-notes">Notes (optional)</Label>
+                            <Input
+                                id="backup-notes"
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                placeholder="e.g. Before mod update"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="notify-players"
+                                checked={notifyPlayers}
+                                onCheckedChange={(checked) => setNotifyPlayers(checked === true)}
+                            />
+                            <Label htmlFor="notify-players" className="cursor-pointer">
+                                Notify players in-game
+                            </Label>
+                        </div>
+                        {notifyPlayers && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="backup-message">Notification message (optional)</Label>
+                                <Input
+                                    id="backup-message"
+                                    value={backupMessage}
+                                    onChange={(e) => setBackupMessage(e.target.value)}
+                                    placeholder="Backup in progress — expect a brief lag"
+                                    maxLength={500}
+                                />
+                            </div>
+                        )}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
@@ -218,7 +286,11 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
             </Dialog>
 
             {/* Rollback Confirmation */}
-            <Dialog open={rollbackTarget !== null} onOpenChange={() => setRollbackTarget(null)}>
+            <Dialog open={rollbackTarget !== null} onOpenChange={() => {
+                setRollbackTarget(null);
+                setRollbackCountdown('0');
+                setRollbackMessage('');
+            }}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>Rollback to Backup</DialogTitle>
@@ -227,14 +299,47 @@ export default function Backups({ backups }: { backups: PaginatedBackups }) {
                             and restart it. A pre-rollback safety backup will be created automatically.
                         </DialogDescription>
                     </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="rollback-countdown">Countdown</Label>
+                            <Select value={rollbackCountdown} onValueChange={setRollbackCountdown}>
+                                <SelectTrigger id="rollback-countdown">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {COUNTDOWN_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {rollbackCountdown !== '0' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="rollback-message">Warning message (optional)</Label>
+                                <Input
+                                    id="rollback-message"
+                                    placeholder="Server rolling back — you will be disconnected..."
+                                    value={rollbackMessage}
+                                    onChange={(e) => setRollbackMessage(e.target.value)}
+                                    maxLength={500}
+                                />
+                            </div>
+                        )}
+                    </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRollbackTarget(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => {
+                            setRollbackTarget(null);
+                            setRollbackCountdown('0');
+                            setRollbackMessage('');
+                        }}>Cancel</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={() => rollbackTarget && rollback(rollbackTarget)}
                         >
-                            Confirm Rollback
+                            {rollbackCountdown === '0' ? 'Rollback Now' : 'Schedule Rollback'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

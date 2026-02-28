@@ -19,6 +19,23 @@ import { Leaderboard } from '@/components/leaderboard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import AppLayout from '@/layouts/app-layout';
 import { fetchAction } from '@/lib/fetch-action';
@@ -32,6 +49,17 @@ const breadcrumbs: BreadcrumbItem[] = [
     },
 ];
 
+const COUNTDOWN_OPTIONS = [
+    { value: '0', label: 'Immediately' },
+    { value: '60', label: '1 minute' },
+    { value: '120', label: '2 minutes' },
+    { value: '300', label: '5 minutes' },
+    { value: '600', label: '10 minutes' },
+    { value: '900', label: '15 minutes' },
+    { value: '1800', label: '30 minutes' },
+    { value: '3600', label: '60 minutes' },
+] as const;
+
 export default function Dashboard({
     server,
     game_state,
@@ -41,6 +69,14 @@ export default function Dashboard({
     game_events,
 }: DashboardData) {
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+    const [showRestartDialog, setShowRestartDialog] = useState(false);
+    const [restartCountdown, setRestartCountdown] = useState('0');
+    const [restartMessage, setRestartMessage] = useState('');
+    const [restartLoading, setRestartLoading] = useState(false);
+    const [showStopDialog, setShowStopDialog] = useState(false);
+    const [stopCountdown, setStopCountdown] = useState('0');
+    const [stopMessage, setStopMessage] = useState('');
+    const [stopLoading, setStopLoading] = useState(false);
 
     usePoll(5000, { only: ['server', 'game_state'] });
 
@@ -48,6 +84,42 @@ export default function Dashboard({
         setActionLoading(action);
         await fetchAction(`/admin/server/${action}`);
         setActionLoading(null);
+        setTimeout(() => router.reload({ only: ['server'] }), 2000);
+    }
+
+    async function handleRestart() {
+        setRestartLoading(true);
+        const countdown = parseInt(restartCountdown, 10);
+        const data: Record<string, unknown> = {};
+        if (countdown > 0) {
+            data.countdown = countdown;
+            if (restartMessage.trim()) {
+                data.message = restartMessage.trim();
+            }
+        }
+        await fetchAction('/admin/server/restart', { data: Object.keys(data).length > 0 ? data : undefined });
+        setRestartLoading(false);
+        setShowRestartDialog(false);
+        setRestartCountdown('0');
+        setRestartMessage('');
+        setTimeout(() => router.reload({ only: ['server'] }), 2000);
+    }
+
+    async function handleStop() {
+        setStopLoading(true);
+        const countdown = parseInt(stopCountdown, 10);
+        const data: Record<string, unknown> = {};
+        if (countdown > 0) {
+            data.countdown = countdown;
+            if (stopMessage.trim()) {
+                data.message = stopMessage.trim();
+            }
+        }
+        await fetchAction('/admin/server/stop', { data: Object.keys(data).length > 0 ? data : undefined });
+        setStopLoading(false);
+        setShowStopDialog(false);
+        setStopCountdown('0');
+        setStopMessage('');
         setTimeout(() => router.reload({ only: ['server'] }), 2000);
     }
 
@@ -88,7 +160,7 @@ export default function Dashboard({
                                     variant="outline"
                                     size="sm"
                                     disabled={actionLoading !== null}
-                                    onClick={() => serverAction('restart')}
+                                    onClick={() => setShowRestartDialog(true)}
                                 >
                                     <RefreshCw className="mr-1.5 size-3.5" />
                                     Restart
@@ -97,7 +169,7 @@ export default function Dashboard({
                                     variant="destructive"
                                     size="sm"
                                     disabled={actionLoading !== null}
-                                    onClick={() => serverAction('stop')}
+                                    onClick={() => setShowStopDialog(true)}
                                 >
                                     <Square className="mr-1.5 size-3.5" />
                                     Stop
@@ -343,6 +415,126 @@ export default function Dashboard({
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Restart Server</DialogTitle>
+                        <DialogDescription>
+                            Choose a delay to warn players before restarting, or restart immediately.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="restart-countdown">Countdown</Label>
+                            <Select value={restartCountdown} onValueChange={setRestartCountdown}>
+                                <SelectTrigger id="restart-countdown">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {COUNTDOWN_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {restartCountdown !== '0' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="restart-message">Warning message (optional)</Label>
+                                <Input
+                                    id="restart-message"
+                                    placeholder="Server restarting for maintenance..."
+                                    value={restartMessage}
+                                    onChange={(e) => setRestartMessage(e.target.value)}
+                                    maxLength={500}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowRestartDialog(false)}
+                            disabled={restartLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant={restartCountdown === '0' ? 'destructive' : 'default'}
+                            onClick={handleRestart}
+                            disabled={restartLoading}
+                        >
+                            {restartLoading
+                                ? 'Restarting...'
+                                : restartCountdown === '0'
+                                  ? 'Restart Now'
+                                  : 'Schedule Restart'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showStopDialog} onOpenChange={setShowStopDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Stop Server</DialogTitle>
+                        <DialogDescription>
+                            Choose a delay to warn players before shutting down, or stop immediately.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="stop-countdown">Countdown</Label>
+                            <Select value={stopCountdown} onValueChange={setStopCountdown}>
+                                <SelectTrigger id="stop-countdown">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {COUNTDOWN_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {stopCountdown !== '0' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="stop-message">Warning message (optional)</Label>
+                                <Input
+                                    id="stop-message"
+                                    placeholder="Server shutting down for maintenance..."
+                                    value={stopMessage}
+                                    onChange={(e) => setStopMessage(e.target.value)}
+                                    maxLength={500}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowStopDialog(false)}
+                            disabled={stopLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleStop}
+                            disabled={stopLoading}
+                        >
+                            {stopLoading
+                                ? 'Stopping...'
+                                : stopCountdown === '0'
+                                  ? 'Stop Now'
+                                  : 'Schedule Shutdown'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

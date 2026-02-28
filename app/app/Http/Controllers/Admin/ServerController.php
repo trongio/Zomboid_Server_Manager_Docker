@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\RestartServerRequest;
+use App\Http\Requests\Admin\StopServerRequest;
+use App\Jobs\RestartGameServer;
+use App\Jobs\StopGameServer;
 use App\Services\AuditLogger;
 use App\Services\DockerManager;
 use App\Services\RconClient;
@@ -44,8 +48,37 @@ class ServerController extends Controller
         return response()->json(['message' => 'Server starting']);
     }
 
-    public function stop(Request $request): JsonResponse
+    public function stop(StopServerRequest $request): JsonResponse
     {
+        $countdown = $request->validated('countdown');
+        $message = $request->validated('message');
+
+        if ($countdown) {
+            $warningMessage = $message ?? "Server shutting down in {$countdown} seconds";
+
+            try {
+                $this->rcon->connect();
+                $this->rcon->command("servermsg \"{$warningMessage}\"");
+            } catch (\Throwable) {
+                // RCON unavailable — still schedule the stop
+            }
+
+            StopGameServer::dispatch($request->ip())
+                ->delay(now()->addSeconds($countdown));
+
+            $this->auditLogger->log(
+                actor: $request->user()->name ?? 'admin',
+                action: 'server.stop.scheduled',
+                ip: $request->ip(),
+                details: ['countdown' => $countdown],
+            );
+
+            return response()->json([
+                'message' => "Server shutdown scheduled in {$countdown} seconds",
+                'countdown' => $countdown,
+            ]);
+        }
+
         try {
             $this->rcon->connect();
             $this->rcon->command('save');
@@ -70,8 +103,37 @@ class ServerController extends Controller
         return response()->json(['message' => 'Server stopped']);
     }
 
-    public function restart(Request $request): JsonResponse
+    public function restart(RestartServerRequest $request): JsonResponse
     {
+        $countdown = $request->validated('countdown');
+        $message = $request->validated('message');
+
+        if ($countdown) {
+            $warningMessage = $message ?? "Server restarting in {$countdown} seconds";
+
+            try {
+                $this->rcon->connect();
+                $this->rcon->command("servermsg \"{$warningMessage}\"");
+            } catch (\Throwable) {
+                // RCON unavailable — still schedule the restart
+            }
+
+            RestartGameServer::dispatch($request->ip())
+                ->delay(now()->addSeconds($countdown));
+
+            $this->auditLogger->log(
+                actor: $request->user()->name ?? 'admin',
+                action: 'server.restart.scheduled',
+                ip: $request->ip(),
+                details: ['countdown' => $countdown],
+            );
+
+            return response()->json([
+                'message' => "Server restart scheduled in {$countdown} seconds",
+                'countdown' => $countdown,
+            ]);
+        }
+
         try {
             $this->rcon->connect();
             $this->rcon->command('save');

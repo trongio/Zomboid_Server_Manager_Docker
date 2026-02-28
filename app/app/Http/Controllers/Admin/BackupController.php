@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\BackupType;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\BackupResource;
+use App\Jobs\RollbackGameServer;
 use App\Models\Backup;
 use App\Services\AuditLogger;
 use App\Services\BackupManager;
+use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,6 +20,7 @@ class BackupController extends Controller
     public function __construct(
         private readonly BackupManager $backupManager,
         private readonly AuditLogger $auditLogger,
+        private readonly RconClient $rcon,
     ) {}
 
     public function index(Request $request): Response
@@ -39,7 +42,19 @@ class BackupController extends Controller
     {
         $request->validate([
             'notes' => 'nullable|string|max:500',
+            'notify_players' => 'sometimes|boolean',
+            'message' => 'sometimes|nullable|string|max:500',
         ]);
+
+        if ($request->boolean('notify_players')) {
+            $message = $request->input('message', 'Backup in progress — expect a brief lag');
+            try {
+                $this->rcon->connect();
+                $this->rcon->command("servermsg \"{$message}\"");
+            } catch (\Throwable) {
+                // RCON unavailable — proceed with backup
+            }
+        }
 
         $result = $this->backupManager->createBackup(
             BackupType::Manual,
@@ -80,9 +95,41 @@ class BackupController extends Controller
 
     public function rollback(Request $request, Backup $backup): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'confirm' => 'required|boolean|accepted',
+            'countdown' => 'sometimes|integer|min:10|max:3600',
+            'message' => 'sometimes|nullable|string|max:500',
         ]);
+
+        $countdown = $validated['countdown'] ?? null;
+
+        if ($countdown) {
+            $warningMessage = ($validated['message'] ?? null)
+                ?? "Server rolling back in {$countdown} seconds — you will be disconnected";
+
+            try {
+                $this->rcon->connect();
+                $this->rcon->command("servermsg \"{$warningMessage}\"");
+            } catch (\Throwable) {
+                // RCON unavailable — still schedule the rollback
+            }
+
+            RollbackGameServer::dispatch($backup->id, $request->ip())
+                ->delay(now()->addSeconds($countdown));
+
+            $this->auditLogger->log(
+                actor: $request->user()->name ?? 'admin',
+                action: 'backup.rollback.scheduled',
+                target: $backup->filename,
+                details: ['countdown' => $countdown],
+                ip: $request->ip(),
+            );
+
+            return response()->json([
+                'message' => "Rollback scheduled in {$countdown} seconds",
+                'countdown' => $countdown,
+            ]);
+        }
 
         $result = $this->backupManager->rollback($backup);
 
