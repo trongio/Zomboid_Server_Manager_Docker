@@ -12,6 +12,7 @@ use App\Services\DockerManager;
 use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use function Illuminate\Support\defer;
 
 class ServerController extends Controller
 {
@@ -140,26 +141,29 @@ class ServerController extends Controller
             ip: $request->ip(),
         );
 
-        try {
-            $this->rcon->connect();
-            $this->rcon->command('save');
-        } catch (\Throwable) {
-            // RCON unavailable — proceed with restart
-        }
+        $docker = $this->docker;
+        $rcon = $this->rcon;
+        $ip = $request->ip();
+        $actor = $request->user()->name ?? 'admin';
 
-        try {
-            $this->docker->restartContainer(timeout: 30);
-        } catch (\Throwable $e) {
-            return response()->json(['error' => 'Failed to restart server: '.$e->getMessage()], 503);
-        }
+        defer(function () use ($docker, $rcon, $ip, $actor) {
+            try {
+                $rcon->connect();
+                $rcon->command('save');
+            } catch (\Throwable) {
+                // RCON unavailable — proceed with restart
+            }
 
-        $this->auditLogger->log(
-            actor: $request->user()->name ?? 'admin',
-            action: 'server.restart.completed',
-            ip: $request->ip(),
-        );
+            $docker->restartContainer(timeout: 30);
 
-        return response()->json(['message' => 'Server restarted']);
+            AuditLogger::record(
+                actor: $actor,
+                action: 'server.restart.completed',
+                ip: $ip,
+            );
+        });
+
+        return response()->json(['message' => 'Server restarting']);
     }
 
     public function save(Request $request): JsonResponse
