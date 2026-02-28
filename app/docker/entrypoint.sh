@@ -59,6 +59,12 @@ if echo "$@" | grep -q "supervisord"; then
             >> /var/www/html/storage/logs/map-tiles.log 2>&1 &
     fi
 
+    # Start Vite dev server only in non-production environments
+    if [ "$APP_ENV" != "production" ]; then
+        echo "[entrypoint] Starting Vite dev server (APP_ENV=$APP_ENV)..."
+        supervisorctl start vite 2>/dev/null || true
+    fi
+
     echo "[entrypoint] Ready."
 fi
 
