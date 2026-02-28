@@ -42,17 +42,15 @@ class OnlinePlayersReader
             ];
         }
 
-        // 2. Try RCON
+        // 2. Try RCON — a successful connect proves the game server is responsive
         try {
             $this->rcon->connect();
             $response = $this->rcon->command('players');
-            $players = $this->parseRconPlayers($response);
-            if ($players !== null) {
-                return [
-                    'usernames' => $players,
-                    'source' => 'rcon',
-                ];
-            }
+
+            return [
+                'usernames' => $this->parseRconPlayers($response) ?? [],
+                'source' => 'rcon',
+            ];
         } catch (\Throwable) {
             // RCON unavailable
         }

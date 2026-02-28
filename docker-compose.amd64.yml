@@ -33,7 +33,9 @@ services:
       - ./game-server/amd64-entrypoint.sh:/home/steam/amd64-entrypoint.sh:ro
       - ./game-server/configure-server.sh:/home/steam/configure-server.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "ss -uln | grep -q ':${PZ_GAME_PORT:-16261}'"]
+      # Check RCON TCP port in /proc/net — proves game server is fully loaded
+      # (ss/netstat not available in renegademaster image)
+      test: ["CMD-SHELL", "grep -q \":$(printf '%04X' ${PZ_RCON_PORT:-27015}) \" /proc/net/tcp6 /proc/net/tcp 2>/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3
