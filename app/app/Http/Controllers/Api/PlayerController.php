@@ -9,6 +9,7 @@ use App\Http\Requests\Api\KickPlayerRequest;
 use App\Http\Requests\Api\SetAccessLevelRequest;
 use App\Http\Requests\Api\TeleportPlayerRequest;
 use App\Services\AuditLogger;
+use App\Services\OnlinePlayersReader;
 use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 
@@ -17,21 +18,13 @@ class PlayerController
     public function __construct(
         private readonly RconClient $rcon,
         private readonly AuditLogger $auditLogger,
+        private readonly OnlinePlayersReader $onlinePlayers,
     ) {}
 
     public function index(): JsonResponse
     {
-        try {
-            $this->rcon->connect();
-            $response = $this->rcon->command('players');
-        } catch (\Throwable) {
-            return response()->json([
-                'players' => [],
-                'count' => 0,
-            ]);
-        }
-
-        $players = $this->parsePlayers($response);
+        $onlineNames = $this->onlinePlayers->getOnlineUsernames();
+        $players = array_map(fn (string $name) => ['name' => $name], $onlineNames);
 
         return response()->json([
             'players' => $players,
@@ -41,21 +34,13 @@ class PlayerController
 
     public function show(string $name): JsonResponse
     {
-        try {
-            $this->rcon->connect();
-            $response = $this->rcon->command('players');
-        } catch (\Throwable) {
-            return response()->json(['error' => 'Server offline'], 503);
-        }
+        $onlineNames = $this->onlinePlayers->getOnlineUsernames();
 
-        $players = $this->parsePlayers($response);
-        $player = collect($players)->firstWhere('name', $name);
-
-        if ($player === null) {
+        if (! in_array($name, $onlineNames, true)) {
             return response()->json(['error' => 'Player not found or not online'], 404);
         }
 
-        return response()->json($player);
+        return response()->json(['name' => $name]);
     }
 
     public function kick(string $name, KickPlayerRequest $request): JsonResponse
@@ -229,20 +214,4 @@ class PlayerController
         return response()->json(['message' => $successMessage]);
     }
 
-    /**
-     * @return array<int, array{name: string}>
-     */
-    private function parsePlayers(string $response): array
-    {
-        $lines = array_filter(array_map('trim', explode("\n", $response)));
-        $players = [];
-
-        foreach ($lines as $line) {
-            if (str_starts_with($line, '-')) {
-                $players[] = ['name' => ltrim($line, '- ')];
-            }
-        }
-
-        return $players;
-    }
 }

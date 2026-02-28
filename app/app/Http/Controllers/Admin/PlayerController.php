@@ -127,21 +127,4 @@ class PlayerController extends Controller
 
         return response()->json(['message' => "Set {$name} access to {$level}"]);
     }
-
-    /**
-     * @return array<int, array{name: string}>
-     */
-    private function parsePlayers(string $response): array
-    {
-        $lines = array_filter(array_map('trim', explode("\n", $response)));
-        $players = [];
-
-        foreach ($lines as $line) {
-            if (str_starts_with($line, '-')) {
-                $players[] = ['name' => ltrim($line, '- ')];
-            }
-        }
-
-        return $players;
-    }
 }

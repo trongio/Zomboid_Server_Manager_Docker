@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\DockerManager;
 use App\Services\GameStateReader;
 use App\Services\ModManager;
-use App\Services\RconClient;
+use App\Services\OnlinePlayersReader;
 use Carbon\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -13,10 +13,10 @@ use Inertia\Response;
 class StatusController extends Controller
 {
     public function __construct(
-        private readonly RconClient $rcon,
         private readonly DockerManager $docker,
         private readonly ModManager $modManager,
         private readonly GameStateReader $gameStateReader,
+        private readonly OnlinePlayersReader $onlinePlayers,
     ) {}
 
     public function __invoke(): Response
@@ -40,15 +40,9 @@ class StatusController extends Controller
         if ($online) {
             $server['uptime'] = $this->calculateUptime($containerStatus['started_at'] ?? null);
 
-            try {
-                $this->rcon->connect();
-                $playersResponse = $this->rcon->command('players');
-                $parsed = $this->parsePlayers($playersResponse);
-                $server['player_count'] = $parsed['count'];
-                $server['players'] = $parsed['names'];
-            } catch (\Throwable) {
-                // RCON unavailable — server may still be starting
-            }
+            $onlineNames = $this->onlinePlayers->getOnlineUsernames();
+            $server['players'] = $onlineNames;
+            $server['player_count'] = count($onlineNames);
         }
 
         $iniData = $this->readServerIni();
@@ -71,28 +65,6 @@ class StatusController extends Controller
             'mods' => $mods,
             'server_name' => config('zomboid.server_name', 'ZomboidServer'),
         ]);
-    }
-
-    /**
-     * @return array{count: int, names: string[]}
-     */
-    private function parsePlayers(string $response): array
-    {
-        $lines = array_filter(array_map('trim', explode("\n", $response)));
-        $names = [];
-
-        foreach ($lines as $line) {
-            if (str_starts_with($line, '-')) {
-                $names[] = ltrim($line, '- ');
-            }
-        }
-
-        $count = count($names);
-        if (preg_match('/\((\d+)\)/', $response, $matches)) {
-            $count = (int) $matches[1];
-        }
-
-        return ['count' => $count, 'names' => $names];
     }
 
     private function calculateUptime(?string $startedAt): ?string
