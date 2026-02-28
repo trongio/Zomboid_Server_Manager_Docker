@@ -145,6 +145,11 @@ Detailed plan with acceptance criteria in `IMPLEMENTATION_PLAN.md`. Status track
 - Import from `@/actions/` (controllers) or `@/routes/` (named routes)
 - Use `.form()` with `<Form>` component or `form.submit(store())` with useForm
 
+### HTTP Method Spoofing
+- `fetchAction` (in `resources/js/lib/fetch-action.ts`) sends PUT/PATCH/DELETE as POST with `X-HTTP-Method-Override` header
+- Symfony/Laravel does NOT read `_method` from JSON request bodies — only from form-encoded POST data or query strings
+- Always use `X-HTTP-Method-Override` header for method spoofing with JSON requests, never rely on `_method` in the JSON body alone
+
 ### General
 - Follow existing code conventions — check sibling files for structure and naming
 - Check for existing components to reuse before writing new ones
