@@ -1,10 +1,17 @@
-import { Head, Link } from '@inertiajs/react';
-import { AlertTriangle, ChevronDown, Eye, EyeOff, Save, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Head, Link, router } from '@inertiajs/react';
+import { ChevronDown, Eye, EyeOff, Save, Search } from 'lucide-react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -31,6 +38,17 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
     { title: 'Config', href: '/admin/config' },
 ];
+
+const COUNTDOWN_OPTIONS = [
+    { value: '0', label: 'Immediately' },
+    { value: '60', label: '1 minute' },
+    { value: '120', label: '2 minutes' },
+    { value: '300', label: '5 minutes' },
+    { value: '600', label: '10 minutes' },
+    { value: '900', label: '15 minutes' },
+    { value: '1800', label: '30 minutes' },
+    { value: '3600', label: '60 minutes' },
+] as const;
 
 // ── Password field with eye toggle ──────────────────────────────────
 
@@ -180,15 +198,11 @@ function SettingInput({
 
 // ── Config section with collapsible groups ──────────────────────────
 
-function ConfigSection({
-    title,
-    description,
-    config,
-    meta,
-    groupOrder,
-    search,
-    onSave,
-}: {
+type ConfigSectionHandle = {
+    save(): void;
+};
+
+type ConfigSectionProps = {
     title: string;
     description: string;
     config: Record<string, string>;
@@ -196,7 +210,13 @@ function ConfigSection({
     groupOrder: string[];
     search: string;
     onSave: (settings: Record<string, string>) => void;
-}) {
+    onDirtyChange: (count: number) => void;
+};
+
+const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(function ConfigSection(
+    { title, description, config, meta, groupOrder, search, onSave, onDirtyChange },
+    ref,
+) {
     const [values, setValues] = useState<Record<string, string>>(config);
     const [dirty, setDirty] = useState<Set<string>>(new Set());
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(groupOrder));
@@ -218,6 +238,10 @@ function ConfigSection({
             .filter((g) => g.entries.length > 0);
     }, [groups, search]);
 
+    useEffect(() => {
+        onDirtyChange(dirty.size);
+    }, [dirty.size]);
+
     function handleChange(key: string, value: string) {
         setValues((prev) => ({ ...prev, [key]: value }));
         if (value !== config[key]) {
@@ -232,6 +256,7 @@ function ConfigSection({
     }
 
     function handleSave() {
+        if (dirty.size === 0) return;
         const changed: Record<string, string> = {};
         dirty.forEach((key) => {
             changed[key] = values[key];
@@ -239,6 +264,8 @@ function ConfigSection({
         onSave(changed);
         setDirty(new Set());
     }
+
+    useImperativeHandle(ref, () => ({ save: handleSave }));
 
     function toggleGroup(group: string) {
         setOpenGroups((prev) => {
@@ -262,17 +289,9 @@ function ConfigSection({
 
     return (
         <div className="space-y-3">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 className="text-lg font-semibold">{title}</h2>
-                    <p className="text-sm text-muted-foreground">{description}</p>
-                </div>
-                {dirty.size > 0 && (
-                    <Button onClick={handleSave} size="sm">
-                        <Save className="mr-1.5 size-4" />
-                        Save {dirty.size} change{dirty.size !== 1 ? 's' : ''}
-                    </Button>
-                )}
+            <div>
+                <h2 className="text-lg font-semibold">{title}</h2>
+                <p className="text-sm text-muted-foreground">{description}</p>
             </div>
 
             {filteredGroups.map(({ group, entries }) => (
@@ -328,26 +347,59 @@ function ConfigSection({
             )}
         </div>
     );
-}
+});
 
 // ── Main config page ────────────────────────────────────────────────
 
 export default function Config({ server_config, sandbox_config }: ConfigProps) {
-    const [restartBanner, setRestartBanner] = useState(false);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
+    const [serverDirty, setServerDirty] = useState(0);
+    const [sandboxDirty, setSandboxDirty] = useState(0);
+
+    // Restart dialog state
+    const [showRestartDialog, setShowRestartDialog] = useState(false);
+    const [restartCountdown, setRestartCountdown] = useState('0');
+    const [restartMessage, setRestartMessage] = useState('');
+    const [restartLoading, setRestartLoading] = useState(false);
+
+    const serverRef = useRef<ConfigSectionHandle>(null);
+    const sandboxRef = useRef<ConfigSectionHandle>(null);
+
+    const totalDirty = serverDirty + sandboxDirty;
 
     async function saveConfig(url: string, settings: Record<string, string>) {
         setSaving(true);
-        const result = await fetchAction(url, {
+        await fetchAction(url, {
             method: 'PATCH',
             data: { settings },
             successMessage: 'Configuration saved',
         });
-        if (result?.restart_required) {
-            setRestartBanner(true);
-        }
         setSaving(false);
+    }
+
+    function handleFloatingSave() {
+        serverRef.current?.save();
+        sandboxRef.current?.save();
+        setShowRestartDialog(true);
+    }
+
+    async function handleRestart() {
+        setRestartLoading(true);
+        const countdown = parseInt(restartCountdown, 10);
+        const data: Record<string, unknown> = {};
+        if (countdown > 0) {
+            data.countdown = countdown;
+            if (restartMessage.trim()) {
+                data.message = restartMessage.trim();
+            }
+        }
+        await fetchAction('/admin/server/restart', { data: Object.keys(data).length > 0 ? data : undefined });
+        setRestartLoading(false);
+        setShowRestartDialog(false);
+        setRestartCountdown('0');
+        setRestartMessage('');
+        setTimeout(() => router.reload({ only: ['server_config', 'sandbox_config'] }), 2000);
     }
 
     // Flatten sandbox config for display
@@ -386,16 +438,8 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
                     </div>
                 </div>
 
-                {restartBanner && (
-                    <Alert variant="destructive">
-                        <AlertTriangle className="size-4" />
-                        <AlertDescription>
-                            Config changes saved. A server restart is required for changes to take effect.
-                        </AlertDescription>
-                    </Alert>
-                )}
-
                 <ConfigSection
+                    ref={serverRef}
                     title="Server Settings"
                     description="server.ini — General server configuration"
                     config={server_config}
@@ -403,9 +447,11 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
                     groupOrder={SERVER_INI_GROUP_ORDER}
                     search={search}
                     onSave={(settings) => saveConfig('/admin/config/server', settings)}
+                    onDirtyChange={setServerDirty}
                 />
 
                 <ConfigSection
+                    ref={sandboxRef}
                     title="Sandbox Settings"
                     description="SandboxVars.lua — Gameplay and world settings"
                     config={flatSandbox}
@@ -413,8 +459,89 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
                     groupOrder={SANDBOX_GROUP_ORDER}
                     search={search}
                     onSave={(settings) => saveConfig('/admin/config/sandbox', settings)}
+                    onDirtyChange={setSandboxDirty}
                 />
             </div>
+
+            {/* Floating save button */}
+            <div
+                className={`fixed bottom-6 right-6 z-50 transition-all duration-200 ${
+                    totalDirty > 0
+                        ? 'translate-y-0 opacity-100'
+                        : 'pointer-events-none translate-y-4 opacity-0'
+                }`}
+            >
+                <Button
+                    size="lg"
+                    onClick={handleFloatingSave}
+                    disabled={saving}
+                    className="shadow-lg"
+                >
+                    <Save className="mr-2 size-4" />
+                    {saving ? 'Saving...' : `Save ${totalDirty} change${totalDirty !== 1 ? 's' : ''}`}
+                </Button>
+            </div>
+
+            {/* Restart dialog */}
+            <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Restart Server</DialogTitle>
+                        <DialogDescription>
+                            Config saved. Restart the server for changes to take effect, or skip if you want to restart later.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="restart-countdown">Countdown</Label>
+                            <Select value={restartCountdown} onValueChange={setRestartCountdown}>
+                                <SelectTrigger id="restart-countdown">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {COUNTDOWN_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {restartCountdown !== '0' && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="restart-message">Warning message (optional)</Label>
+                                <Input
+                                    id="restart-message"
+                                    placeholder="Server restarting for config changes..."
+                                    value={restartMessage}
+                                    onChange={(e) => setRestartMessage(e.target.value)}
+                                    maxLength={500}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowRestartDialog(false)}
+                            disabled={restartLoading}
+                        >
+                            Skip
+                        </Button>
+                        <Button
+                            variant={restartCountdown === '0' ? 'destructive' : 'default'}
+                            onClick={handleRestart}
+                            disabled={restartLoading}
+                        >
+                            {restartLoading
+                                ? 'Restarting...'
+                                : restartCountdown === '0'
+                                  ? 'Restart Now'
+                                  : 'Schedule Restart'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
