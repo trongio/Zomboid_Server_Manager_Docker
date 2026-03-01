@@ -4,6 +4,7 @@ import {
     Archive,
     Bell,
     BookOpen,
+    Crosshair,
     Gamepad2,
     LayoutGrid,
     MapPin,
@@ -81,6 +82,11 @@ const adminNavItems: NavItem[] = [
         title: 'RCON Console',
         href: '/admin/rcon',
         icon: Terminal,
+    },
+    {
+        title: 'Moderation',
+        href: '/admin/moderation',
+        icon: Crosshair,
     },
     {
         title: 'Safe Zones',

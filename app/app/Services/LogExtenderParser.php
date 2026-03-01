@@ -69,11 +69,13 @@ class LogExtenderParser
 
             [$timestamp, $rest] = $parsed;
 
-            // Death event: contains "died" or "was killed"
-            if (preg_match('/"([^"]+)"\s+died\b/', $rest, $matches)) {
+            // Death event: contains "died" with optional coordinates
+            if (preg_match('/"([^"]+)"\s+died(?:\s+at\s+(\d+),(\d+),\d+)?/', $rest, $matches)) {
                 GameEvent::query()->create([
                     'event_type' => 'death',
                     'player' => $matches[1],
+                    'x' => isset($matches[2]) ? (int) $matches[2] : null,
+                    'y' => isset($matches[3]) ? (int) $matches[3] : null,
                     'details' => ['raw' => trim($rest)],
                     'game_time' => $timestamp,
                 ]);
@@ -132,15 +134,19 @@ class LogExtenderParser
 
             [$timestamp, $rest] = $parsed;
 
-            // PvP: "user PlayerA (...) hit user PlayerB (...) with Weapon"
-            if (preg_match('/user\s+(\S+)\s+\([^)]+\)\s+hit\s+user\s+(\S+)\s+\([^)]+\)\s+with\s+(.+?)(?:\s+damage\s+(.+))?$/i', $rest, $matches)) {
+            // PvP: "user PlayerA (x,y,z) hit user PlayerB (x,y,z) with Weapon"
+            if (preg_match('/user\s+(\S+)\s+\((\d+),(\d+),\d+\)\s+hit\s+user\s+(\S+)\s+\((\d+),(\d+),\d+\)\s+with\s+(.+?)(?:\s+damage\s+(.+))?$/i', $rest, $matches)) {
                 GameEvent::query()->create([
                     'event_type' => 'pvp_kill',
                     'player' => $matches[1],
-                    'target' => $matches[2],
+                    'target' => $matches[4],
+                    'x' => (int) $matches[2],
+                    'y' => (int) $matches[3],
                     'details' => [
-                        'weapon' => trim($matches[3]),
-                        'damage' => $matches[4] ?? null,
+                        'weapon' => trim($matches[7]),
+                        'damage' => $matches[8] ?? null,
+                        'victim_x' => (int) $matches[5],
+                        'victim_y' => (int) $matches[6],
                     ],
                     'game_time' => $timestamp,
                 ]);

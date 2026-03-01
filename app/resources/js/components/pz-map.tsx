@@ -22,6 +22,16 @@ export type DrawnZone = {
     y2: number;
 };
 
+export type EventMarker = {
+    id: number;
+    x: number;
+    y: number;
+    type: string;
+    player: string;
+    target: string | null;
+    label: string;
+};
+
 type PzMapProps = {
     markers?: PlayerMarker[];
     mapConfig: MapConfig;
@@ -35,6 +45,9 @@ type PzMapProps = {
     onZoneDrawn?: (zone: DrawnZone) => void;
     selectedZoneId?: string | null;
     onZoneClick?: (zone: ZoneOverlay) => void;
+    eventMarkers?: EventMarker[];
+    onEventMarkerClick?: (marker: EventMarker) => void;
+    onMapReady?: (map: L.Map) => void;
 };
 
 const statusColors: Record<PlayerMarker['status'], string> = {
@@ -187,6 +200,13 @@ function latLngToPz(ll: L.LatLng): { x: number; y: number } {
     return { x: ll.lng, y: -ll.lat };
 }
 
+const eventTypeColors: Record<string, string> = {
+    pvp_kill: '#ef4444',
+    death: '#9ca3af',
+    connect: '#22c55e',
+    disconnect: '#f59e0b',
+};
+
 export default function PzMap({
     markers = [],
     mapConfig,
@@ -200,11 +220,15 @@ export default function PzMap({
     onZoneDrawn,
     selectedZoneId,
     onZoneClick,
+    eventMarkers,
+    onEventMarkerClick,
+    onMapReady,
 }: PzMapProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<L.Map | null>(null);
     const markersLayerRef = useRef<L.LayerGroup | null>(null);
     const zonesLayerRef = useRef<L.LayerGroup | null>(null);
+    const eventsLayerRef = useRef<L.LayerGroup | null>(null);
     const drawStateRef = useRef<{
         drawing: boolean;
         startLatLng: L.LatLng | null;
@@ -261,7 +285,12 @@ export default function PzMap({
         const zonesLayer = L.layerGroup().addTo(map);
         zonesLayerRef.current = zonesLayer;
 
+        const eventsLayer = L.layerGroup().addTo(map);
+        eventsLayerRef.current = eventsLayer;
+
         mapRef.current = map;
+
+        onMapReady?.(map);
 
         // Drawing event handlers
         map.on('mousedown', (e: L.LeafletMouseEvent) => {
@@ -319,6 +348,7 @@ export default function PzMap({
             mapRef.current = null;
             markersLayerRef.current = null;
             zonesLayerRef.current = null;
+            eventsLayerRef.current = null;
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -422,6 +452,41 @@ export default function PzMap({
             }
         });
     }, [zones, selectedZoneId, onZoneClick]);
+
+    // Update event markers
+    useEffect(() => {
+        const layer = eventsLayerRef.current;
+        if (!layer) return;
+
+        layer.clearLayers();
+        if (!eventMarkers) return;
+
+        eventMarkers.forEach((em) => {
+            const color = eventTypeColors[em.type] ?? '#9ca3af';
+            const circle = L.circleMarker([-em.y, em.x], {
+                radius: 7,
+                color,
+                fillColor: color,
+                fillOpacity: 0.7,
+                weight: 2,
+            }).addTo(layer);
+
+            const typeLabel = em.type.replace('_', ' ');
+            const targetInfo = em.target ? `<br/><small>Target: ${em.target}</small>` : '';
+            circle.bindPopup(
+                `<div style="min-width:120px;">
+                    <strong>${em.player}</strong><br/>
+                    <span style="color:${color};text-transform:capitalize;">${typeLabel}</span>
+                    ${targetInfo}<br/>
+                    <small style="color:#9ca3af;">X: ${em.x}, Y: ${em.y}</small>
+                </div>`,
+            );
+
+            if (onEventMarkerClick) {
+                circle.on('click', () => onEventMarkerClick(em));
+            }
+        });
+    }, [eventMarkers, onEventMarkerClick]);
 
     return <div ref={containerRef} className={`isolate h-full w-full ${className}`} />;
 }

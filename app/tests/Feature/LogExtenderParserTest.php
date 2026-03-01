@@ -59,7 +59,13 @@ LOG;
     $event = GameEvent::query()->where('player', 'Alice')->first();
     expect($event)->not->toBeNull()
         ->and($event->event_type)->toBe('death')
-        ->and($event->player)->toBe('Alice');
+        ->and($event->player)->toBe('Alice')
+        ->and($event->x)->toBe(10883)
+        ->and($event->y)->toBe(10085);
+
+    $bob = GameEvent::query()->where('player', 'Bob')->first();
+    expect($bob->x)->toBe(5000)
+        ->and($bob->y)->toBe(5000);
 });
 
 test('parses connect and disconnect events', function () {
@@ -97,7 +103,11 @@ LOG;
     expect($event->event_type)->toBe('pvp_kill')
         ->and($event->player)->toBe('Alice')
         ->and($event->target)->toBe('Bob')
-        ->and($event->details['weapon'])->toBe('Base.Axe');
+        ->and($event->x)->toBe(10883)
+        ->and($event->y)->toBe(10085)
+        ->and($event->details['weapon'])->toBe('Base.Axe')
+        ->and($event->details['victim_x'])->toBe(10884)
+        ->and($event->details['victim_y'])->toBe(10085);
 });
 
 test('parses crafting events from craft log', function () {

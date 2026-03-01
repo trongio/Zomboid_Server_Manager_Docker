@@ -83,6 +83,9 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
         Route::patch('respawn-delay', [Admin\RespawnDelayController::class, 'update'])->name('respawn-delay.update');
         Route::post('respawn-delay/{username}/reset', [Admin\RespawnDelayController::class, 'reset'])->name('respawn-delay.reset');
 
+        // Moderation
+        Route::get('moderation', [Admin\ModerationController::class, 'index'])->name('moderation');
+
         // Safe Zones
         Route::get('safe-zones', [Admin\SafeZoneController::class, 'index'])->name('safe-zones.index');
         Route::patch('safe-zones/config', [Admin\SafeZoneController::class, 'updateConfig'])->name('safe-zones.config.update');

@@ -86,6 +86,8 @@ export type GameEventEntry = {
     player: string;
     target: string | null;
     details: Record<string, unknown> | null;
+    x: number | null;
+    y: number | null;
     game_time: string | null;
     created_at: string;
 };
