@@ -1,5 +1,5 @@
 import { router } from '@inertiajs/react';
-import { Ban, ShieldCheck, UserX } from 'lucide-react';
+import { Ban, ShieldCheck, TimerReset, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,9 +25,11 @@ type Props = {
     kickTarget: string | null;
     banTarget: string | null;
     accessTarget: string | null;
+    resetTimerTarget?: string | null;
     onCloseKick: () => void;
     onCloseBan: () => void;
     onCloseAccess: () => void;
+    onCloseResetTimer?: () => void;
     reloadOnly: string[];
 };
 
@@ -35,9 +37,11 @@ export default function PlayerActionDialogs({
     kickTarget,
     banTarget,
     accessTarget,
+    resetTimerTarget = null,
     onCloseKick,
     onCloseBan,
     onCloseAccess,
+    onCloseResetTimer,
     reloadOnly,
 }: Props) {
     const [reason, setReason] = useState('');
@@ -158,6 +162,36 @@ export default function PlayerActionDialogs({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Reset Respawn Timer Dialog */}
+            {onCloseResetTimer && (
+                <Dialog open={resetTimerTarget !== null} onOpenChange={() => onCloseResetTimer()}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Reset Respawn Timer for {resetTimerTarget}</DialogTitle>
+                            <DialogDescription>
+                                This will clear the respawn cooldown, allowing the player to rejoin immediately.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={onCloseResetTimer}>Cancel</Button>
+                            <Button
+                                disabled={loading}
+                                onClick={() =>
+                                    handleAction(
+                                        `/admin/respawn-delay/${resetTimerTarget}/reset`,
+                                        {},
+                                        onCloseResetTimer,
+                                    )
+                                }
+                            >
+                                <TimerReset className="mr-1.5 size-3.5" />
+                                Reset Timer
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
         </>
     );
 }

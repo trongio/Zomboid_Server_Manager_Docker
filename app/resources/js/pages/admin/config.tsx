@@ -1,8 +1,9 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, Eye, EyeOff, Save, Search } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Loader2, Save, Search, Timer } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
     Dialog,
@@ -29,9 +30,15 @@ import type {SettingMeta} from '@/lib/config-metadata';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 
+type RespawnDelayConfig = {
+    enabled: boolean;
+    delay_minutes: number;
+};
+
 type ConfigProps = {
     server_config: Record<string, string>;
     sandbox_config: Record<string, unknown>;
+    respawn_delay: RespawnDelayConfig;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -351,7 +358,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
 
 // ── Main config page ────────────────────────────────────────────────
 
-export default function Config({ server_config, sandbox_config }: ConfigProps) {
+export default function Config({ server_config, sandbox_config, respawn_delay }: ConfigProps) {
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
     const [serverDirty, setServerDirty] = useState(0);
@@ -362,6 +369,11 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
     const [restartCountdown, setRestartCountdown] = useState('0');
     const [restartMessage, setRestartMessage] = useState('');
     const [restartLoading, setRestartLoading] = useState(false);
+
+    // Respawn delay state
+    const [respawnEnabled, setRespawnEnabled] = useState(respawn_delay.enabled);
+    const [respawnMinutes, setRespawnMinutes] = useState(respawn_delay.delay_minutes);
+    const [respawnSaving, setRespawnSaving] = useState(false);
 
     const serverRef = useRef<ConfigSectionHandle>(null);
     const sandboxRef = useRef<ConfigSectionHandle>(null);
@@ -402,6 +414,16 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
         setTimeout(() => router.reload({ only: ['server_config', 'sandbox_config'] }), 2000);
     }
 
+    async function saveRespawnDelay() {
+        setRespawnSaving(true);
+        await fetchAction('/admin/respawn-delay', {
+            method: 'PATCH',
+            data: { enabled: respawnEnabled, delay_minutes: respawnMinutes },
+            successMessage: 'Respawn delay settings saved',
+        });
+        setRespawnSaving(false);
+    }
+
     // Flatten sandbox config for display
     const flatSandbox: Record<string, string> = {};
     function flatten(obj: Record<string, unknown>, prefix = '') {
@@ -437,6 +459,66 @@ export default function Config({ server_config, sandbox_config }: ConfigProps) {
                         />
                     </div>
                 </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <Timer className="size-5" />
+                            Custom Rules
+                        </CardTitle>
+                        <CardDescription>
+                            Server-side rules enforced by the ZomboidManager Lua mod
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center justify-between rounded-lg border p-4">
+                            <div className="space-y-0.5">
+                                <Label htmlFor="respawn-enabled" className="text-sm font-medium">
+                                    Respawn Delay
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Prevent players from immediately creating a new character after death
+                                </p>
+                            </div>
+                            <Switch
+                                id="respawn-enabled"
+                                checked={respawnEnabled}
+                                onCheckedChange={setRespawnEnabled}
+                            />
+                        </div>
+                        {respawnEnabled && (
+                            <div className="grid gap-2">
+                                <Label htmlFor="respawn-minutes">Cooldown (minutes)</Label>
+                                <Input
+                                    id="respawn-minutes"
+                                    type="number"
+                                    min={1}
+                                    max={10080}
+                                    value={respawnMinutes}
+                                    onChange={(e) => setRespawnMinutes(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    className="w-32"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    No server restart required — changes apply within 60 seconds
+                                </p>
+                            </div>
+                        )}
+                        <Button
+                            onClick={saveRespawnDelay}
+                            disabled={respawnSaving}
+                            size="sm"
+                        >
+                            {respawnSaving ? (
+                                <>
+                                    <Loader2 className="mr-2 size-4 animate-spin" />
+                                    Saving...
+                                </>
+                            ) : (
+                                'Save'
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
 
                 <ConfigSection
                     ref={serverRef}

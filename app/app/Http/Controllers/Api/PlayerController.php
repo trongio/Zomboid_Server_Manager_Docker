@@ -49,7 +49,7 @@ class PlayerController
 
         return $this->executePlayerCommand(
             name: $name,
-            command: "kickuser \"{$name}\"".($reason ? " \"{$reason}\"" : ''),
+            command: $reason ? "kickuser \"{$name}\" -r \"{$reason}\"" : "kickuser \"{$name}\"",
             action: 'player.kick',
             details: ['reason' => $reason],
             ip: $request->ip(),

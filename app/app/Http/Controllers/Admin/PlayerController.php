@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OnlinePlayersReader;
 use App\Services\RconClient;
+use App\Services\RespawnDelayManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -19,6 +20,7 @@ class PlayerController extends Controller
         private readonly RconClient $rcon,
         private readonly AuditLogger $auditLogger,
         private readonly OnlinePlayersReader $onlinePlayers,
+        private readonly RespawnDelayManager $respawnDelay,
     ) {}
 
     public function index(): Response
@@ -76,6 +78,8 @@ class PlayerController extends Controller
 
         return Inertia::render('admin/players', [
             'players' => $players,
+            'respawn_cooldowns' => $this->respawnDelay->getActiveCooldowns(),
+            'respawn_config' => $this->respawnDelay->getConfig(),
         ]);
     }
 
@@ -85,8 +89,8 @@ class PlayerController extends Controller
 
         try {
             $this->rcon->connect();
-            $command = $reason ? "kickuser \"{$name}\" \"{$reason}\"" : "kickuser \"{$name}\"";
-            $this->rcon->command($command);
+            $command = $reason !== '' ? "kickuser \"{$name}\" -r \"{$reason}\"" : "kickuser \"{$name}\"";
+            $response = $this->rcon->command($command);
         } catch (\Throwable $e) {
             return response()->json(['error' => 'Failed: '.$e->getMessage()], 503);
         }
@@ -95,11 +99,11 @@ class PlayerController extends Controller
             actor: $request->user()->name ?? 'admin',
             action: 'player.kick',
             target: $name,
-            details: ['reason' => $reason],
+            details: ['reason' => $reason, 'rcon_response' => $response, 'command' => $command],
             ip: $request->ip(),
         );
 
-        return response()->json(['message' => "Kicked {$name}"]);
+        return response()->json(['message' => "Kicked {$name}", 'rcon_response' => $response, 'command' => $command]);
     }
 
     public function ban(Request $request, string $name): JsonResponse

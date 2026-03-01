@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\RespawnDelayManager;
 use App\Services\SandboxLuaParser;
 use App\Services\ServerIniParser;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class ConfigController extends Controller
         private readonly ServerIniParser $iniParser,
         private readonly SandboxLuaParser $luaParser,
         private readonly AuditLogger $auditLogger,
+        private readonly RespawnDelayManager $respawnDelay,
     ) {}
 
     public function index(): Response
@@ -39,6 +41,7 @@ class ConfigController extends Controller
         return Inertia::render('admin/config', [
             'server_config' => $serverConfig,
             'sandbox_config' => $sandboxConfig,
+            'respawn_delay' => $this->respawnDelay->getConfig(),
         ]);
     }
 

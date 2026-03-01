@@ -78,6 +78,11 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
         Route::patch('discord', [Admin\DiscordWebhookController::class, 'update'])->name('discord.update');
         Route::post('discord/test', [Admin\DiscordWebhookController::class, 'test'])->name('discord.test');
 
+        // Respawn Delay
+        Route::get('respawn-delay', [Admin\RespawnDelayController::class, 'index'])->name('respawn-delay.index');
+        Route::patch('respawn-delay', [Admin\RespawnDelayController::class, 'update'])->name('respawn-delay.update');
+        Route::post('respawn-delay/{username}/reset', [Admin\RespawnDelayController::class, 'reset'])->name('respawn-delay.reset');
+
         // Server Control
         Route::post('server/start', [Admin\ServerController::class, 'start'])->name('server.start');
         Route::post('server/stop', [Admin\ServerController::class, 'stop'])->name('server.stop');

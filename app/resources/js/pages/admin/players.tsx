@@ -1,5 +1,5 @@
 import { Head, Link, usePoll } from '@inertiajs/react';
-import { Backpack, Ban, Circle, Clock, Search, ShieldCheck, Skull, UserX } from 'lucide-react';
+import { Backpack, Ban, Circle, Clock, Search, ShieldCheck, Skull, TimerReset, UserX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlayerActionDialogs from '@/components/player-action-dialogs';
 import { SortIcon } from '@/components/sort-icon';
@@ -32,6 +32,17 @@ type Player = {
     } | null;
 };
 
+type RespawnCooldown = {
+    death_time: number;
+    remaining_seconds: number;
+    remaining_minutes: number;
+};
+
+type RespawnConfig = {
+    enabled: boolean;
+    delay_minutes: number;
+};
+
 type SortKey = 'status' | 'username' | 'kills' | 'hours' | 'joined';
 type StatusFilter = 'all' | 'online' | 'offline';
 
@@ -48,7 +59,13 @@ const roleBadgeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
     unknown: 'outline',
 };
 
-export default function Players({ players }: { players: Player[] }) {
+type PlayersProps = {
+    players: Player[];
+    respawn_cooldowns: Record<string, RespawnCooldown>;
+    respawn_config: RespawnConfig;
+};
+
+export default function Players({ players, respawn_cooldowns = {}, respawn_config }: PlayersProps) {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const { sortKey, sortDir, toggleSort } = useTableSort<SortKey>('status', 'desc');
@@ -56,6 +73,7 @@ export default function Players({ players }: { players: Player[] }) {
     const [kickTarget, setKickTarget] = useState<string | null>(null);
     const [banTarget, setBanTarget] = useState<string | null>(null);
     const [accessTarget, setAccessTarget] = useState<string | null>(null);
+    const [resetTimerTarget, setResetTimerTarget] = useState<string | null>(null);
 
     usePoll(5000, { only: ['players'] });
 
@@ -194,7 +212,17 @@ export default function Players({ players }: { players: Player[] }) {
                                                     className={`size-2 ${player.isOnline ? 'fill-green-500 text-green-500' : 'fill-muted text-muted'}`}
                                                 />
                                             </TableCell>
-                                            <TableCell className="font-medium">{player.username}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-1.5">
+                                                    {player.username}
+                                                    {respawn_cooldowns[player.username] && (
+                                                        <Badge variant="destructive" className="text-xs">
+                                                            <Clock className="mr-0.5 size-3" />
+                                                            {respawn_cooldowns[player.username].remaining_minutes}m
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                            </TableCell>
                                             <TableCell className="hidden sm:table-cell">
                                                 <Badge variant={roleBadgeVariant[player.role] ?? 'outline'}>
                                                     {player.role.replace('_', ' ')}
@@ -228,6 +256,16 @@ export default function Players({ players }: { players: Player[] }) {
                                                     >
                                                         <ShieldCheck className="size-3.5" />
                                                     </Button>
+                                                    {respawn_cooldowns[player.username] && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => setResetTimerTarget(player.username)}
+                                                            title="Reset respawn timer"
+                                                        >
+                                                            <TimerReset className="size-3.5" />
+                                                        </Button>
+                                                    )}
                                                     {player.isOnline && (
                                                         <Button
                                                             variant="ghost"
@@ -269,10 +307,12 @@ export default function Players({ players }: { players: Player[] }) {
                 kickTarget={kickTarget}
                 banTarget={banTarget}
                 accessTarget={accessTarget}
+                resetTimerTarget={resetTimerTarget}
                 onCloseKick={() => setKickTarget(null)}
                 onCloseBan={() => setBanTarget(null)}
                 onCloseAccess={() => setAccessTarget(null)}
-                reloadOnly={['players']}
+                onCloseResetTimer={() => setResetTimerTarget(null)}
+                reloadOnly={['players', 'respawn_cooldowns']}
             />
         </AppLayout>
     );

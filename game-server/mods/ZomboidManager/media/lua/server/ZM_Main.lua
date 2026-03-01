@@ -9,6 +9,7 @@ require("ZM_PlayerTracker")
 require("ZM_ItemCatalog")
 require("ZM_GameState")
 require("ZM_PlayerStats")
+require("ZM_RespawnDelay")
 
 print("[ZomboidManager] Initializing server-side bridge mod...")
 
@@ -18,6 +19,11 @@ local function onCreatePlayer(playerIndex, player)
         return
     end
     print("[ZomboidManager] Player connected: " .. (player:getUsername() or "unknown"))
+
+    -- Check respawn cooldown first — if kicked, skip everything else
+    if ZM_RespawnDelay.checkRespawnCooldown(player) then
+        return
+    end
 
     -- Export this player's inventory
     ZM_InventoryExporter.exportPlayer(player)
@@ -55,10 +61,16 @@ local function onEveryOneMinute()
 
     -- Export game state (time, weather, season)
     ZM_GameState.export()
+
+    -- Respawn delay: reload config, process resets, clean expired
+    ZM_RespawnDelay.tick()
 end
 
 --- OnServerStarted — export game state and item catalog on server boot
 local function onServerStarted()
+    -- Initialize respawn delay system
+    ZM_RespawnDelay.init()
+
     -- Export game state immediately so it's available even when server is paused
     if ZM_GameState.export() then
         print("[ZomboidManager] Exported initial game state")
@@ -74,8 +86,9 @@ end
 
 -- Register event hooks
 Events.OnCreatePlayer.Add(onCreatePlayer)
+Events.OnPlayerDeath.Add(ZM_RespawnDelay.onPlayerDeath)
 Events.EveryTenMinutes.Add(onEveryTenMinutes)
 Events.EveryOneMinute.Add(onEveryOneMinute)
 Events.OnServerStarted.Add(onServerStarted)
 
-print("[ZomboidManager] Event hooks registered: OnCreatePlayer, EveryTenMinutes, EveryOneMinute, OnServerStarted, GameState")
+print("[ZomboidManager] Event hooks registered: OnCreatePlayer, OnPlayerDeath, EveryTenMinutes, EveryOneMinute, OnServerStarted, GameState")

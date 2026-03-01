@@ -41,6 +41,10 @@ class DiscordWebhookService
         // Player
         'player.kick' => ['color' => 0xE67E22, 'emoji' => "\u{1F462}", 'title' => 'Player Kicked'],
         'player.ban' => ['color' => 0xE74C3C, 'emoji' => "\u{1F6AB}", 'title' => 'Player Banned'],
+
+        // Respawn Delay
+        'respawn_delay.update' => ['color' => 0x9B59B6, 'emoji' => "\u{23F1}", 'title' => 'Respawn Delay Updated'],
+        'respawn_delay.reset' => ['color' => 0x3498DB, 'emoji' => "\u{1F504}", 'title' => 'Respawn Timer Reset'],
     ];
 
     /**
