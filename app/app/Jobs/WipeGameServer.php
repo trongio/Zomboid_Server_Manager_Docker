@@ -64,9 +64,12 @@ class WipeGameServer implements ShouldQueue
             ip: $this->ip,
         );
 
-        // 3. Delete save data
+        // 3. Delete save data + PZ internal backups (PZ auto-restores from these on startup)
+        $dataPath = config('zomboid.paths.data');
         $serverName = config('zomboid.server_name', 'ZomboidServer');
-        $savePath = config('zomboid.paths.data')."/Saves/Multiplayer/{$serverName}";
+        $savePath = "{$dataPath}/Saves/Multiplayer/{$serverName}";
+        $startupBackups = "{$dataPath}/backups/startup";
+        $serverDb = "{$dataPath}/db/{$serverName}.db";
 
         if (is_dir($savePath)) {
             $deleteResult = Process::run(['rm', '-rf', $savePath]);
@@ -81,6 +84,19 @@ class WipeGameServer implements ShouldQueue
             }
         } else {
             Log::info('Save directory does not exist, nothing to delete', ['path' => $savePath]);
+        }
+
+        // Remove PZ startup backups — PZ restores saves from these on boot
+        if (is_dir($startupBackups)) {
+            $backupResult = Process::run(['rm', '-rf', $startupBackups]);
+            Log::info('PZ startup backups deleted', ['success' => $backupResult->successful()]);
+        }
+
+        // Remove player account database so accounts are reset
+        if (file_exists($serverDb)) {
+            Process::run(['rm', '-f', $serverDb]);
+            Process::run(['rm', '-f', "{$serverDb}-shm", "{$serverDb}-wal"]);
+            Log::info('Server player database deleted', ['path' => $serverDb]);
         }
 
         // 4. Start server

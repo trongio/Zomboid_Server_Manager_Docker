@@ -65,6 +65,10 @@ class DiscordWebhookSetting extends Model
             'server.start.completed' => ['label' => 'Server Ready (After Start)', 'default' => true, 'group' => 'Server'],
             'server.restart.completed' => ['label' => 'Server Ready (After Restart)', 'default' => true, 'group' => 'Server'],
             'server.save' => ['label' => 'World Saved', 'default' => false, 'group' => 'Server'],
+            'server.wipe' => ['label' => 'Server Wipe Started', 'default' => true, 'group' => 'Server'],
+            'server.wipe.scheduled' => ['label' => 'Server Wipe Scheduled', 'default' => true, 'group' => 'Server'],
+            'server.wipe.executed' => ['label' => 'Server Wipe Executed', 'default' => true, 'group' => 'Server'],
+            'server.wipe.completed' => ['label' => 'Server Online (Post-Wipe)', 'default' => true, 'group' => 'Server'],
 
             // Backup
             'backup.create' => ['label' => 'Backup Started', 'default' => true, 'group' => 'Backup'],

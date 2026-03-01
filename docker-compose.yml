@@ -71,6 +71,7 @@ services:
         condition: service_healthy
     command: php artisan queue:work redis --tries=3 --timeout=300 --sleep=3
     volumes:
+      - ./app:/var/www/html
       - zomboid-data:/pz-data
       - zomboid-server:/pz-server:ro
       - backup-data:/backups

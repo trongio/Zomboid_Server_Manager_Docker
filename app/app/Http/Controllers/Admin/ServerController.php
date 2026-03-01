@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Enums\BackupType;
 use App\Http\Requests\Admin\RestartServerRequest;
 use App\Http\Requests\Admin\StopServerRequest;
 use App\Http\Requests\Admin\WipeServerRequest;
@@ -13,13 +12,10 @@ use App\Jobs\StopGameServer;
 use App\Jobs\WaitForServerReady;
 use App\Jobs\WipeGameServer;
 use App\Services\AuditLogger;
-use App\Services\BackupManager;
 use App\Services\DockerManager;
 use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Process;
 use function Illuminate\Support\defer;
 
 class ServerController extends Controller
@@ -28,7 +24,6 @@ class ServerController extends Controller
         private readonly DockerManager $docker,
         private readonly RconClient $rcon,
         private readonly AuditLogger $auditLogger,
-        private readonly BackupManager $backupManager,
     ) {}
 
     public function start(Request $request): JsonResponse
@@ -238,62 +233,14 @@ class ServerController extends Controller
             ]);
         }
 
-        // Immediate wipe
+        // Immediate wipe — dispatch via queue for reliable execution
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
             action: 'server.wipe',
             ip: $request->ip(),
         );
 
-        $docker = $this->docker;
-        $rcon = $this->rcon;
-        $backupManager = $this->backupManager;
-        $ip = $request->ip();
-        $actor = $request->user()->name ?? 'admin';
-
-        defer(function () use ($docker, $rcon, $backupManager, $ip, $actor) {
-            // 1. Create pre-wipe backup
-            try {
-                $result = $backupManager->createBackup(BackupType::PreRollback, 'Pre-wipe safety backup');
-
-                Log::info('Pre-wipe backup created', [
-                    'filename' => $result['backup']->filename,
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning('Pre-wipe backup failed, proceeding with wipe', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            // 2. Graceful shutdown
-            try {
-                $rcon->connect();
-                $rcon->command('save');
-                sleep(5);
-                $rcon->command('quit');
-            } catch (\Throwable) {
-                // RCON unavailable — proceed with Docker stop
-            }
-
-            $docker->stopContainer(timeout: 30);
-
-            // 3. Delete save data
-            $serverName = config('zomboid.server_name', 'ZomboidServer');
-            $savePath = config('zomboid.paths.data')."/Saves/Multiplayer/{$serverName}";
-
-            if (is_dir($savePath)) {
-                Process::run(['rm', '-rf', $savePath]);
-            }
-
-            // 4. Start server
-            $docker->startContainer();
-
-            WaitForServerReady::dispatch(
-                'server.wipe.completed',
-                $actor,
-                $ip,
-            );
-        });
+        WipeGameServer::dispatch($request->ip());
 
         return response()->json(['message' => 'Server wipe in progress']);
     }
