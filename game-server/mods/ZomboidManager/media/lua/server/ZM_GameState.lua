@@ -45,6 +45,14 @@ function ZM_GameState.export()
     local okN, nightVal = pcall(function() return gt:getNight() end)
     if okN and nightVal then isNight = nightVal > 0.5 end
 
+    -- Calculate day of year from month and day
+    local daysInMonth = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+    local dayOfYear = 0
+    for i = 1, month - 1 do
+        dayOfYear = dayOfYear + (daysInMonth[i] or 30)
+    end
+    dayOfYear = dayOfYear + day
+
     local state = {
         time = {
             year = year,
@@ -52,7 +60,7 @@ function ZM_GameState.export()
             day = day,
             hour = hour,
             minute = minute,
-            day_of_year = 0,
+            day_of_year = dayOfYear,
             is_night = isNight,
             formatted = string.format("%02d:%02d", hour, minute),
             date = string.format("%04d-%02d-%02d", year, month, day),
