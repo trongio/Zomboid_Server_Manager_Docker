@@ -22,6 +22,7 @@ find /var/www/html/storage /var/www/html/bootstrap/cache -type f -not -name '.gi
 # ── PZ data permissions ──────────────────────────────────────────────
 # Game server creates config files as root — make them writable by www-data
 # so the Laravel app can update server.ini and SandboxVars.lua from the web UI.
+# Also grant write access to Saves/ and db/ for backup rollback extraction.
 PZ_DATA="${PZ_DATA_PATH:-/pz-data}"
 PZ_SERVER_NAME_VAL="${PZ_SERVER_NAME:-ZomboidServer}"
 if [ -d "$PZ_DATA/Server" ]; then
@@ -30,6 +31,20 @@ if [ -d "$PZ_DATA/Server" ]; then
     chmod 664 "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}_SandboxVars.lua" 2>/dev/null || true
     chown www-data:www-data "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}.ini" 2>/dev/null || true
     chown www-data:www-data "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}_SandboxVars.lua" 2>/dev/null || true
+fi
+# Saves and db directories need to be writable for backup rollback
+for dir in "$PZ_DATA/Saves" "$PZ_DATA/db"; do
+    if [ -d "$dir" ]; then
+        chgrp -R www-data "$dir" 2>/dev/null || true
+        chmod -R g+w "$dir" 2>/dev/null || true
+    fi
+done
+
+# ── Backup directory permissions ─────────────────────────────────────
+BACKUP_DIR="${BACKUP_PATH:-/backups}"
+if [ -d "$BACKUP_DIR" ]; then
+    chgrp www-data "$BACKUP_DIR" 2>/dev/null || true
+    chmod 775 "$BACKUP_DIR" 2>/dev/null || true
 fi
 
 # ── APP_KEY generation ───────────────────────────────────────────────

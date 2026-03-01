@@ -76,10 +76,12 @@ services:
       - backup-data:/backups
       - lua-bridge:/lua-bridge
       - map-tiles:/map-tiles
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file: ./app/.env
     environment:
       DB_HOST: ${DB_HOST:-db}
       REDIS_HOST: ${REDIS_HOST:-redis}
+      GAME_SERVER_CONTAINER_NAME: ${GAME_SERVER_CONTAINER_NAME:-pz-game-server}
       PZ_DATA_PATH: /pz-data
       PZ_SERVER_PATH: /pz-server
       PZ_RCON_HOST: game-server

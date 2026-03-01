@@ -103,8 +103,9 @@ class BackupManager
         // 1. Create pre-rollback safety backup
         $preRollback = $this->createBackup(BackupType::PreRollback, "Pre-rollback safety backup before restoring {$backup->filename}");
 
-        // 2. Stop the game server
+        // 2. Stop the game server and wait for file handles to be released
         $this->stopServer();
+        sleep(3);
 
         // 3. Extract backup over save directory
         $this->extractBackup($backup);
@@ -136,6 +137,10 @@ class BackupManager
 
     /**
      * Extract a backup archive over the PZ data directory.
+     *
+     * Uses --touch and --no-same-owner to avoid utime/chmod failures
+     * when www-data extracts over root-owned directories.
+     * Exit code 1 with only "Cannot utime/change mode" warnings is non-fatal.
      */
     private function extractBackup(Backup $backup): void
     {
@@ -143,11 +148,34 @@ class BackupManager
 
         $result = Process::run([
             'tar', '-xzf', $backup->path,
+            '--overwrite',
+            '--no-same-owner',
+            '--no-same-permissions',
+            '--touch',
             '-C', $dataPath,
         ]);
 
         if (! $result->successful()) {
-            throw new \RuntimeException("Failed to extract backup: {$result->errorOutput()}");
+            $stderr = $result->errorOutput();
+
+            // Tar exits non-zero for harmless metadata warnings (utime, chmod)
+            // on directories owned by root. Only fail on real extraction errors.
+            $lines = array_filter(explode("\n", trim($stderr)));
+            $fatalLines = array_filter($lines, function (string $line): bool {
+                return $line !== ''
+                    && ! str_contains($line, 'Cannot utime')
+                    && ! str_contains($line, 'Cannot change mode')
+                    && ! str_contains($line, 'Exiting with failure status due to previous errors');
+            });
+
+            if ($fatalLines !== []) {
+                throw new \RuntimeException("Failed to extract backup: {$stderr}");
+            }
+
+            Log::warning('Backup extraction had non-fatal warnings', [
+                'backup' => $backup->filename,
+                'warnings' => $stderr,
+            ]);
         }
     }
 
