@@ -62,6 +62,16 @@ class DiscordWebhookService
         'safezone.violation.detected' => ['color' => 0xE74C3C, 'emoji' => "\u{26A0}", 'title' => 'PvP Violation Detected'],
         'safezone.violation.dismissed' => ['color' => 0x95A5A6, 'emoji' => "\u{2705}", 'title' => 'PvP Violation Dismissed'],
         'safezone.violation.actioned' => ['color' => 0xE74C3C, 'emoji' => "\u{1F6AB}", 'title' => 'PvP Violation Actioned'],
+
+        // Shop
+        'shop.currency.awarded' => ['color' => 0xF1C40F, 'emoji' => "\u{1FA99}", 'title' => 'Currency Awarded'],
+        'shop.item.create' => ['color' => 0x2ECC71, 'emoji' => "\u{1F6D2}", 'title' => 'Shop Item Created'],
+        'shop.item.update' => ['color' => 0x3498DB, 'emoji' => "\u{1F6D2}", 'title' => 'Shop Item Updated'],
+        'shop.item.delete' => ['color' => 0xE74C3C, 'emoji' => "\u{1F6D2}", 'title' => 'Shop Item Deleted'],
+        'shop.bundle.create' => ['color' => 0x2ECC71, 'emoji' => "\u{1F4E6}", 'title' => 'Shop Bundle Created'],
+        'shop.bundle.delete' => ['color' => 0xE74C3C, 'emoji' => "\u{1F4E6}", 'title' => 'Shop Bundle Deleted'],
+        'shop.promotion.create' => ['color' => 0x2ECC71, 'emoji' => "\u{1F3F7}", 'title' => 'Promotion Created'],
+        'shop.promotion.delete' => ['color' => 0xE74C3C, 'emoji' => "\u{1F3F7}", 'title' => 'Promotion Deleted'],
     ];
 
     /**

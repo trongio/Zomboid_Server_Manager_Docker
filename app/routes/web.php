@@ -5,6 +5,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PlayerProfileController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\RankingsController;
+use App\Http\Controllers\ShopController;
 use App\Http\Controllers\StatusController;
 use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
@@ -15,8 +16,23 @@ Route::get('status', StatusController::class)->name('status');
 Route::get('rankings', RankingsController::class)->name('rankings');
 Route::get('rankings/{username}', PlayerProfileController::class)->name('rankings.player');
 
+// Public shop browse (no auth required)
+Route::prefix('shop')->name('shop.')->group(function () {
+    Route::get('/', [ShopController::class, 'index'])->name('index');
+    Route::get('bundle/{slug}', [ShopController::class, 'showBundle'])->name('bundle.show');
+    Route::get('{slug}', [ShopController::class, 'show'])->name('show');
+});
+
 Route::middleware(['auth'])->group(function () {
     Route::get('portal', PortalController::class)->name('portal');
+
+    // Auth-only shop actions
+    Route::prefix('shop')->name('shop.')->group(function () {
+        Route::get('my/purchases', [ShopController::class, 'myPurchases'])->name('my.purchases');
+        Route::get('my/wallet', [ShopController::class, 'myWallet'])->name('my.wallet');
+        Route::post('bundle/{slug}/purchase', [ShopController::class, 'purchaseBundle'])->name('bundle.purchase')->middleware('throttle:10,1');
+        Route::post('{slug}/purchase', [ShopController::class, 'purchaseItem'])->name('purchase')->middleware('throttle:10,1');
+    });
 });
 
 Route::middleware(['auth', 'verified', 'admin'])->group(function () {
@@ -102,6 +118,34 @@ Route::middleware(['auth', 'verified', 'admin'])->group(function () {
         Route::post('safe-zones', [Admin\SafeZoneController::class, 'store'])->name('safe-zones.store');
         Route::delete('safe-zones/{zoneId}', [Admin\SafeZoneController::class, 'destroy'])->name('safe-zones.destroy');
         Route::post('safe-zones/violations/{id}/resolve', [Admin\SafeZoneController::class, 'resolveViolation'])->name('safe-zones.violations.resolve');
+
+        // Shop Management
+        Route::get('shop', [Admin\ShopController::class, 'index'])->name('shop');
+        Route::post('shop/categories', [Admin\ShopController::class, 'storeCategory'])->name('shop.categories.store');
+        Route::patch('shop/categories/{category}', [Admin\ShopController::class, 'updateCategory'])->name('shop.categories.update');
+        Route::delete('shop/categories/{category}', [Admin\ShopController::class, 'destroyCategory'])->name('shop.categories.destroy');
+        Route::post('shop/items', [Admin\ShopController::class, 'storeItem'])->name('shop.items.store');
+        Route::patch('shop/items/{item}', [Admin\ShopController::class, 'updateItem'])->name('shop.items.update');
+        Route::delete('shop/items/{item}', [Admin\ShopController::class, 'destroyItem'])->name('shop.items.destroy');
+        Route::post('shop/items/{item}/toggle', [Admin\ShopController::class, 'toggleItem'])->name('shop.items.toggle');
+
+        // Shop Bundles
+        Route::get('shop/bundles', [Admin\ShopBundleController::class, 'index'])->name('shop.bundles');
+        Route::post('shop/bundles', [Admin\ShopBundleController::class, 'store'])->name('shop.bundles.store');
+        Route::patch('shop/bundles/{bundle}', [Admin\ShopBundleController::class, 'update'])->name('shop.bundles.update');
+        Route::delete('shop/bundles/{bundle}', [Admin\ShopBundleController::class, 'destroy'])->name('shop.bundles.destroy');
+
+        // Shop Promotions
+        Route::get('shop/promotions', [Admin\ShopPromotionController::class, 'index'])->name('shop.promotions');
+        Route::post('shop/promotions', [Admin\ShopPromotionController::class, 'store'])->name('shop.promotions.store');
+        Route::patch('shop/promotions/{promotion}', [Admin\ShopPromotionController::class, 'update'])->name('shop.promotions.update');
+        Route::delete('shop/promotions/{promotion}', [Admin\ShopPromotionController::class, 'destroy'])->name('shop.promotions.destroy');
+        Route::post('shop/promotions/{promotion}/toggle', [Admin\ShopPromotionController::class, 'toggle'])->name('shop.promotions.toggle');
+
+        // Wallets
+        Route::get('wallets', [Admin\WalletController::class, 'index'])->name('wallets');
+        Route::post('wallets/{user}/credit', [Admin\WalletController::class, 'credit'])->name('wallets.credit');
+        Route::get('wallets/{user}/transactions', [Admin\WalletController::class, 'transactions'])->name('wallets.transactions');
 
         // Server Settings (connection info)
         Route::patch('server-settings', [Admin\ServerSettingController::class, 'update'])->name('server-settings.update');

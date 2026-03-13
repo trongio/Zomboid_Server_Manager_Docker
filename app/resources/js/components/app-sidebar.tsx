@@ -4,6 +4,7 @@ import {
     Archive,
     Bell,
     BookOpen,
+    Coins,
     Crosshair,
     Timer,
     Gamepad2,
@@ -13,10 +14,13 @@ import {
     ScrollText,
     Shield,
     ShieldAlert,
+    ShoppingBag,
+    Store,
     Terminal,
     Trophy,
     User,
     Users,
+    Wallet,
     Wrench,
 } from 'lucide-react';
 import { NavFooter } from '@/components/nav-footer';
@@ -107,6 +111,16 @@ const adminNavItems: NavItem[] = [
         icon: Activity,
     },
     {
+        title: 'Shop',
+        href: '/admin/shop',
+        icon: Store,
+    },
+    {
+        title: 'Wallets',
+        href: '/admin/wallets',
+        icon: Wallet,
+    },
+    {
         title: 'Rankings',
         href: '/rankings',
         icon: Trophy,
@@ -118,6 +132,16 @@ const playerNavItems: NavItem[] = [
         title: 'Player Portal',
         href: '/portal',
         icon: Gamepad2,
+    },
+    {
+        title: 'Shop',
+        href: '/shop',
+        icon: ShoppingBag,
+    },
+    {
+        title: 'My Wallet',
+        href: '/shop/my/wallet',
+        icon: Coins,
     },
     {
         title: 'Rankings',

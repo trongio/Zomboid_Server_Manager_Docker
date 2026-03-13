@@ -27,6 +27,12 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                         >
                             Rankings
                         </Link>
+                        <Link
+                            href="/shop"
+                            className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                        >
+                            Shop
+                        </Link>
                         {auth.user ? (
                             <Link
                                 href="/dashboard"

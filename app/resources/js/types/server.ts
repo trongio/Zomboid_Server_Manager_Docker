@@ -304,3 +304,122 @@ export type DeliveryResult = {
     processed_at: string;
     message: string | null;
 };
+
+// Shop types
+export type ShopCategory = {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    icon: string | null;
+    sort_order: number;
+    is_active: boolean;
+    items_count?: number;
+    created_at: string;
+    updated_at: string;
+};
+
+export type ShopItem = {
+    id: string;
+    category_id: string | null;
+    category?: ShopCategory | null;
+    name: string;
+    slug: string;
+    description: string | null;
+    item_type: string;
+    quantity: number;
+    price: string;
+    is_active: boolean;
+    is_featured: boolean;
+    max_per_player: number | null;
+    stock: number | null;
+    metadata: Record<string, unknown> | null;
+    icon?: string;
+    created_at: string;
+    updated_at: string;
+};
+
+export type ShopBundle = {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    price: string;
+    is_active: boolean;
+    is_featured: boolean;
+    max_per_player: number | null;
+    items: (ShopItem & { pivot: { quantity: number } })[];
+    created_at: string;
+    updated_at: string;
+};
+
+export type ShopPromotion = {
+    id: string;
+    name: string;
+    code: string | null;
+    type: 'percentage' | 'fixed_amount';
+    value: string;
+    min_purchase: string | null;
+    max_discount: string | null;
+    applies_to: 'all' | 'category' | 'item' | 'bundle';
+    target_ids: string[] | null;
+    usage_limit: number | null;
+    per_user_limit: number | null;
+    usage_count: number;
+    starts_at: string;
+    ends_at: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+};
+
+export type WalletTransaction = {
+    id: string;
+    wallet_id: string;
+    type: 'credit' | 'debit' | 'refund';
+    amount: string;
+    balance_after: string;
+    source: 'admin_award' | 'purchase' | 'refund' | 'system' | 'payment';
+    description: string | null;
+    created_at: string;
+};
+
+export type ShopPurchase = {
+    id: string;
+    user_id: number;
+    purchasable_type: string;
+    purchasable_id: string;
+    purchasable?: ShopItem | ShopBundle;
+    quantity_bought: number;
+    total_price: string;
+    discount_amount: string;
+    delivery_status: 'pending' | 'queued' | 'delivered' | 'partially_delivered' | 'failed';
+    delivered_at: string | null;
+    metadata: Record<string, unknown> | null;
+    deliveries?: ShopDelivery[];
+    created_at: string;
+    updated_at: string;
+};
+
+export type ShopDelivery = {
+    id: string;
+    shop_purchase_id: string;
+    username: string;
+    item_type: string;
+    quantity: number;
+    status: 'pending' | 'queued' | 'delivered' | 'failed';
+    attempts: number;
+    delivered_at: string | null;
+    error_message: string | null;
+    created_at: string;
+};
+
+export type WalletUser = {
+    id: number;
+    username: string;
+    name: string;
+    role: string;
+    balance: number;
+    total_earned: number;
+    total_spent: number;
+};
