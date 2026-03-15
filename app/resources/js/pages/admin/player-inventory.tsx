@@ -497,73 +497,87 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                             </CardHeader>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
-                            <CardContent>
+                            <CardContent className="overflow-x-auto">
                                 {totalDeliveries > 0 ? (
-                                    <div className="space-y-2">
-                                        {deliveries.pending.map((entry) => (
-                                            <div
-                                                key={entry.id}
-                                                className="flex flex-col gap-1.5 rounded-lg border border-border/50 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Circle className="size-2 shrink-0 fill-yellow-500 text-yellow-500" />
-                                                    <span className="text-sm font-medium">
-                                                        {entry.action === 'give'
-                                                            ? 'Give'
-                                                            : 'Remove'}{' '}
-                                                        {entry.item_type}
-                                                    </span>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        x{entry.count}
-                                                    </Badge>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        pending
-                                                    </Badge>
-                                                    <span className="text-muted-foreground text-xs">
-                                                        {formatRelativeTime(entry.created_at)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {deliveries.results.map((result) => (
-                                            <div
-                                                key={result.id}
-                                                className="flex flex-col gap-1.5 rounded-lg border border-border/50 px-4 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <Circle
-                                                        className={`size-2 shrink-0 ${
-                                                            result.status === 'delivered'
-                                                                ? 'fill-green-500 text-green-500'
-                                                                : 'fill-red-500 text-red-500'
-                                                        }`}
-                                                    />
-                                                    <span className="text-sm">
-                                                        {result.message ?? result.status}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge
-                                                        variant={
-                                                            result.status === 'delivered'
-                                                                ? 'secondary'
-                                                                : 'destructive'
-                                                        }
-                                                        className="text-xs"
-                                                    >
-                                                        {result.status}
-                                                    </Badge>
-                                                    <span className="text-muted-foreground text-xs">
-                                                        {formatRelativeTime(
-                                                            result.processed_at,
-                                                        )}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[30px]" />
+                                                <TableHead>Action</TableHead>
+                                                <TableHead>Item</TableHead>
+                                                <TableHead className="text-center">Qty</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Time</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {deliveries.pending.map((entry) => (
+                                                <TableRow key={entry.id}>
+                                                    <TableCell>
+                                                        <Circle className="size-2 fill-yellow-500 text-yellow-500" />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-sm font-medium capitalize">
+                                                            {entry.action}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-muted-foreground text-sm">
+                                                            {entry.item_type}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className="tabular-nums">{entry.count}</span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="text-xs">
+                                                            pending
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-muted-foreground text-xs">
+                                                            {formatRelativeTime(entry.created_at)}
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                            {deliveries.results.map((result) => (
+                                                <TableRow key={result.id}>
+                                                    <TableCell>
+                                                        <Circle
+                                                            className={`size-2 ${
+                                                                result.status === 'delivered'
+                                                                    ? 'fill-green-500 text-green-500'
+                                                                    : 'fill-red-500 text-red-500'
+                                                            }`}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell colSpan={3}>
+                                                        <span className="text-sm">
+                                                            {result.message ?? result.status}
+                                                        </span>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge
+                                                            variant={
+                                                                result.status === 'delivered'
+                                                                    ? 'secondary'
+                                                                    : 'destructive'
+                                                            }
+                                                            className="text-xs"
+                                                        >
+                                                            {result.status}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <span className="text-muted-foreground text-xs">
+                                                            {formatRelativeTime(result.processed_at)}
+                                                        </span>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                 ) : (
                                     <p className="text-muted-foreground py-4 text-center text-sm">
                                         No delivery entries for this player
