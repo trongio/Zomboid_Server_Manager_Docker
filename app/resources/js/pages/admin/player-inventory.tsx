@@ -117,9 +117,12 @@ function formatRelativeTime(dateStr: string): string {
     return `${Math.floor(diffHr / 24)}d ago`;
 }
 
+const ITEMS_PER_PAGE = 20;
+
 export default function PlayerInventory({ username, inventory, catalog, deliveries }: Props) {
     const [filter, setFilter] = useState('');
     const [sortBy, setSortBy] = useState<'name' | 'category' | 'condition'>('name');
+    const [page, setPage] = useState(1);
     const [giveOpen, setGiveOpen] = useState(false);
     const [removeTarget, setRemoveTarget] = useState<InventoryItem | null>(null);
     const [giveSearch, setGiveSearch] = useState('');
@@ -191,6 +194,13 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
 
     const categories = useMemo(() => [...new Set(items.map((i) => i.category))], [items]);
     const totalItemCount = useMemo(() => items.reduce((sum, i) => sum + i.count, 0), [items]);
+
+    const lastPage = Math.max(1, Math.ceil(filteredItems.length / ITEMS_PER_PAGE));
+    const currentPage = Math.min(page, lastPage);
+    const paginatedItems = useMemo(
+        () => filteredItems.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE),
+        [filteredItems, currentPage],
+    );
 
     const filteredCatalog = useMemo(() => {
         if (!giveSearch) return catalog.slice(0, 50);
@@ -359,7 +369,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                             <Input
                                                 placeholder="Filter items..."
                                                 value={filter}
-                                                onChange={(e) => setFilter(e.target.value)}
+                                                onChange={(e) => { setFilter(e.target.value); setPage(1); }}
                                                 className="pl-9 sm:w-[200px]"
                                             />
                                         </div>
@@ -385,6 +395,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                             </CardHeader>
                             <CardContent className="overflow-x-auto">
                                 {filteredItems.length > 0 ? (
+                                    <>
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
@@ -397,7 +408,7 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {filteredItems.map((item) => (
+                                            {paginatedItems.map((item) => (
                                                 <TableRow key={item.full_type}>
                                                     <TableCell>
                                                         <ItemIcon
@@ -461,6 +472,34 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                             ))}
                                         </TableBody>
                                     </Table>
+
+                                    {/* Pagination */}
+                                    {lastPage > 1 && (
+                                        <div className="mt-4 flex items-center justify-between">
+                                            <p className="text-muted-foreground text-sm">
+                                                {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredItems.length)} of {filteredItems.length} items
+                                            </p>
+                                            <div className="flex items-center gap-1">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={currentPage <= 1}
+                                                    onClick={() => setPage(currentPage - 1)}
+                                                >
+                                                    Previous
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={currentPage >= lastPage}
+                                                    onClick={() => setPage(currentPage + 1)}
+                                                >
+                                                    Next
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    </>
                                 ) : (
                                     <p className="text-muted-foreground py-8 text-center">
                                         {filter
