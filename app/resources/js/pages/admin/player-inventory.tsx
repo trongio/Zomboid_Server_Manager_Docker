@@ -35,6 +35,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
@@ -45,6 +46,17 @@ import type {
     InventorySnapshot,
     ItemCatalogEntry,
 } from '@/types/server';
+
+type StackedItem = {
+    full_type: string;
+    name: string;
+    category: string;
+    icon: string;
+    totalCount: number;
+    condition: number | null;
+    equipped: boolean;
+    containers: string[];
+};
 
 type Props = {
     username: string;
@@ -128,8 +140,39 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
 
     const items = inventory?.items ?? [];
 
+    const stackedItems = useMemo(() => {
+        const map = new Map<string, StackedItem>();
+        for (const item of items) {
+            const existing = map.get(item.full_type);
+            if (existing) {
+                existing.totalCount += item.count;
+                if (item.equipped) existing.equipped = true;
+                if (item.condition !== null) {
+                    existing.condition = existing.condition !== null
+                        ? Math.min(existing.condition, item.condition)
+                        : item.condition;
+                }
+                if (!existing.containers.includes(item.container)) {
+                    existing.containers.push(item.container);
+                }
+            } else {
+                map.set(item.full_type, {
+                    full_type: item.full_type,
+                    name: item.name,
+                    category: item.category,
+                    icon: item.icon,
+                    totalCount: item.count,
+                    condition: item.condition,
+                    equipped: item.equipped,
+                    containers: [item.container],
+                });
+            }
+        }
+        return [...map.values()];
+    }, [items]);
+
     const filteredItems = useMemo(() => {
-        const result = items.filter(
+        const result = stackedItems.filter(
             (item) =>
                 item.name.toLowerCase().includes(filter.toLowerCase()) ||
                 item.full_type.toLowerCase().includes(filter.toLowerCase()) ||
@@ -144,9 +187,10 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
         });
 
         return result;
-    }, [items, filter, sortBy]);
+    }, [stackedItems, filter, sortBy]);
 
     const categories = useMemo(() => [...new Set(items.map((i) => i.category))], [items]);
+    const totalItemCount = useMemo(() => items.reduce((sum, i) => sum + i.count, 0), [items]);
 
     const filteredCatalog = useMemo(() => {
         if (!giveSearch) return catalog.slice(0, 50);
@@ -261,7 +305,12 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                 <CardContent className="flex items-center gap-3 pt-6">
                                     <Backpack className="text-muted-foreground size-5" />
                                     <div>
-                                        <p className="text-2xl font-bold">{items.length}</p>
+                                        <p className="text-2xl font-bold">
+                                            {totalItemCount}
+                                            <span className="text-muted-foreground text-sm font-normal">
+                                                {' '}({stackedItems.length} unique)
+                                            </span>
+                                        </p>
                                         <p className="text-muted-foreground text-xs">
                                             Total Items
                                         </p>
@@ -294,14 +343,14 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                             </Card>
                         </div>
 
-                        {/* Inventory Grid */}
+                        {/* Inventory Table */}
                         <Card>
                             <CardHeader>
                                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                     <div>
                                         <CardTitle>Items</CardTitle>
                                         <CardDescription>
-                                            {filteredItems.length} of {items.length} items
+                                            {filteredItems.length} of {stackedItems.length} unique items
                                         </CardDescription>
                                     </div>
                                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -334,62 +383,84 @@ export default function PlayerInventory({ username, inventory, catalog, deliveri
                                     </div>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="overflow-x-auto">
                                 {filteredItems.length > 0 ? (
-                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                                        {filteredItems.map((item, idx) => (
-                                            <div
-                                                key={`${item.full_type}-${item.container}-${idx}`}
-                                                className="group relative flex gap-3 rounded-lg border border-border/50 p-3"
-                                            >
-                                                <ItemIcon
-                                                    src={item.icon}
-                                                    name={item.name}
-                                                />
-                                                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                                    <div className="flex items-start justify-between gap-1">
-                                                        <span className="truncate text-sm font-medium">
-                                                            {item.name}
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead className="w-[50px]" />
+                                                <TableHead>Item</TableHead>
+                                                <TableHead>Category</TableHead>
+                                                <TableHead className="text-center">Qty</TableHead>
+                                                <TableHead className="w-[120px]">Condition</TableHead>
+                                                <TableHead>Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredItems.map((item) => (
+                                                <TableRow key={item.full_type}>
+                                                    <TableCell>
+                                                        <ItemIcon
+                                                            src={item.icon}
+                                                            name={item.name}
+                                                            size={32}
+                                                        />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex min-w-0 flex-col">
+                                                            <span className="text-sm font-medium">
+                                                                {item.name}
+                                                            </span>
+                                                            <span className="text-muted-foreground text-xs">
+                                                                {item.full_type}
+                                                            </span>
+                                                            {item.equipped && (
+                                                                <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                                                                    <Swords className="size-3" />
+                                                                    Equipped
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="text-xs">
+                                                            {item.category}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell className="text-center">
+                                                        <span className="font-medium tabular-nums">
+                                                            {item.totalCount}
                                                         </span>
-                                                        {item.count > 1 && (
-                                                            <Badge
-                                                                variant="secondary"
-                                                                className="shrink-0 text-xs"
-                                                            >
-                                                                x{item.count}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="w-fit text-xs"
-                                                    >
-                                                        {item.category}
-                                                    </Badge>
-                                                    <ConditionBar condition={item.condition} />
-                                                    <div className="flex items-center gap-2">
-                                                        {item.equipped && (
-                                                            <Swords className="text-muted-foreground size-3" />
-                                                        )}
-                                                        <span className="text-muted-foreground truncate text-xs">
-                                                            {item.container}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="absolute right-1 top-1 size-7 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                                                    onClick={() => {
-                                                        setRemoveCount(1);
-                                                        setRemoveTarget(item);
-                                                    }}
-                                                >
-                                                    <Trash2 className="size-3.5 text-destructive" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <ConditionBar condition={item.condition} />
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="size-8 p-0"
+                                                            onClick={() => {
+                                                                setRemoveCount(1);
+                                                                setRemoveTarget({
+                                                                    full_type: item.full_type,
+                                                                    name: item.name,
+                                                                    category: item.category,
+                                                                    count: item.totalCount,
+                                                                    condition: item.condition,
+                                                                    equipped: item.equipped,
+                                                                    container: item.containers[0],
+                                                                    icon: item.icon,
+                                                                });
+                                                            }}
+                                                        >
+                                                            <Trash2 className="size-4 text-destructive" />
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
                                 ) : (
                                     <p className="text-muted-foreground py-8 text-center">
                                         {filter
