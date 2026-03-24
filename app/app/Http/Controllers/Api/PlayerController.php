@@ -132,9 +132,9 @@ class PlayerController
             $command = "teleportto \"{$name}\" \"{$safeTarget}\"";
             $details = ['target_player' => $targetPlayer];
         } else {
-            $x = $request->validated('x');
-            $y = $request->validated('y');
-            $z = $request->validated('z', '0');
+            $x = (float) $request->validated('x');
+            $y = (float) $request->validated('y');
+            $z = (float) $request->validated('z', '0');
             $command = "teleport \"{$name}\" {$x},{$y},{$z}";
             $details = ['x' => $x, 'y' => $y, 'z' => $z];
         }
@@ -153,7 +153,7 @@ class PlayerController
     {
         $name = RconSanitizer::playerName($name);
         $itemId = RconSanitizer::itemId($request->validated('item_id'));
-        $count = $request->validated('count', 1);
+        $count = (int) $request->validated('count', 1);
 
         return $this->executePlayerCommand(
             name: $name,
@@ -169,7 +169,7 @@ class PlayerController
     {
         $name = RconSanitizer::playerName($name);
         $skill = RconSanitizer::skill($request->validated('skill'));
-        $amount = $request->validated('amount');
+        $amount = (int) $request->validated('amount');
 
         return $this->executePlayerCommand(
             name: $name,

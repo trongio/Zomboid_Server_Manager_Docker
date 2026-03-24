@@ -149,11 +149,23 @@ class BackupManager
     {
         $dataPath = config('zomboid.paths.data');
 
+        // Validate archive contents to prevent tar slip (path traversal)
+        $listResult = Process::timeout(30)->run(['tar', '-tzf', $backup->path]);
+        if ($listResult->successful()) {
+            $entries = array_filter(explode("\n", trim($listResult->output())));
+            foreach ($entries as $entry) {
+                if (str_contains($entry, '..') || str_starts_with($entry, '/')) {
+                    throw new \RuntimeException("Backup contains unsafe path: {$entry}");
+                }
+            }
+        }
+
         $result = Process::timeout(300)->run([
             'tar', '-xzf', $backup->path,
             '--overwrite',
             '--no-same-owner',
             '--no-same-permissions',
+            '--no-absolute-names',
             '--touch',
             '-C', $dataPath,
         ]);
