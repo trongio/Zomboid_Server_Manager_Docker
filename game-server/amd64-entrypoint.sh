@@ -22,7 +22,7 @@ done
 # Note: ZomboidManager Workshop cache at steamapps/workshop/content/108600/3685323705
 # is populated by configure-server.sh — do NOT delete it here.
 
-if [ -f "$CONFIGURE_SCRIPT" ]; then
+if [ -f "$CONFIGURE_SCRIPT" ] && ! grep -q "configure-server.sh" /home/steam/run_server.sh; then
     sed -i '/^start_server$/i bash '"$CONFIGURE_SCRIPT" /home/steam/run_server.sh
     echo "[entrypoint] Patched run_server.sh to run configure-server.sh before start"
 fi
