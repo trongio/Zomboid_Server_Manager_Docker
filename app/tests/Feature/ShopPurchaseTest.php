@@ -6,6 +6,7 @@ use App\Models\ShopItem;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WhitelistEntry;
+use App\Services\DeliveryQueueManager;
 use App\Services\OnlinePlayersReader;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -20,9 +21,25 @@ beforeEach(function () {
     Wallet::factory()->for($this->user)->create(['balance' => 1000, 'total_earned' => 1000, 'total_spent' => 0]);
 
     // Mock online players reader — purchases require the player to be online
-    $mock = Mockery::mock(OnlinePlayersReader::class);
-    $mock->shouldReceive('getOnlineUsernames')->andReturn(['testplayer']);
-    $this->app->instance(OnlinePlayersReader::class, $mock);
+    $onlineMock = Mockery::mock(OnlinePlayersReader::class);
+    $onlineMock->shouldReceive('getOnlineUsernames')->andReturn(['testplayer']);
+    $this->app->instance(OnlinePlayersReader::class, $onlineMock);
+
+    // Mock delivery queue — simulate successful RCON delivery (no real game server in tests)
+    $deliveryMock = Mockery::mock(DeliveryQueueManager::class);
+    $deliveryMock->shouldReceive('giveItem')->andReturnUsing(function (string $username, string $itemType, int $count) {
+        return [
+            'id' => 'test-'.uniqid(),
+            'action' => 'give',
+            'username' => $username,
+            'item_type' => $itemType,
+            'count' => $count,
+            'status' => 'delivered',
+            'created_at' => now()->toIso8601String(),
+        ];
+    });
+    $deliveryMock->shouldReceive('readResults')->andReturn(['results' => []]);
+    $this->app->instance(DeliveryQueueManager::class, $deliveryMock);
 });
 
 it('lists shop items publicly without auth', function () {
