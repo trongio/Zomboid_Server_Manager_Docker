@@ -83,7 +83,7 @@ migrate: db-backup
 	$(COMPOSE) exec app php artisan migrate --force
 
 test:
-	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=pgsql -e DB_DATABASE=zomboid_test app php artisan test --parallel
+	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=pgsql -e DB_DATABASE=zomboid_test app php artisan test --compact
 
 exec:
 	$(COMPOSE) exec app $(CMD)
