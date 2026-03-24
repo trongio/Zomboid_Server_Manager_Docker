@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
         then: function () {
+            // Global route patterns — enforce max length to match RconSanitizer limits
+            \Illuminate\Support\Facades\Route::pattern('name', '[a-zA-Z0-9_]{1,50}');
+            \Illuminate\Support\Facades\Route::pattern('username', '[a-zA-Z0-9_]{1,50}');
+
             \Illuminate\Support\Facades\Route::middleware([])->group(function () {
                 \Illuminate\Support\Facades\Route::get('ping', fn () => response('pong', 200, ['Cache-Control' => 'no-store']))->name('ping');
             });

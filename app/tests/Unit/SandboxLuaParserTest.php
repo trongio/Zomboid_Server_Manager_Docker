@@ -137,3 +137,23 @@ it('writes boolean strings as unquoted booleans', function () {
 it('throws when sandbox file not found for write', function () {
     $this->parser->write('/nonexistent/path/sandbox.lua', ['Zombies' => 1]);
 })->throws(RuntimeException::class, 'Sandbox file not found');
+
+// ── Security: Quote Escaping Defense-in-Depth ───────────────────────
+
+it('escapes double quotes in string values', function () {
+    $method = new ReflectionMethod(SandboxLuaParser::class, 'formatValue');
+
+    $result = $method->invoke($this->parser, 'test"injection');
+
+    // Should produce escaped quote, not unescaped
+    expect($result)->toBe('"test\\"injection"')
+        ->and($result)->not->toBe('"test"injection"');
+});
+
+it('escapes backslashes in string values', function () {
+    $method = new ReflectionMethod(SandboxLuaParser::class, 'formatValue');
+
+    $result = $method->invoke($this->parser, 'test\\value');
+
+    expect($result)->toBe('"test\\\\value"');
+});

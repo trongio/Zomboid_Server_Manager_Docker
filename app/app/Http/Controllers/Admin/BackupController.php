@@ -10,10 +10,12 @@ use App\Jobs\CreateBackupJob;
 use App\Jobs\RollbackGameServer;
 use App\Jobs\SendServerWarning;
 use App\Models\Backup;
+use App\Rules\RconSafeMessage;
 use App\Services\AuditLogger;
 use App\Services\BackupManager;
 use App\Services\GameVersionReader;
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -57,11 +59,11 @@ class BackupController extends Controller
         $request->validate([
             'notes' => 'nullable|string|max:500',
             'notify_players' => 'sometimes|boolean',
-            'message' => 'sometimes|nullable|string|max:500',
+            'message' => ['sometimes', 'nullable', 'string', 'max:500', new RconSafeMessage],
         ]);
 
         if ($request->boolean('notify_players')) {
-            $message = $request->input('message', 'Backup in progress — expect a brief lag');
+            $message = RconSanitizer::message($request->input('message', 'Backup in progress — expect a brief lag'));
             try {
                 $this->rcon->connect();
                 $this->rcon->command("servermsg \"{$message}\"");
@@ -127,7 +129,7 @@ class BackupController extends Controller
         $validated = $request->validate([
             'confirm' => 'required|boolean|accepted',
             'countdown' => 'sometimes|integer|min:10|max:3600',
-            'message' => 'sometimes|nullable|string|max:500',
+            'message' => ['sometimes', 'nullable', 'string', 'max:500', new RconSafeMessage],
             'switch_branch' => 'sometimes|nullable|string|in:public,unstable,iwillbackupmysave',
         ]);
 
@@ -137,8 +139,10 @@ class BackupController extends Controller
         $countdown = $validated['countdown'] ?? null;
 
         if ($countdown) {
-            $warningMessage = ($validated['message'] ?? null)
-                ?? "Server rolling back in {$countdown} seconds — you will be disconnected";
+            $warningMessage = RconSanitizer::message(
+                ($validated['message'] ?? null)
+                ?? "Server rolling back in {$countdown} seconds — you will be disconnected"
+            );
 
             try {
                 $this->rcon->connect();

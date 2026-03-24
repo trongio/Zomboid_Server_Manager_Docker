@@ -128,8 +128,8 @@ describe('Role-based redirect', function () {
     it('redirects new registrations to portal', function () {
         $response = $this->post(route('register.store'), [
             'username' => 'newplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertRedirect('/portal');
@@ -140,8 +140,8 @@ describe('Registration with PZ account', function () {
     it('creates user with player role by default', function () {
         $this->post(route('register.store'), [
             'username' => 'newplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $user = User::where('username', 'newplayer')->first();
@@ -153,8 +153,8 @@ describe('Registration with PZ account', function () {
     it('creates whitelist entry linked to user', function () {
         $this->post(route('register.store'), [
             'username' => 'newplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $user = User::where('username', 'newplayer')->first();
@@ -163,15 +163,15 @@ describe('Registration with PZ account', function () {
         expect($entry)->not->toBeNull();
         expect($entry->user_id)->toBe($user->id);
         // PZ hash is bcrypt(md5(password)) — verify it matches
-        expect(password_verify(md5('secret'), $entry->pz_password_hash))->toBeTrue();
+        expect(password_verify(md5('secretpw'), $entry->pz_password_hash))->toBeTrue();
         expect($entry->active)->toBeTrue();
     });
 
     it('allows registration without email', function () {
         $this->post(route('register.store'), [
             'username' => 'noemailplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $user = User::where('username', 'noemailplayer')->first();
@@ -182,8 +182,8 @@ describe('Registration with PZ account', function () {
         $this->post(route('register.store'), [
             'username' => 'emailplayer',
             'email' => 'player@example.com',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $user = User::where('username', 'emailplayer')->first();
@@ -195,8 +195,8 @@ describe('Username validation', function () {
     it('rejects usernames shorter than 3 characters', function () {
         $response = $this->post(route('register.store'), [
             'username' => 'ab',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');
@@ -205,8 +205,8 @@ describe('Username validation', function () {
     it('rejects usernames with special characters', function () {
         $response = $this->post(route('register.store'), [
             'username' => 'bad user!',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');
@@ -215,8 +215,8 @@ describe('Username validation', function () {
     it('accepts usernames with underscores', function () {
         $this->post(route('register.store'), [
             'username' => 'good_user_123',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $this->assertAuthenticated();
@@ -228,8 +228,8 @@ describe('Username validation', function () {
 
         $response = $this->post(route('register.store'), [
             'username' => 'takenname',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');
@@ -498,13 +498,13 @@ describe('Password sync to PZ SQLite', function () {
             ->from(route('user-password.edit'))
             ->put(route('user-password.update'), [
                 'current_password' => 'password',
-                'password' => 'newpass',
-                'password_confirmation' => 'newpass',
+                'password' => 'newpass1!',
+                'password_confirmation' => 'newpass1!',
             ])
             ->assertSessionHasNoErrors();
 
         // PostgreSQL password should still be updated
         $user->refresh();
-        expect(Hash::check('newpass', $user->password))->toBeTrue();
+        expect(Hash::check('newpass1!', $user->password))->toBeTrue();
     });
 });

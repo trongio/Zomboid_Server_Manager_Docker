@@ -9,6 +9,7 @@ use App\Models\ShopItem;
 use App\Models\ShopPromotion;
 use App\Models\ShopPurchase;
 use App\Models\User;
+use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -62,13 +63,20 @@ class ShopPurchaseService
         $discount = $this->promotionEngine->calculateDiscount($item, $quantity, $promotion);
         $totalPrice = max(0, ((float) $item->price * $quantity) - $discount);
 
-        // Check available balance (actual balance minus pending purchase holds)
-        $availableBalance = $this->walletService->getAvailableBalance($user);
-        if ($availableBalance < $totalPrice) {
-            throw new InsufficientBalanceException($availableBalance, $totalPrice);
-        }
-
         $purchase = DB::transaction(function () use ($user, $item, $quantity, $promotion, $discount, $totalPrice) {
+            // Lock wallet row to prevent concurrent purchases from double-spending.
+            // Uses fresh query (not cached relation) to find or create, then locks by ID.
+            $wallet = Wallet::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                ['balance' => 0, 'total_earned' => 0, 'total_spent' => 0],
+            );
+            Wallet::query()->lockForUpdate()->find($wallet->id);
+
+            $availableBalance = $this->walletService->getAvailableBalance($user);
+            if ($availableBalance < $totalPrice) {
+                throw new InsufficientBalanceException($availableBalance, $totalPrice);
+            }
+
             $purchase = ShopPurchase::query()->create([
                 'user_id' => $user->id,
                 'wallet_transaction_id' => null,
@@ -156,13 +164,20 @@ class ShopPurchaseService
         $discount = $this->promotionEngine->calculateDiscount($bundle, 1, $promotion);
         $totalPrice = max(0, (float) $bundle->price - $discount);
 
-        // Check available balance (actual balance minus pending purchase holds)
-        $availableBalance = $this->walletService->getAvailableBalance($user);
-        if ($availableBalance < $totalPrice) {
-            throw new InsufficientBalanceException($availableBalance, $totalPrice);
-        }
-
         $purchase = DB::transaction(function () use ($user, $bundle, $promotion, $discount, $totalPrice) {
+            // Lock wallet row to prevent concurrent purchases from double-spending.
+            // Uses fresh query (not cached relation) to find or create, then locks by ID.
+            $wallet = Wallet::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                ['balance' => 0, 'total_earned' => 0, 'total_spent' => 0],
+            );
+            Wallet::query()->lockForUpdate()->find($wallet->id);
+
+            $availableBalance = $this->walletService->getAvailableBalance($user);
+            if ($availableBalance < $totalPrice) {
+                throw new InsufficientBalanceException($availableBalance, $totalPrice);
+            }
+
             $itemSnapshot = $bundle->items->map(fn ($item) => [
                 'id' => $item->id,
                 'name' => $item->name,

@@ -7,6 +7,7 @@ use App\Services\AuditLogger;
 use App\Services\RconClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -25,7 +26,7 @@ class RconController extends Controller
     public function execute(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'command' => 'required|string|max:500',
+            'command' => ['required', 'string', 'max:500', 'regex:/^[^\n\r]*$/'],
         ]);
 
         $command = $validated['command'];
@@ -34,8 +35,14 @@ class RconController extends Controller
             $this->rcon->connect();
             $response = $this->rcon->command($command);
         } catch (\Throwable $e) {
+            Log::error('RCON command failed', ['command_verb' => explode(' ', $command, 2)[0], 'error' => $e->getMessage()]);
+
+            $errorMessage = app()->isProduction()
+                ? 'RCON command failed — server may be offline'
+                : 'RCON failed: '.$e->getMessage();
+
             return response()->json([
-                'error' => 'RCON failed: '.$e->getMessage(),
+                'error' => $errorMessage,
                 'command' => $command,
             ], 503);
         }

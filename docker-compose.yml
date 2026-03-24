@@ -30,8 +30,8 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8000}:8000"
-      - "5173:5173"
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./app:/var/www/html
       - app-vendor:/var/www/html/vendor
@@ -42,12 +42,12 @@ services:
       - backup-data:/backups
       - lua-bridge:/lua-bridge
       - map-tiles:/map-tiles
-      - /var/run/docker.sock:/var/run/docker.sock
     env_file: ./app/.env
     environment:
       DB_HOST: ${DB_HOST:-db}
       REDIS_HOST: ${REDIS_HOST:-redis}
       GAME_SERVER_CONTAINER_NAME: ${GAME_SERVER_CONTAINER_NAME:-pz-game-server}
+      DOCKER_PROXY_URL: http://docker-socket-proxy:2375
       PZ_DATA_PATH: /pz-data
       PZ_SERVER_PATH: /pz-server
       PZ_RCON_HOST: game-server
@@ -57,6 +57,13 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
     networks:
       - zomboid-net
       - backend-net
@@ -84,12 +91,12 @@ services:
       - backup-data:/backups
       - lua-bridge:/lua-bridge
       - map-tiles:/map-tiles
-      - /var/run/docker.sock:/var/run/docker.sock
     env_file: ./app/.env
     environment:
       DB_HOST: ${DB_HOST:-db}
       REDIS_HOST: ${REDIS_HOST:-redis}
       GAME_SERVER_CONTAINER_NAME: ${GAME_SERVER_CONTAINER_NAME:-pz-game-server}
+      DOCKER_PROXY_URL: http://docker-socket-proxy:2375
       PZ_DATA_PATH: /pz-data
       PZ_SERVER_PATH: /pz-server
       PZ_RCON_HOST: game-server
@@ -99,6 +106,13 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
     networks:
       - zomboid-net
       - backend-net
@@ -111,9 +125,10 @@ services:
     container_name: pz-db
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./db/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
     environment:
       POSTGRES_DB: ${DB_DATABASE:-zomboid}
       POSTGRES_USER: ${DB_USERNAME:-zomboid}
@@ -146,6 +161,41 @@ services:
       retries: 5
     networks:
       - backend-net
+
+  # ---------------------------------------------------------------------------
+  # Docker Socket Proxy — Restricted Docker API access for app/queue
+  # ---------------------------------------------------------------------------
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+    container_name: pz-docker-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      LOG: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backend-net
+
+  # ---------------------------------------------------------------------------
+  # Caddy — Reverse proxy with automatic TLS
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2.11.2-alpine
+    container_name: pz-caddy
+    restart: unless-stopped
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    networks:
+      - zomboid-net
 
 # -----------------------------------------------------------------------------
 # Networks
@@ -185,3 +235,7 @@ volumes:
     name: pz-lua-bridge
   map-tiles:
     name: pz-map-tiles
+  caddy-data:
+    name: pz-caddy-data
+  caddy-config:
+    name: pz-caddy-config

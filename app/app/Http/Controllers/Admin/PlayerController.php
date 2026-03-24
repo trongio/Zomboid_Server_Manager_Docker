@@ -10,6 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\OnlinePlayersReader;
 use App\Services\PzPasswordSyncService;
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use App\Services\RespawnDelayManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -88,7 +89,8 @@ class PlayerController extends Controller
 
     public function kick(Request $request, string $name): JsonResponse
     {
-        $reason = $request->input('reason', '');
+        $name = RconSanitizer::playerName($name);
+        $reason = RconSanitizer::message($request->input('reason', ''));
 
         try {
             $this->rcon->connect();
@@ -111,6 +113,7 @@ class PlayerController extends Controller
 
     public function ban(Request $request, string $name): JsonResponse
     {
+        $name = RconSanitizer::playerName($name);
         $reason = $request->input('reason', '');
         $ipBan = $request->boolean('ip_ban');
 
@@ -137,7 +140,8 @@ class PlayerController extends Controller
 
     public function setAccessLevel(Request $request, string $name): JsonResponse
     {
-        $level = $request->input('level', 'none');
+        $name = RconSanitizer::playerName($name);
+        $level = RconSanitizer::accessLevel($request->input('level', 'none'));
 
         try {
             $this->rcon->connect();

@@ -38,14 +38,14 @@ prompt() {
 
     if [ "$is_secret" = "true" ]; then
         echo -ne "  ${label} ${DIM}[hidden]${NC}: "
-        read -rs value
+        read -rs value || true
         echo ""
     elif [ -n "$default" ]; then
         echo -ne "  ${label} ${DIM}[${default}]${NC}: "
-        read -r value
+        read -r value || true
     else
         echo -ne "  ${label}: "
-        read -r value
+        read -r value || true
     fi
 
     value="${value:-$default}"
@@ -69,7 +69,7 @@ if [ -f .env ] || [ -f app/.env ]; then
     echo ""
     echo -e "${YELLOW}Existing .env file(s) detected.${NC}"
     echo -ne "  Overwrite and reconfigure? ${DIM}[y/N]${NC}: "
-    read -r overwrite
+    read -r overwrite || true
     if [ "${overwrite,,}" != "y" ]; then
         echo "Cancelled."
         exit 0
@@ -87,7 +87,7 @@ section "Environment"
 echo "  1) Production  (recommended for real servers)"
 echo "  2) Development (debug mode, Vite dev server)"
 echo -ne "  ${DIM}[1]${NC}: "
-read -r env_choice
+read -r env_choice || true
 env_choice="${env_choice:-1}"
 
 if [ "$env_choice" = "2" ]; then
@@ -113,7 +113,7 @@ prompt ADMIN_USERNAME "Username" "admin"
 # Generate a random password as default
 DEFAULT_ADMIN_PASS=$(generate_secret 18 16)
 echo -ne "  Password ${DIM}[auto-generated]${NC}: "
-read -rs ADMIN_PASSWORD
+read -rs ADMIN_PASSWORD || true
 echo ""
 if [ -z "$ADMIN_PASSWORD" ]; then
     ADMIN_PASSWORD="$DEFAULT_ADMIN_PASS"
@@ -134,7 +134,7 @@ echo "  Steam branch:"
 echo "    1) public  — Stable release (recommended)"
 echo "    2) b42     — Build 42 beta"
 echo -ne "  ${DIM}[1]${NC}: "
-read -r branch_choice
+read -r branch_choice || true
 branch_choice="${branch_choice:-1}"
 if [ "$branch_choice" = "2" ]; then
     PZ_STEAM_BRANCH="b42"
@@ -144,20 +144,52 @@ fi
 
 prompt PZ_SERVER_PASSWORD "Server password (empty = open)" ""
 
-# ── Web Panel ─────────────────────────────────────────────────────────────────
-section "Web Panel"
-if [ "$APP_ENV" = "production" ]; then
-    DEFAULT_PORT="80"
-else
-    DEFAULT_PORT="8080"
-fi
-prompt APP_PORT "Port" "$DEFAULT_PORT"
-if [ "$APP_PORT" = "80" ]; then
-    DEFAULT_URL="http://localhost"
-else
-    DEFAULT_URL="http://localhost:${APP_PORT}"
-fi
-prompt APP_URL "URL" "$DEFAULT_URL"
+# ── Web Panel (HTTPS via Caddy) ───────────────────────────────────────────────
+section "Web Panel (HTTPS)"
+echo "  How will you access the panel?"
+echo "  1) Domain name  (e.g., zomboid.example.com — auto Let's Encrypt)"
+echo "  2) Public IP     (e.g., 203.0.113.50 — self-signed cert)"
+echo "  3) Localhost only (local dev — self-signed cert)"
+echo -ne "  ${DIM}[3]${NC}: "
+read -r access_choice || true
+access_choice="${access_choice:-3}"
+
+APP_PORT=8000
+CADDY_HTTP_PORT=80
+CADDY_HTTPS_PORT=443
+
+case "$access_choice" in
+    1)
+        while true; do
+            prompt SITE_HOST "Domain name" ""
+            if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
+                break
+            fi
+            echo -e "  ${RED}Invalid domain name. Try again.${NC}"
+        done
+        APP_URL="https://${SITE_HOST}"
+        CADDY_SITE="${SITE_HOST}"
+        CADDY_TLS=""
+        ;;
+    2)
+        while true; do
+            prompt SITE_HOST "Server IP address" ""
+            if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                break
+            fi
+            echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+        done
+        APP_URL="https://${SITE_HOST}"
+        CADDY_SITE="${SITE_HOST}"
+        CADDY_TLS=$'\ttls internal'
+        ;;
+    *)
+        SITE_HOST="localhost"
+        APP_URL="https://localhost"
+        CADDY_SITE="localhost"
+        CADDY_TLS=$'\ttls internal'
+        ;;
+esac
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
@@ -169,11 +201,11 @@ echo -e "  Admin:        ${GREEN}${ADMIN_USERNAME}${NC}"
 echo -e "  Server:       ${GREEN}${PZ_SERVER_NAME}${NC}"
 echo -e "  Players:      ${GREEN}${PZ_MAX_PLAYERS}${NC} / RAM: ${GREEN}${PZ_MAX_RAM}${NC}"
 echo -e "  Branch:       ${GREEN}${PZ_STEAM_BRANCH}${NC}"
-echo -e "  Panel:        ${GREEN}${APP_URL}${NC}"
+echo -e "  Panel:        ${GREEN}${APP_URL}${NC} (HTTPS via Caddy)"
 echo -e "  Architecture: ${GREEN}${ARCH_LABEL}${NC}"
 echo ""
 echo -ne "  Proceed? ${DIM}[Y/n]${NC}: "
-read -r proceed
+read -r proceed || true
 if [ "${proceed,,}" = "n" ]; then
     echo "Cancelled."
     exit 0
@@ -193,6 +225,26 @@ APP_SECRET=$(openssl rand -base64 32)
 REDIS_PASS=$(generate_secret 18 20)
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Generate Caddyfile
+# ══════════════════════════════════════════════════════════════════════════════
+echo "Creating caddy/Caddyfile..."
+mkdir -p caddy
+cat > caddy/Caddyfile <<CADDYEOF
+{
+	# Managed by setup.sh — edit freely or re-run make init
+}
+
+${CADDY_SITE} {
+${CADDY_TLS}
+	reverse_proxy app:8000
+}
+
+http://${CADDY_SITE} {
+	redir https://${CADDY_SITE}{uri} permanent
+}
+CADDYEOF
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Generate root .env
 # ══════════════════════════════════════════════════════════════════════════════
 echo "Creating .env from ${ROOT_TEMPLATE}..."
@@ -210,6 +262,8 @@ sed \
     -e "s|^APP_DEBUG=.*|APP_DEBUG=${APP_DEBUG}|" \
     -e "s|^APP_URL=.*|APP_URL=${APP_URL}|" \
     -e "s|^APP_PORT=.*|APP_PORT=${APP_PORT}|" \
+    -e "s|^CADDY_HTTP_PORT=.*|CADDY_HTTP_PORT=${CADDY_HTTP_PORT}|" \
+    -e "s|^CADDY_HTTPS_PORT=.*|CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT}|" \
     -e "s|^DB_PASSWORD=.*|DB_PASSWORD=${DB_PASS}|" \
     -e "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=${REDIS_PASS}|" \
     -e "s|^API_KEY=.*|API_KEY=${API_SECRET}|" \
@@ -242,9 +296,12 @@ sed \
 
 # Production-specific overrides for app/.env
 if [ "$APP_ENV" = "production" ]; then
-    # Ensure session encryption is on
     sed -i "s|^SESSION_ENCRYPT=.*|SESSION_ENCRYPT=true|" app/.env 2>/dev/null || true
+    sed -i "s|^SESSION_SECURE_COOKIE=.*|SESSION_SECURE_COOKIE=true|" app/.env 2>/dev/null || true
 fi
+
+# Always set LOG_STACK to daily
+sed -i "s|^LOG_STACK=.*|LOG_STACK=daily|" app/.env 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Ensure database volume exists
@@ -269,7 +326,7 @@ echo -e "${GREEN}${BOLD}══════════════════�
 echo -e "${GREEN}${BOLD}  Setup complete!${NC}"
 echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
 echo ""
-echo -e "  ${BOLD}Web Panel:${NC}     ${APP_URL}"
+echo -e "  ${BOLD}Web Panel:${NC}     ${APP_URL}  ${DIM}(HTTPS)${NC}"
 echo -e "  ${BOLD}Admin User:${NC}    ${ADMIN_USERNAME}"
 if [ "$ADMIN_PASS_GENERATED" = "true" ]; then
 echo -e "  ${BOLD}Admin Pass:${NC}    ${YELLOW}${ADMIN_PASSWORD}${NC}"

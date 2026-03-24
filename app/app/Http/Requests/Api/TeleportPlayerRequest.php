@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Rules\RconSafeIdentifier;
 use Illuminate\Foundation\Http\FormRequest;
 
 class TeleportPlayerRequest extends FormRequest
@@ -12,7 +13,7 @@ class TeleportPlayerRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
@@ -20,7 +21,7 @@ class TeleportPlayerRequest extends FormRequest
             'x' => ['required_without:target_player', 'numeric'],
             'y' => ['required_without:target_player', 'numeric'],
             'z' => ['sometimes', 'numeric'],
-            'target_player' => ['required_without:x', 'string', 'max:255'],
+            'target_player' => ['required_without:x', 'string', 'max:255', new RconSafeIdentifier('player')],
         ];
     }
 }

@@ -66,7 +66,8 @@ class ServerIniParser
                 $key = trim($key);
 
                 if (array_key_exists($key, $updates)) {
-                    $newLines[] = "{$key}={$updates[$key]}";
+                    $safeValue = str_replace(["\n", "\r"], '', (string) $updates[$key]);
+                    $newLines[] = "{$key}={$safeValue}";
                     $updatedKeys[] = $key;
 
                     continue;
@@ -79,7 +80,9 @@ class ServerIniParser
         // Append any new keys that didn't exist in the file
         foreach ($updates as $key => $value) {
             if (! in_array($key, $updatedKeys, true)) {
-                $newLines[] = "{$key}={$value}";
+                $safeKey = str_replace(["\n", "\r", '='], '', (string) $key);
+                $safeValue = str_replace(["\n", "\r"], '', (string) $value);
+                $newLines[] = "{$safeKey}={$safeValue}";
             }
         }
 

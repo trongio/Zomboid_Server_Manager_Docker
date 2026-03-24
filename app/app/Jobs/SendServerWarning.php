@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Cache;
@@ -29,7 +30,7 @@ class SendServerWarning implements ShouldQueue
 
         try {
             $rcon->connect();
-            $rcon->command("servermsg \"{$this->message}\"");
+            $rcon->command("servermsg \"".RconSanitizer::message($this->message)."\"");
         } catch (\Throwable) {
             // RCON unavailable — skip this warning silently
         }

@@ -8,10 +8,12 @@ use App\Http\Requests\Api\ServerLogsRequest;
 use App\Jobs\RestartGameServer;
 use App\Jobs\SendServerWarning;
 use App\Jobs\UpdateGameServer;
+use App\Rules\RconSafeMessage;
 use App\Services\AuditLogger;
 use App\Services\DockerManager;
 use App\Services\GameVersionReader;
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use App\Services\ServerStatusResolver;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -105,7 +107,7 @@ class ServerController
         $message = $request->validated('message');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server restarting in {$countdown} seconds";
+            $warningMessage = RconSanitizer::message($message ?? "Server restarting in {$countdown} seconds");
 
             try {
                 $this->rcon->connect();
@@ -165,7 +167,7 @@ class ServerController
 
     public function broadcast(BroadcastRequest $request): JsonResponse
     {
-        $message = $request->validated('message');
+        $message = RconSanitizer::message($request->validated('message'));
 
         try {
             $this->rcon->connect();
@@ -196,7 +198,7 @@ class ServerController
         $request->validate([
             'branch' => ['sometimes', 'string', 'in:public,unstable,iwillbackupmysave'],
             'countdown' => ['sometimes', 'integer', 'min:10', 'max:3600'],
-            'message' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'message' => ['sometimes', 'nullable', 'string', 'max:500', new RconSafeMessage],
         ]);
 
         $countdown = $request->input('countdown');
@@ -204,7 +206,7 @@ class ServerController
         $branch = $request->input('branch');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server updating in {$countdown} seconds";
+            $warningMessage = RconSanitizer::message($message ?? "Server updating in {$countdown} seconds");
 
             try {
                 $this->rcon->connect();

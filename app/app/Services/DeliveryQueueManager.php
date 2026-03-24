@@ -126,7 +126,8 @@ class DeliveryQueueManager
 
         try {
             $this->rcon->connect();
-            $this->rcon->command("additem \"{$username}\" \"{$itemType}\" {$count}");
+            $safeCount = (int) $count;
+            $this->rcon->command("additem \"".RconSanitizer::playerName($username)."\" \"".RconSanitizer::itemId($itemType)."\" {$safeCount}");
             Log::info("[DeliveryQueue] RCON additem: {$count}x {$itemType} to {$username}");
 
             // Request inventory re-export so web sees the change
@@ -213,7 +214,7 @@ class DeliveryQueueManager
             mkdir($dir, 0755, true);
         }
 
-        $tmpPath = $path.'.tmp.'.getmypid();
+        $tmpPath = $path.'.tmp.'.getmypid().'.'.bin2hex(random_bytes(4));
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
         if (file_put_contents($tmpPath, $json) === false) {

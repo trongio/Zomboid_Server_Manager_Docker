@@ -54,8 +54,8 @@ class RegistrationTest extends TestCase
     {
         $response = $this->post(route('register.store'), [
             'username' => 'testplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $this->assertAuthenticated();
@@ -66,8 +66,8 @@ class RegistrationTest extends TestCase
     {
         $this->post(route('register.store'), [
             'username' => 'testplayer',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $this->assertAuthenticated();
@@ -88,8 +88,8 @@ class RegistrationTest extends TestCase
         $response = $this->post(route('register.store'), [
             'username' => 'emailplayer',
             'email' => 'player@example.com',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $this->assertAuthenticated();
@@ -103,8 +103,8 @@ class RegistrationTest extends TestCase
     {
         $this->post(route('register.store'), [
             'username' => 'takenname',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         // Log out so we can attempt a second registration
@@ -112,8 +112,8 @@ class RegistrationTest extends TestCase
 
         $response = $this->post(route('register.store'), [
             'username' => 'takenname',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');
@@ -123,8 +123,8 @@ class RegistrationTest extends TestCase
     {
         $response = $this->post(route('register.store'), [
             'username' => 'invalid user!',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');
@@ -134,8 +134,8 @@ class RegistrationTest extends TestCase
     {
         $response = $this->post(route('register.store'), [
             'username' => 'ab',
-            'password' => 'secret',
-            'password_confirmation' => 'secret',
+            'password' => 'secretpw',
+            'password_confirmation' => 'secretpw',
         ]);
 
         $response->assertSessionHasErrors('username');

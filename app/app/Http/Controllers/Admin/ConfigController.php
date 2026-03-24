@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Rules\SafeConfigValue;
 use App\Services\AuditLogger;
 use App\Services\RespawnDelayManager;
 use App\Services\SandboxLuaParser;
@@ -49,7 +50,7 @@ class ConfigController extends Controller
     {
         $settings = $request->validate([
             'settings' => 'required|array|min:1',
-            'settings.*' => 'string',
+            'settings.*' => ['string', new SafeConfigValue(allowBackslash: true)],
         ])['settings'];
 
         $path = config('zomboid.paths.server_ini');
@@ -81,6 +82,7 @@ class ConfigController extends Controller
     {
         $settings = $request->validate([
             'settings' => 'required|array|min:1',
+            'settings.*' => ['required', new SafeConfigValue],
         ])['settings'];
 
         $path = config('zomboid.paths.sandbox_lua');
