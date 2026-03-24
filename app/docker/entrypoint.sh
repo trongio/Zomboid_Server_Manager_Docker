@@ -64,6 +64,11 @@ if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
     echo "[entrypoint] Add this to your .env to persist across restarts."
 fi
 
+# ── Package discovery ──────────────────────────────────────────────
+# Host bind-mount may contain stale bootstrap/cache from dev deps — purge and regenerate
+rm -f /var/www/html/bootstrap/cache/packages.php /var/www/html/bootstrap/cache/services.php
+php artisan package:discover --no-interaction 2>/dev/null || true
+
 # ── Only run setup tasks for the main app (not queue worker) ─────────
 if echo "$@" | grep -q "supervisord"; then
 

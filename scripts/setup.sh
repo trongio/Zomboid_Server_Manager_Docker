@@ -146,8 +146,17 @@ prompt PZ_SERVER_PASSWORD "Server password (empty = open)" ""
 
 # ── Web Panel ─────────────────────────────────────────────────────────────────
 section "Web Panel"
-prompt APP_PORT "Port" "8000"
-DEFAULT_URL="http://localhost:${APP_PORT}"
+if [ "$APP_ENV" = "production" ]; then
+    DEFAULT_PORT="80"
+else
+    DEFAULT_PORT="8080"
+fi
+prompt APP_PORT "Port" "$DEFAULT_PORT"
+if [ "$APP_PORT" = "80" ]; then
+    DEFAULT_URL="http://localhost"
+else
+    DEFAULT_URL="http://localhost:${APP_PORT}"
+fi
 prompt APP_URL "URL" "$DEFAULT_URL"
 
 # ══════════════════════════════════════════════════════════════════════════════

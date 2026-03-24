@@ -4,11 +4,44 @@ namespace Tests\Feature\Auth;
 
 use App\Models\WhitelistEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
+
+    private string $pzDbPath;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Always use a temp PZ SQLite DB — never hit the real game server
+        $this->pzDbPath = sys_get_temp_dir().'/pz_test_reg_'.uniqid().'.db';
+        touch($this->pzDbPath);
+
+        config(['database.connections.pz_sqlite.database' => $this->pzDbPath]);
+        DB::purge('pz_sqlite');
+
+        DB::connection('pz_sqlite')->statement('
+            CREATE TABLE IF NOT EXISTS whitelist (
+                username TEXT PRIMARY KEY,
+                password TEXT,
+                world TEXT DEFAULT NULL,
+                role INTEGER DEFAULT 2,
+                authType INTEGER DEFAULT 1
+            )
+        ');
+    }
+
+    protected function tearDown(): void
+    {
+        DB::connection('pz_sqlite')->disconnect();
+        @unlink($this->pzDbPath);
+
+        parent::tearDown();
+    }
 
     public function test_registration_screen_can_be_rendered()
     {
