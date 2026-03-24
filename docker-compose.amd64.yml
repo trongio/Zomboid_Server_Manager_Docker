@@ -1,5 +1,6 @@
 services:
   game-server:
+    # Pin to a specific version tag when available to prevent supply chain attacks
     image: renegademaster/zomboid-dedicated-server:latest
     entrypoint: ["/bin/bash", "/home/steam/amd64-entrypoint.sh"]
     environment:

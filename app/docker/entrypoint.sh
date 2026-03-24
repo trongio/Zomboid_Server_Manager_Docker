@@ -1,17 +1,6 @@
 #!/bin/sh
 set -e
 
-# ── Docker socket permissions ────────────────────────────────────────
-# Give www-data access to the Docker socket (GID varies by host)
-if [ -S /var/run/docker.sock ]; then
-    DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
-    if ! getent group "$DOCKER_GID" > /dev/null 2>&1; then
-        addgroup -g "$DOCKER_GID" -S docker
-    fi
-    DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
-    addgroup www-data "$DOCKER_GROUP" 2>/dev/null || true
-fi
-
 # ── Storage permissions ──────────────────────────────────────────────
 # Bind mounts override Dockerfile permissions — fix at runtime
 # Only target directories and runtime files, skip .gitignore to avoid git noise
@@ -81,10 +70,16 @@ if echo "$@" | grep -q "supervisord"; then
     if php artisan migrate:status --no-interaction 2>/dev/null | grep -q "Ran"; then
         BACKUP_FILE="/backups/db-pre-migrate-$(date +%Y%m%d-%H%M%S).sql"
         echo "[entrypoint] Backing up database before migrations..."
-        PGPASSWORD="${DB_PASSWORD}" pg_dump -h "${DB_HOST:-db}" -U "${DB_USERNAME:-zomboid}" \
+        PGPASSFILE="$(mktemp)"
+        echo "*:*:${DB_DATABASE:-zomboid}:${DB_USERNAME:-zomboid}:${DB_PASSWORD}" > "$PGPASSFILE"
+        chmod 600 "$PGPASSFILE"
+        export PGPASSFILE
+        pg_dump -h "${DB_HOST:-db}" -U "${DB_USERNAME:-zomboid}" \
             -d "${DB_DATABASE:-zomboid}" --no-owner > "$BACKUP_FILE" 2>/dev/null \
             && echo "[entrypoint] Backup saved to $BACKUP_FILE" \
             || echo "[entrypoint] Backup skipped (pg_dump not available or DB empty)"
+        rm -f "$PGPASSFILE"
+        unset PGPASSFILE
     fi
 
     # Database migrations

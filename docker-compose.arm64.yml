@@ -1,5 +1,6 @@
 services:
   game-server:
+    # Pin to a specific version tag when available to prevent supply chain attacks
     image: ghcr.io/joyfui/project-zomboid-server-docker-arm64:latest
     stdin_open: true
     tty: true

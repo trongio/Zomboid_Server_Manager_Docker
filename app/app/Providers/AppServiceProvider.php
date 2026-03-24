@@ -39,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
             $config = $app['config']['zomboid.docker'];
 
             return new DockerManager(
-                socketPath: $config['socket'],
+                proxyUrl: $config['proxy_url'],
                 containerName: $config['container_name'],
             );
         });

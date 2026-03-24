@@ -1,0 +1,12 @@
+{
+	# Managed by setup.sh — edit freely or re-run make init
+}
+
+localhost {
+	tls internal
+	reverse_proxy app:8000
+}
+
+http://localhost {
+	redir https://localhost{uri} permanent
+}
