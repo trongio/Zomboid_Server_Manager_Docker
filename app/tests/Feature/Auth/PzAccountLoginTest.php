@@ -11,6 +11,14 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     $this->withoutVite();
+    // Always use a temp PZ SQLite DB — never hit the real game server
+    $this->pzDbPath = setupPzSqliteForLogin();
+});
+
+afterEach(function () {
+    if (isset($this->pzDbPath)) {
+        cleanupPzSqlite($this->pzDbPath);
+    }
 });
 
 /**
@@ -101,7 +109,6 @@ describe('Existing web user login', function () {
 
 describe('Game-first player instant login', function () {
     it('auto-creates web account from PZ SQLite with PZ-hashed password', function () {
-        $dbPath = setupPzSqliteForLogin();
         insertPzLoginAccount('game_player', 'mypass');
 
         $this->post(route('login.store'), [
@@ -124,7 +131,7 @@ describe('Game-first player instant login', function () {
         expect($entry->user_id)->toBe($user->id);
         expect($entry->active)->toBeTrue();
 
-        cleanupPzSqlite($dbPath);
+
     });
 
     it('auto-creates web account from PZ SQLite with plain text password', function () {
@@ -143,11 +150,10 @@ describe('Game-first player instant login', function () {
         expect($user)->not->toBeNull();
         expect(Hash::check('plainpass', $user->password))->toBeTrue();
 
-        cleanupPzSqlite($dbPath);
+
     });
 
     it('rejects wrong password and does not create account', function () {
-        $dbPath = setupPzSqliteForLogin();
         insertPzLoginAccount('pz_user', 'correctpass');
 
         $this->post(route('login.store'), [
@@ -158,12 +164,10 @@ describe('Game-first player instant login', function () {
         $this->assertGuest();
         expect(User::where('username', 'pz_user')->exists())->toBeFalse();
 
-        cleanupPzSqlite($dbPath);
+
     });
 
     it('rejects login for username not in PZ SQLite', function () {
-        $dbPath = setupPzSqliteForLogin();
-
         $this->post(route('login.store'), [
             'username' => 'nonexistent',
             'password' => 'anypass',
@@ -171,7 +175,7 @@ describe('Game-first player instant login', function () {
 
         $this->assertGuest();
 
-        cleanupPzSqlite($dbPath);
+
     });
 });
 
@@ -206,7 +210,7 @@ describe('Sync-created user login', function () {
         $user->refresh();
         expect(Hash::check('gamepass', $user->password))->toBeTrue();
 
-        cleanupPzSqlite($dbPath);
+
     });
 });
 
@@ -223,12 +227,15 @@ describe('PZ SQLite unavailable', function () {
         // Should not crash — just a normal login failure
         $response->assertStatus(302);
         $this->assertGuest();
+
+        // Restore temp DB so afterEach cleanup works
+        config(['database.connections.pz_sqlite.database' => $this->pzDbPath]);
+        DB::purge('pz_sqlite');
     });
 });
 
 describe('Sync command fixes networkPlayers race condition', function () {
     it('creates missing WhitelistEntry and fixes password for user created from networkPlayers', function () {
-        $dbPath = setupPzSqliteForLogin();
 
         // Simulate Pass 2 having created a user with a random password (no WhitelistEntry)
         $user = User::forceCreate([
@@ -250,11 +257,10 @@ describe('Sync command fixes networkPlayers race condition', function () {
         expect($entry->user_id)->toBe($user->id);
         expect($entry->active)->toBeTrue();
 
-        cleanupPzSqlite($dbPath);
+
     });
 
     it('does not duplicate WhitelistEntry if one already exists', function () {
-        $dbPath = setupPzSqliteForLogin();
 
         $user = User::factory()->create(['username' => 'linked_player']);
         WhitelistEntry::create([
@@ -272,6 +278,6 @@ describe('Sync command fixes networkPlayers race condition', function () {
 
         expect(WhitelistEntry::where('pz_username', 'linked_player')->count())->toBe(1);
 
-        cleanupPzSqlite($dbPath);
+
     });
 });
