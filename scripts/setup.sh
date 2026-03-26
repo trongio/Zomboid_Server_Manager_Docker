@@ -422,7 +422,12 @@ make down 2>/dev/null || true
 # Caddy volumes may hold stale TLS state from a previous access mode — reset them
 docker volume rm pz-caddy-data pz-caddy-config 2>/dev/null || true
 
-make up
+# Start services (retry once — Docker can race on recently-deleted volumes)
+if ! make up; then
+    echo -e "${YELLOW}Retrying after volume cleanup...${NC}"
+    sleep 3
+    make up
+fi
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Sync passwords into existing volumes (re-run safe)
