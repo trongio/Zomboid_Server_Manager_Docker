@@ -39,7 +39,7 @@ class ServerStatusResolver
             'uptime' => null,
             'map' => null,
             'max_players' => null,
-            'game_version' => $this->versionReader->getCachedVersion(),
+            'game_version' => $this->versionReader->getCachedVersion() ?? $this->versionReader->refreshVersion(),
             'steam_branch' => $this->versionReader->getCurrentBranch(),
             'data_source' => 'none',
         ];

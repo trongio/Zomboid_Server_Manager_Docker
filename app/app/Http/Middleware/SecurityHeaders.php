@@ -29,17 +29,28 @@ class SecurityHeaders
         $connectSrc = "'self'";
         $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net";
         $fontSrc = "'self' https://fonts.bunny.net";
+        $imgSrc = "'self' data:";
 
         if ($isLocal) {
             $scriptSrc .= " 'unsafe-eval'";
             $connectSrc .= ' ws://localhost:5173 http://localhost:5173';
         }
 
+        // Allow map tile images from the configured proxy (e.g. map.projectzomboid.com)
+        $mapProxyUrl = config('zomboid.map.proxy_url', '');
+        if ($mapProxyUrl) {
+            $scheme = parse_url($mapProxyUrl, PHP_URL_SCHEME);
+            $host = parse_url($mapProxyUrl, PHP_URL_HOST);
+            if ($scheme && $host) {
+                $imgSrc .= " {$scheme}://{$host}";
+            }
+        }
+
         $csp = implode('; ', [
             "default-src 'self'",
             "script-src {$scriptSrc}",
             "style-src {$styleSrc}",
-            "img-src 'self' data:",
+            "img-src {$imgSrc}",
             "connect-src {$connectSrc}",
             "font-src {$fontSrc}",
             "object-src 'none'",

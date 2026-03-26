@@ -37,6 +37,15 @@ Schedule::command('zomboid:generate-map-tiles')
     ->when(fn () => ! is_dir(config('zomboid.map.tiles_path').'/html/map_data/base/layer0_files'))
     ->runInBackground();
 
+Schedule::command('zomboid:download-item-icons')
+    ->hourly()
+    ->when(function () {
+        $catalog = config('zomboid.lua_bridge.items_catalog');
+
+        return file_exists($catalog) && ! glob(public_path('images/items/*.png'));
+    })
+    ->runInBackground();
+
 Schedule::job(new CreateBackupJob(BackupType::Daily))
     ->dailyAt('04:00')
     ->when(function () {

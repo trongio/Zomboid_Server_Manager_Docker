@@ -3,6 +3,22 @@
 # Runs configure-server.sh to apply .env settings, then optionally updates
 # via SteamCMD, and starts the server.
 
+# --- Root-only init: fix volume permissions, then re-exec as steam ---
+if [ "$(id -u)" = "0" ]; then
+    echo "[entrypoint] Running as root — fixing volume ownership..."
+    chown steam:steam /home/steam/Zomboid 2>/dev/null || true
+    chown -R steam:steam /home/steam/Zomboid/Lua 2>/dev/null || true
+    chown -R steam:steam /home/steam/Zomboid/mods 2>/dev/null || true
+    chown -R steam:steam /home/steam/Zomboid/Server 2>/dev/null || true
+    chown steam:steam /home/steam/Zomboid/db 2>/dev/null || true
+    chown steam:steam /home/steam/Zomboid/Saves 2>/dev/null || true
+    chmod -R 1777 /home/steam/Zomboid/Lua 2>/dev/null || true
+    echo "[entrypoint] Dropping to steam user..."
+    exec env HOME=/home/steam su -p -s /bin/bash steam -- "$0" "$@"
+fi
+
+# --- Everything below runs as steam user ---
+
 # Apply server configuration from environment variables
 bash /home/steam/configure-server.sh
 

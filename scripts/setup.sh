@@ -550,3 +550,15 @@ else
     echo -e "  ${DIM}  Check logs: docker logs pz-game-server${NC}"
 fi
 echo ""
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Item icons — download in background if catalog is available
+# ══════════════════════════════════════════════════════════════════════════════
+if docker exec pz-app test -f /lua-bridge/items_catalog.json 2>/dev/null; then
+    echo -e "${DIM}Downloading item icons in background...${NC}"
+    docker exec -d pz-app php artisan zomboid:download-item-icons --no-interaction \
+        >> /dev/null 2>&1 || true
+else
+    echo -e "${DIM}Item icons: skipped (catalog not yet exported by game server)${NC}"
+    echo -e "${DIM}  Run later: make exec CMD=\"php artisan zomboid:download-item-icons\"${NC}"
+fi

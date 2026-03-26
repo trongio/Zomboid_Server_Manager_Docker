@@ -2,6 +2,7 @@ services:
   game-server:
     # Pin to a specific version tag when available to prevent supply chain attacks
     image: ghcr.io/joyfui/project-zomboid-server-docker-arm64:latest
+    user: "0:0"
     stdin_open: true
     tty: true
     entrypoint: ["/bin/bash", "/home/steam/entrypoint.sh"]
@@ -33,7 +34,9 @@ services:
       - ./game-server/entrypoint.sh:/home/steam/entrypoint.sh:ro
       - ./game-server/mods/ZomboidManager:/home/steam/Zomboid/mods/ZomboidManager:ro
     healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q '[P]rojectZomboid64'"]
+      # Check RCON TCP port in /proc/net — proves game server is fully loaded
+      # (grep reads kernel's /proc directly, works without FEX emulation)
+      test: ["CMD-SHELL", "grep -q \":$(printf '%04X' ${PZ_RCON_PORT:-27015}) \" /proc/net/tcp6 /proc/net/tcp 2>/dev/null"]
       interval: 30s
       timeout: 10s
       retries: 5
