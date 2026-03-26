@@ -161,55 +161,103 @@ prompt PZ_SERVER_PASSWORD "Server password (empty = open)" ""
 
 # ── Web Panel (HTTPS via Caddy) ───────────────────────────────────────────────
 section "Web Panel (HTTPS)"
-echo "  How will you access the panel?"
-while true; do
-    echo "  1) Domain name  (e.g., zomboid.example.com — auto Let's Encrypt, domain must be pointed to this server already)"
-    echo "  2) Public IP     (e.g., 203.0.113.50 — self-signed cert)"
-    echo "  3) Localhost only (local dev — self-signed cert)"
-    echo -ne "  ${DIM}[3]${NC}: "
-    read -r access_choice || true
-    access_choice="${access_choice:-3}"
-    [[ "$access_choice" =~ ^[123]$ ]] && break
-    echo -e "  ${RED}Invalid choice. Enter 1, 2, or 3.${NC}"
-done
+
+# Detect public IP once (used by domain and IP validation)
+echo -e "  ${DIM}Detecting server public IP...${NC}"
+SERVER_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || true)
+if [ -n "$SERVER_IP" ]; then
+    echo -e "  ${DIM}Detected: ${SERVER_IP}${NC}"
+else
+    echo -e "  ${YELLOW}Could not detect public IP (no internet or behind NAT).${NC}"
+fi
 
 APP_PORT=8000
 CADDY_HTTP_PORT=80
 CADDY_HTTPS_PORT=443
 
-case "$access_choice" in
-    1)
-        while true; do
-            prompt SITE_HOST "Domain name" ""
-            if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
-                break
+while true; do
+    echo ""
+    echo "  How will you access the panel?"
+    echo "  1) Domain name  (e.g., zomboid.example.com — auto Let's Encrypt)"
+    echo "  2) IP address    (public or LAN — self-signed cert)"
+    echo "  3) Localhost only (local dev — self-signed cert)"
+    echo -ne "  ${DIM}[3]${NC}: "
+    read -r access_choice || true
+    access_choice="${access_choice:-3}"
+    if ! [[ "$access_choice" =~ ^[123]$ ]]; then
+        echo -e "  ${RED}Invalid choice. Enter 1, 2, or 3.${NC}"
+        continue
+    fi
+
+    case "$access_choice" in
+        1)
+            while true; do
+                prompt SITE_HOST "Domain name" ""
+                if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$ ]]; then
+                    break
+                fi
+                echo -e "  ${RED}Invalid domain name. Try again.${NC}"
+            done
+            # DNS pre-check: verify domain resolves to this server
+            DOMAIN_IP=$(dig +short "$SITE_HOST" 2>/dev/null | tail -1)
+            if [ -z "$DOMAIN_IP" ]; then
+                echo -e "  ${RED}${SITE_HOST} does not resolve to any IP address.${NC}"
+                echo -e "  ${RED}Let's Encrypt requires DNS to be configured first.${NC}"
+                continue
+            elif [ -n "$SERVER_IP" ] && [ "$DOMAIN_IP" != "$SERVER_IP" ]; then
+                echo -e "  ${RED}${SITE_HOST} resolves to ${DOMAIN_IP}, but this server's public IP is ${SERVER_IP}.${NC}"
+                echo -e "  ${RED}Let's Encrypt will fail unless the domain points to this server.${NC}"
+                continue
+            else
+                echo -e "  ${GREEN}✓ ${SITE_HOST} resolves to ${DOMAIN_IP}${NC}"
             fi
-            echo -e "  ${RED}Invalid domain name. Try again.${NC}"
-        done
-        APP_URL="https://${SITE_HOST}"
-        CADDY_SITE="${SITE_HOST}"
-        CADDY_TLS=""
-        ;;
-    2)
-        while true; do
-            prompt SITE_HOST "Server IP address" ""
-            if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                break
+            APP_URL="https://${SITE_HOST}"
+            CADDY_SITE="${SITE_HOST}"
+            CADDY_TLS=""
+            break
+            ;;
+        2)
+            while true; do
+                prompt SITE_HOST "Server IP address" ""
+                if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                    break
+                fi
+                echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+            done
+            # Verify IP belongs to this server (public or LAN)
+            LOCAL_IPS=$(hostname -I 2>/dev/null || true)
+            IP_VALID=false
+            if [ -n "$SERVER_IP" ] && [ "$SITE_HOST" = "$SERVER_IP" ]; then
+                IP_VALID=true
+                echo -e "  ${GREEN}✓ Matches server public IP${NC}"
+            elif echo "$LOCAL_IPS" | grep -qw "$SITE_HOST"; then
+                IP_VALID=true
+                echo -e "  ${GREEN}✓ Matches local network interface${NC}"
             fi
-            echo -e "  ${RED}Invalid IP address. Try again.${NC}"
-        done
-        APP_URL="https://${SITE_HOST}"
-        CADDY_SITE=":443"
-        CADDY_TLS=$'\ttls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'
-        GENERATE_SELF_SIGNED=true
-        ;;
-    3)
-        SITE_HOST="localhost"
-        APP_URL="https://localhost"
-        CADDY_SITE="localhost"
-        CADDY_TLS=$'\ttls internal'
-        ;;
-esac
+            if [ "$IP_VALID" = "false" ]; then
+                echo -e "  ${RED}${SITE_HOST} is not assigned to this server.${NC}"
+                if [ -n "$SERVER_IP" ]; then
+                    echo -e "  ${RED}Public IP: ${SERVER_IP} | Local IPs: ${LOCAL_IPS}${NC}"
+                else
+                    echo -e "  ${RED}Local IPs: ${LOCAL_IPS}${NC}"
+                fi
+                continue
+            fi
+            APP_URL="https://${SITE_HOST}"
+            CADDY_SITE=":443"
+            CADDY_TLS=$'\ttls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'
+            GENERATE_SELF_SIGNED=true
+            break
+            ;;
+        3)
+            SITE_HOST="localhost"
+            APP_URL="https://localhost"
+            CADDY_SITE="localhost"
+            CADDY_TLS=$'\ttls internal'
+            break
+            ;;
+    esac
+done
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
@@ -365,11 +413,15 @@ if ! docker volume inspect pz-postgres >/dev/null 2>&1; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Stop existing services (if any) so they pick up new config
+# Stop existing services and clean stale state
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${BOLD}Starting services...${NC}"
 make down 2>/dev/null || true
+
+# Caddy volumes may hold stale TLS state from a previous access mode — reset them
+docker volume rm pz-caddy-data pz-caddy-config 2>/dev/null || true
+
 make up
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -388,6 +440,12 @@ if [ -n "$REDIS_PASS" ]; then
     docker exec pz-redis redis-cli -a "$REDIS_PASS" CONFIG SET requirepass "$REDIS_PASS" >/dev/null 2>&1 || true
 fi
 
+# Clear stale config/route cache (APP_URL or other settings may have changed)
+echo "Clearing application cache..."
+docker exec pz-app php artisan config:clear --no-interaction >/dev/null 2>&1 || true
+docker exec pz-app php artisan route:clear --no-interaction >/dev/null 2>&1 || true
+docker exec pz-app php artisan view:clear --no-interaction >/dev/null 2>&1 || true
+
 # Admin user: update or create via artisan (entrypoint may not have run yet)
 echo "Syncing admin account..."
 for attempt in 1 2 3; do
@@ -398,12 +456,41 @@ for attempt in 1 2 3; do
 done
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Health check — verify the panel is reachable
+# ══════════════════════════════════════════════════════════════════════════════
+echo "Verifying web panel..."
+HEALTH_OK=false
+for attempt in 1 2 3 4 5; do
+    HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/" 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
+        HEALTH_OK=true
+        break
+    fi
+    sleep 3
+done
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Done
 # ══════════════════════════════════════════════════════════════════════════════
 echo ""
-echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}${BOLD}  Setup complete!${NC}"
-echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
+if [ "$HEALTH_OK" = "true" ]; then
+    echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
+    echo -e "${GREEN}${BOLD}  Setup complete!${NC}"
+    echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
+else
+    echo -e "${YELLOW}${BOLD}══════════════════════════════════════════════${NC}"
+    echo -e "${YELLOW}${BOLD}  Setup complete — but panel not reachable!${NC}"
+    echo -e "${YELLOW}${BOLD}══════════════════════════════════════════════${NC}"
+    echo ""
+    if [ "$access_choice" = "1" ]; then
+        echo -e "  ${YELLOW}Let's Encrypt may still be issuing a certificate.${NC}"
+        echo -e "  ${YELLOW}Check: make logs | grep caddy${NC}"
+        echo -e "  ${YELLOW}Ensure ports 80 and 443 are open in your firewall.${NC}"
+    else
+        echo -e "  ${YELLOW}Ensure ports 80 and 443 are open in your firewall.${NC}"
+        echo -e "  ${YELLOW}Check: make logs${NC}"
+    fi
+fi
 echo ""
 echo -e "  ${BOLD}Web Panel:${NC}     ${APP_URL}  ${DIM}(HTTPS)${NC}"
 echo -e "  ${BOLD}Admin User:${NC}    ${ADMIN_USERNAME}"
