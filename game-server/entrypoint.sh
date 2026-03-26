@@ -32,7 +32,18 @@ fi
 # Only run SteamCMD if server files are missing or PZ_FORCE_UPDATE=true
 if [ ! -f /home/steam/pzserver/start-server.sh ] || [ "${PZ_FORCE_UPDATE:-false}" = "true" ]; then
   echo "[entrypoint] Installing/updating PZ server (branch: $BRANCH)..."
-  FEXBash "/home/steam/Steam/steamcmd.sh +@sSteamCmdForcePlatformType linux +force_install_dir /home/steam/pzserver +login anonymous +app_update 380870 $BETA_FLAG validate +quit"
+  for attempt in 1 2 3; do
+    FEXBash "/home/steam/Steam/steamcmd.sh +@sSteamCmdForcePlatformType linux +force_install_dir /home/steam/pzserver +login anonymous +app_update 380870 $BETA_FLAG validate +quit" && break
+    echo "[entrypoint] SteamCMD failed (attempt $attempt/3), retrying in 10s..."
+    sleep 10
+  done
+  if [ ! -f /home/steam/pzserver/start-server.sh ]; then
+    echo "[entrypoint] FATAL: SteamCMD failed to install the server after 3 attempts."
+    echo "[entrypoint] Check your internet connection and Steam service status."
+    echo "[entrypoint] Container will stay alive for debugging — check logs with: docker logs pz-game-server"
+    sleep infinity
+    exit 1
+  fi
 else
   echo "[entrypoint] Server files found, skipping SteamCMD. Set PZ_FORCE_UPDATE=true to force update."
 fi

@@ -514,3 +514,16 @@ fi
 echo ""
 echo -e "  ${BOLD}API Key:${NC}       ${DIM}${API_SECRET}${NC}"
 echo ""
+
+# Game server status hint — SteamCMD download takes a while on first run
+GS_STATUS=$(docker inspect --format='{{.State.Health.Status}}' pz-game-server 2>/dev/null || echo "unknown")
+if [ "$GS_STATUS" = "healthy" ]; then
+    echo -e "  ${GREEN}Game server: running${NC}"
+elif [ "$GS_STATUS" = "starting" ]; then
+    echo -e "  ${YELLOW}Game server: starting (SteamCMD is downloading ~3 GB, this takes a while)${NC}"
+    echo -e "  ${DIM}  Monitor with: docker logs -f pz-game-server${NC}"
+else
+    echo -e "  ${YELLOW}Game server: ${GS_STATUS}${NC}"
+    echo -e "  ${DIM}  Check logs: docker logs pz-game-server${NC}"
+fi
+echo ""
