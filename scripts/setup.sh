@@ -530,12 +530,12 @@ for attempt in 1 2 3; do
 done
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Health check — verify the panel is reachable
+# Health check — verify the app is running (local check only)
 # ══════════════════════════════════════════════════════════════════════════════
-echo "Verifying web panel..."
+echo "Verifying app is running..."
 HEALTH_OK=false
 for attempt in 1 2 3 4 5; do
-    HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "${APP_URL}/" 2>/dev/null || echo "000")
+    HTTP_CODE=$(curl -sk -o /dev/null -w "%{http_code}" "http://localhost:${APP_PORT}/" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 400 ]; then
         HEALTH_OK=true
         break
@@ -553,20 +553,17 @@ if [ "$HEALTH_OK" = "true" ]; then
     echo -e "${GREEN}${BOLD}══════════════════════════════════════════════${NC}"
 else
     echo -e "${YELLOW}${BOLD}══════════════════════════════════════════════${NC}"
-    echo -e "${YELLOW}${BOLD}  Setup complete — but panel not reachable!${NC}"
+    echo -e "${YELLOW}${BOLD}  Setup complete — but app not responding!${NC}"
     echo -e "${YELLOW}${BOLD}══════════════════════════════════════════════${NC}"
     echo ""
-    if [ "$access_choice" = "1" ]; then
-        echo -e "  ${YELLOW}Let's Encrypt may still be issuing a certificate.${NC}"
-        echo -e "  ${YELLOW}Check: make logs | grep caddy${NC}"
-        echo -e "  ${YELLOW}Ensure ports 80 and 443 are open in your firewall.${NC}"
-    else
-        echo -e "  ${YELLOW}Ensure ports 80 and 443 are open in your firewall.${NC}"
-        echo -e "  ${YELLOW}Check: make logs${NC}"
-    fi
+    echo -e "  ${YELLOW}The app container may still be starting up.${NC}"
+    echo -e "  ${YELLOW}Check: make logs${NC}"
 fi
 echo ""
-echo -e "  ${BOLD}Web Panel:${NC}     ${APP_URL}  ${DIM}(HTTPS)${NC}"
+echo -e "  ${BOLD}Local Admin:${NC}   http://localhost:${APP_PORT}"
+if [ "$access_choice" != "3" ]; then
+    echo -e "  ${BOLD}Public Admin:${NC}  ${APP_URL}  ${DIM}(requires 'make admin-expose')${NC}"
+fi
 echo -e "  ${BOLD}Admin User:${NC}    ${ADMIN_USERNAME}"
 if [ "$ADMIN_PASS_GENERATED" = "true" ]; then
 echo -e "  ${BOLD}Admin Pass:${NC}    ${YELLOW}${ADMIN_PASSWORD}${NC}"

@@ -63,7 +63,7 @@ info:
 		echo "Public IP: unavailable"; \
 	fi; \
 	if [ -f .firewall.conf ]; then \
-		. .firewall.conf; \
+		. ./.firewall.conf; \
 		echo "Firewall backend: $$FIREWALL_BACKEND"; \
 	else \
 		echo "Firewall: not configured (run 'make init')"; \
