@@ -477,6 +477,39 @@ After editing `.env`, restart to apply:
 make down && make up
 ```
 
+## Firewall & Network Access
+
+The setup wizard (`make init`) detects your OS and firewall backend automatically. Configuration is saved to `.firewall.conf` (gitignored).
+
+### Supported Backends
+
+| Backend | OS | Auto-managed |
+|---|---|---|
+| **firewalld** | Fedora, RHEL, CentOS | Yes |
+| **ufw** | Ubuntu, Debian | Yes |
+| **manual** | Everything else | Prints guidance |
+
+### Quick Reference
+
+| Command | What it does |
+|---|---|
+| `make expose` | Opens game ports (16261-16262/udp) in host firewall |
+| `make hide` | Closes game ports |
+| `make admin-expose` | Opens Caddy web ports (80/443) for public HTTPS admin access |
+| `make admin-hide` | Closes Caddy web ports |
+
+- **Local admin** is always available at `http://localhost:8000` — no firewall changes needed.
+- **Public admin** goes through Caddy (HTTPS), not through port 8000 directly.
+- **Game ports** are closed by default. Run `make expose` to let players connect.
+- All firewall rules are **runtime only** (non-permanent) on firewalld. ufw rules persist across reboots.
+- **Router port forwarding** is not automated — see the per-OS docs below.
+
+### Per-OS Documentation
+
+- [firewalld (Fedora/RHEL)](docs/firewall-firewalld.md)
+- [ufw (Ubuntu/Debian)](docs/firewall-ufw.md)
+- [Manual / Unsupported OS](docs/firewall-manual.md)
+
 ## Screenshots
 
 <details open>

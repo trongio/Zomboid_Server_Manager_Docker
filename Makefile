@@ -9,13 +9,16 @@ endif
 
 COMPOSE := docker compose -f docker-compose.yml -f $(ARCH_FILE)
 
-FW_ZONE ?= FedoraWorkstation
 PZ_GAME_PORT ?= 16261
 PZ_DIRECT_PORT ?= 16262
 APP_PORT ?= 8000
+CADDY_HTTP_PORT ?= 80
+CADDY_HTTPS_PORT ?= 443
+
+FW_DISPATCH := bash scripts/firewall/dispatch.sh
 
 .PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package \
-	fw-game-open fw-game-close fw-admin-open fw-admin-close admin-expose admin-hide expose hide info
+	admin-expose admin-hide expose hide info
 
 # ── First-run setup ──────────────────────────────────────────────────
 # Interactive wizard: configures env, creates DB volume, starts services,
@@ -59,35 +62,17 @@ info:
 	else \
 		echo "Public IP: unavailable"; \
 	fi; \
-	echo "Game ports are closed in firewalld by default. Run 'make expose' to allow remote players."
+	if [ -f .firewall.conf ]; then \
+		. .firewall.conf; \
+		echo "Firewall backend: $$FIREWALL_BACKEND"; \
+	else \
+		echo "Firewall: not configured (run 'make init')"; \
+	fi; \
+	echo "Game ports are closed by default. Run 'make expose' to allow remote players."
 
 # ── Firewall helpers ────────────────────────────────────────────────
-# These targets change runtime firewalld rules only. Nothing here is permanent.
-
-fw-game-open:
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(PZ_GAME_PORT)/udp >/dev/null || \
-		sudo firewall-cmd --zone=$(FW_ZONE) --add-port=$(PZ_GAME_PORT)/udp
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(PZ_DIRECT_PORT)/udp >/dev/null || \
-		sudo firewall-cmd --zone=$(FW_ZONE) --add-port=$(PZ_DIRECT_PORT)/udp
-	@echo "Opened game ports in firewalld runtime: $(PZ_GAME_PORT)/udp $(PZ_DIRECT_PORT)/udp"
-	@$(MAKE) info
-
-fw-game-close:
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(PZ_GAME_PORT)/udp >/dev/null && \
-		sudo firewall-cmd --zone=$(FW_ZONE) --remove-port=$(PZ_GAME_PORT)/udp || true
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(PZ_DIRECT_PORT)/udp >/dev/null && \
-		sudo firewall-cmd --zone=$(FW_ZONE) --remove-port=$(PZ_DIRECT_PORT)/udp || true
-	@echo "Closed game ports in firewalld runtime: $(PZ_GAME_PORT)/udp $(PZ_DIRECT_PORT)/udp"
-
-fw-admin-open:
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(APP_PORT)/tcp >/dev/null || \
-		sudo firewall-cmd --zone=$(FW_ZONE) --add-port=$(APP_PORT)/tcp
-	@echo "Opened admin port in firewalld runtime: $(APP_PORT)/tcp"
-
-fw-admin-close:
-	@sudo firewall-cmd --zone=$(FW_ZONE) --query-port=$(APP_PORT)/tcp >/dev/null && \
-		sudo firewall-cmd --zone=$(FW_ZONE) --remove-port=$(APP_PORT)/tcp || true
-	@echo "Closed admin port in firewalld runtime: $(APP_PORT)/tcp"
+# These targets dispatch to OS-specific scripts via .firewall.conf.
+# Nothing here is permanent — all rules are runtime only.
 
 # ── Core commands ────────────────────────────────────────────────────
 # Default startup keeps the admin UI local-only and does not change firewall rules.
@@ -119,7 +104,7 @@ nuke:
 		echo "Removing leftover volumes: $$REMAINING"; \
 		echo "$$REMAINING" | xargs docker volume rm 2>/dev/null || true; \
 	fi
-	@rm -f .env app/.env
+	@rm -f .env app/.env .firewall.conf
 	@rm -f caddy/Caddyfile caddy/certs/cert.pem caddy/certs/key.pem
 	@echo "Nuke complete. All volumes and config removed."
 
@@ -142,25 +127,28 @@ pull:
 	$(COMPOSE) pull
 
 # ── Game firewall exposure ──────────────────────────────────────────
-# Separate from up/down on purpose.
+# Separate from up/down on purpose. Game ports only (UDP).
 expose:
-	@$(MAKE) fw-game-open
+	@PZ_GAME_PORT=$(PZ_GAME_PORT) PZ_DIRECT_PORT=$(PZ_DIRECT_PORT) $(FW_DISPATCH) game-open
+	@$(MAKE) info
 
 hide:
-	@$(MAKE) fw-game-close
+	@PZ_GAME_PORT=$(PZ_GAME_PORT) PZ_DIRECT_PORT=$(PZ_DIRECT_PORT) $(FW_DISPATCH) game-close
 
 # ── Admin UI exposure ───────────────────────────────────────────────
-# Separate on purpose. These do not affect the game ports.
+# Opens Caddy web ports (80/443) in the firewall for public HTTPS access.
+# The app stays bound to 127.0.0.1:8000 — it is never exposed directly.
+# Requires Caddy to be configured (run 'make init' first).
 admin-expose:
-	APP_BIND_IP=0.0.0.0 VITE_BIND_IP=127.0.0.1 $(COMPOSE) up -d --force-recreate app
-	@$(MAKE) fw-admin-open
-	@echo "Admin URL: http://localhost:$(APP_PORT)"
-	@echo "Remote admin URL: http://$$(curl -4 -fsS https://api.ipify.org 2>/dev/null || echo '<public-ip-unavailable>'):$(APP_PORT)"
+	@CADDY_HTTP_PORT=$(CADDY_HTTP_PORT) CADDY_HTTPS_PORT=$(CADDY_HTTPS_PORT) $(FW_DISPATCH) admin-open
+	@echo "Admin panel exposed via Caddy on ports $(CADDY_HTTP_PORT)/$(CADDY_HTTPS_PORT)"
+	@echo "Local:  http://localhost:$(APP_PORT)"
+	@echo "Public: https://$$(curl -4 -fsS https://api.ipify.org 2>/dev/null || echo '<see-your-caddy-config>')"
 
 admin-hide:
-	@$(MAKE) fw-admin-close
-	APP_BIND_IP=127.0.0.1 VITE_BIND_IP=127.0.0.1 $(COMPOSE) up -d --force-recreate app
-	@echo "Admin URL: http://localhost:$(APP_PORT)"
+	@CADDY_HTTP_PORT=$(CADDY_HTTP_PORT) CADDY_HTTPS_PORT=$(CADDY_HTTPS_PORT) $(FW_DISPATCH) admin-close
+	@echo "Admin panel restricted to local access."
+	@echo "Local:  http://localhost:$(APP_PORT)"
 
 # ── App commands ─────────────────────────────────────────────────────
 migrate: db-backup
@@ -202,23 +190,43 @@ workshop-package:
 
 help:
 	@echo "Available targets:"
-	@echo "  init           - Interactive first-run setup wizard"
-	@echo "  setup          - Alias for 'init'"
-	@echo "  db-check       - Check if DB volume exists, create if not"
-	@echo "  db-init        - Create DB volume (empty) if it doesn't exist"
-	@echo "  db-reset       - Reset DB volume (DANGER: deletes data)"
-	@echo "  up             - Start services (admin UI local-only by default)"
-	@echo "  down           - Stop services"
-	@echo "  nuke           - Destroy ALL data and stop services (DANGER)"
-	@echo "  build          - Build Docker images"
-	@echo "  restart        - Restart services"
-	@echo "  stop           - Stop services without removing containers"
-	@echo "  logs           - Follow service logs"
-	@echo "  ps             - List running containers"
-	@echo "  pull           - Pull latest images"
-	@echo "  expose         - Open game ports in firewall (runtime only)"
-	@echo "  hide           - Close game ports in firewall (runtime only)"
-	@echo "  admin-expose   - Make admin UI accessible remotely (opens port)"
-	@echo "  admin-hide     - Restrict admin UI to localhost (closes port)"
-	@echo "  migrate        - Run database migrations"
-	@echo "  test           - Run tests in the app container"
+	@echo ""
+	@echo "  Setup:"
+	@echo "    init           - Interactive first-run setup wizard (detects OS & firewall)"
+	@echo "    setup          - Alias for 'init'"
+	@echo ""
+	@echo "  Services:"
+	@echo "    up             - Start services (admin UI local-only at localhost:8000)"
+	@echo "    down           - Stop services"
+	@echo "    build          - Build Docker images"
+	@echo "    restart        - Restart services"
+	@echo "    stop           - Stop services without removing containers"
+	@echo "    logs           - Follow service logs"
+	@echo "    ps             - List running containers"
+	@echo "    pull           - Pull latest images"
+	@echo ""
+	@echo "  Firewall (auto-detects backend from .firewall.conf):"
+	@echo "    expose         - Open game ports (UDP) in host firewall"
+	@echo "    hide           - Close game ports (UDP) in host firewall"
+	@echo "    admin-expose   - Open Caddy web ports (80/443) for public admin HTTPS"
+	@echo "    admin-hide     - Close Caddy web ports (80/443)"
+	@echo ""
+	@echo "  Database:"
+	@echo "    db-check       - Check if DB volume exists, create if not"
+	@echo "    db-init        - Create DB volume (empty) if it doesn't exist"
+	@echo "    db-reset       - Reset DB volume (DANGER: deletes data)"
+	@echo "    db-backup      - Backup database to db-backups/"
+	@echo "    db-restore     - Restore latest backup from db-backups/"
+	@echo ""
+	@echo "  App:"
+	@echo "    migrate        - Run database migrations"
+	@echo "    test           - Run tests in the app container"
+	@echo "    exec CMD=...   - Run a command in the app container"
+	@echo ""
+	@echo "  Other:"
+	@echo "    info           - Show URLs, public IP, and firewall status"
+	@echo "    arch           - Show detected CPU architecture"
+	@echo "    nuke           - Destroy ALL data and stop services (DANGER)"
+	@echo ""
+	@echo "  Supported firewall backends: firewalld (Fedora/RHEL), ufw (Ubuntu/Debian), manual"
+	@echo "  See docs/firewall-*.md for per-OS documentation."

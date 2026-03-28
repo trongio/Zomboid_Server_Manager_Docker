@@ -1,6 +1,7 @@
 # Environment
 .env
 .credentials.json
+.firewall.conf
 
 # PHP / Composer
 /app/vendor/

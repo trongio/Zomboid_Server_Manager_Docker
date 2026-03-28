@@ -259,6 +259,10 @@ while true; do
     esac
 done
 
+# ── Firewall Backend ──────────────────────────────────────────────────────────
+# Detect or prompt for firewall backend, generates .firewall.conf
+bash scripts/firewall/detect.sh .firewall.conf
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════
@@ -271,6 +275,10 @@ echo -e "  Players:      ${GREEN}${PZ_MAX_PLAYERS}${NC} / RAM: ${GREEN}${PZ_MAX_
 echo -e "  Branch:       ${GREEN}${PZ_STEAM_BRANCH}${NC}"
 echo -e "  Panel:        ${GREEN}${APP_URL}${NC} (HTTPS via Caddy)"
 echo -e "  Architecture: ${GREEN}${ARCH_LABEL}${NC}"
+if [ -f .firewall.conf ]; then
+    . .firewall.conf
+    echo -e "  Firewall:     ${GREEN}${FIREWALL_BACKEND}${NC}"
+fi
 echo ""
 echo -ne "  Proceed? ${DIM}[Y/n]${NC}: "
 read -r proceed || true
@@ -343,6 +351,11 @@ http://${CADDY_SITE} {
 	redir https://${CADDY_SITE}{uri} permanent
 }
 CADDYEOF
+fi
+
+# Update .firewall.conf now that Caddyfile exists
+if [ -f .firewall.conf ]; then
+    sed -i 's/^CADDY_ENABLED=.*/CADDY_ENABLED=true/' .firewall.conf
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
