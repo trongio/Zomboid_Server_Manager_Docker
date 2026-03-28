@@ -30,8 +30,8 @@ services:
       redis:
         condition: service_healthy
     ports:
-      - "${APP_PORT:-8000}:8000"
-      - "5173:5173"
+      - "${APP_BIND_IP:-127.0.0.1}:${APP_PORT:-8000}:8000"
+      - "${VITE_BIND_IP:-127.0.0.1}:5173:5173"
     volumes:
       - ./app:/var/www/html
       - app-vendor:/var/www/html/vendor
