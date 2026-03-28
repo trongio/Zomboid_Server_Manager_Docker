@@ -217,32 +217,57 @@ while true; do
             break
             ;;
         2)
-            while true; do
-                prompt SITE_HOST "Server IP address" ""
-                if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                    break
-                fi
-                echo -e "  ${RED}Invalid IP address. Try again.${NC}"
-            done
-            # Verify IP belongs to this server (public or LAN)
+            # Collect detected IPs into a numbered list
+            IP_OPTIONS=()
+            IP_LABELS=()
+            if [ -n "$SERVER_IP" ]; then
+                IP_OPTIONS+=("$SERVER_IP")
+                IP_LABELS+=("$SERVER_IP  (public)")
+            fi
             LOCAL_IPS=$(hostname -I 2>/dev/null || true)
-            IP_VALID=false
-            if [ -n "$SERVER_IP" ] && [ "$SITE_HOST" = "$SERVER_IP" ]; then
-                IP_VALID=true
-                echo -e "  ${GREEN}✓ Matches server public IP${NC}"
-            elif echo "$LOCAL_IPS" | grep -qw "$SITE_HOST"; then
-                IP_VALID=true
-                echo -e "  ${GREEN}✓ Matches local network interface${NC}"
-            fi
-            if [ "$IP_VALID" = "false" ]; then
-                echo -e "  ${RED}${SITE_HOST} is not assigned to this server.${NC}"
-                if [ -n "$SERVER_IP" ]; then
-                    echo -e "  ${RED}Public IP: ${SERVER_IP} | Local IPs: ${LOCAL_IPS}${NC}"
+            for lip in $LOCAL_IPS; do
+                # Skip Docker/bridge IPs (172.x) and the public IP if already listed
+                if [ "$lip" = "$SERVER_IP" ]; then continue; fi
+                if [[ "$lip" =~ ^172\. ]]; then continue; fi
+                IP_OPTIONS+=("$lip")
+                IP_LABELS+=("$lip  (LAN)")
+            done
+
+            if [ ${#IP_OPTIONS[@]} -gt 0 ]; then
+                echo ""
+                echo "  Detected addresses:"
+                for i in "${!IP_OPTIONS[@]}"; do
+                    echo "    $((i+1))) ${IP_LABELS[$i]}"
+                done
+                echo "    $((${#IP_OPTIONS[@]}+1))) Enter manually"
+                echo -ne "  ${DIM}[1]${NC}: "
+                read -r ip_pick || true
+                ip_pick="${ip_pick:-1}"
+
+                if [[ "$ip_pick" =~ ^[0-9]+$ ]] && [ "$ip_pick" -ge 1 ] && [ "$ip_pick" -le "${#IP_OPTIONS[@]}" ]; then
+                    SITE_HOST="${IP_OPTIONS[$((ip_pick-1))]}"
                 else
-                    echo -e "  ${RED}Local IPs: ${LOCAL_IPS}${NC}"
+                    # Manual entry
+                    while true; do
+                        prompt SITE_HOST "IP address" ""
+                        if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                            break
+                        fi
+                        echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                    done
                 fi
-                continue
+            else
+                # No IPs detected — fall back to manual entry
+                while true; do
+                    prompt SITE_HOST "Server IP address" ""
+                    if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                        break
+                    fi
+                    echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                done
             fi
+
+            echo -e "  ${GREEN}✓ Using ${SITE_HOST}${NC}"
             APP_URL="https://${SITE_HOST}"
             CADDY_SITE=":443"
             CADDY_TLS=$'\ttls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'
@@ -305,15 +330,41 @@ REDIS_PASS=$(generate_secret 18 20)
 # ══════════════════════════════════════════════════════════════════════════════
 mkdir -p caddy/certs
 if [ "$GENERATE_SELF_SIGNED" = "true" ]; then
+    # Remove stale certs from previous runs (may be root-owned from Docker)
+    rm -f caddy/certs/cert.pem caddy/certs/key.pem 2>/dev/null || \
+        sudo rm -f caddy/certs/cert.pem caddy/certs/key.pem 2>/dev/null || true
+
     echo "Generating self-signed certificate for ${SITE_HOST}..."
-    openssl req -x509 -newkey rsa:2048 \
+    CERT_OK=false
+    CERT_ERR=""
+
+    # Try with -addext (OpenSSL 1.1.1+) first, fall back without it
+    if CERT_ERR=$(openssl req -x509 -newkey rsa:2048 \
         -keyout caddy/certs/key.pem -out caddy/certs/cert.pem \
         -days 3650 -nodes \
         -subj "/CN=${SITE_HOST}" \
-        -addext "subjectAltName=IP:${SITE_HOST}" 2>/dev/null
+        -addext "subjectAltName=IP:${SITE_HOST}" 2>&1); then
+        CERT_OK=true
+    elif CERT_ERR=$(openssl req -x509 -newkey rsa:2048 \
+        -keyout caddy/certs/key.pem -out caddy/certs/cert.pem \
+        -days 3650 -nodes \
+        -subj "/CN=${SITE_HOST}" 2>&1); then
+        CERT_OK=true
+        echo -e "  ${YELLOW}Note: Certificate generated without SAN extension (older OpenSSL).${NC}"
+    fi
+
+    if [ "$CERT_OK" = "false" ]; then
+        echo -e "  ${RED}Failed to generate self-signed certificate.${NC}"
+        # Show only meaningful error lines (skip RSA progress noise)
+        echo "$CERT_ERR" | grep -v '^[.+*-]*$' | grep -v '^-----$' | tail -3 >&2
+        echo -e "  ${DIM}You can generate one manually:${NC}"
+        echo -e "  ${DIM}  openssl req -x509 -newkey rsa:2048 -keyout caddy/certs/key.pem -out caddy/certs/cert.pem -days 3650 -nodes -subj '/CN=${SITE_HOST}'${NC}"
+        exit 1
+    fi
 else
-    # Clean up certs from a previous IP-mode run
-    rm -f caddy/certs/cert.pem caddy/certs/key.pem
+    # Clean up certs from a previous IP-mode run (may be root-owned from Docker)
+    rm -f caddy/certs/cert.pem caddy/certs/key.pem 2>/dev/null || \
+        sudo rm -f caddy/certs/cert.pem caddy/certs/key.pem 2>/dev/null || true
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════

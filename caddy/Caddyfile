@@ -2,11 +2,11 @@
 	# Managed by setup.sh — edit freely or re-run make init
 }
 
-localhost {
-	tls internal
+:443 {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 	reverse_proxy app:8000
 }
 
-http://localhost {
-	redir https://localhost{uri} permanent
+:80 {
+	redir https://{host}{uri} permanent
 }
