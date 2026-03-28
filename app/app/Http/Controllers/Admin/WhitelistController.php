@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AddWhitelistRequest;
+use App\Http\Requests\Admin\ToggleWhitelistRequest;
 use App\Http\Requests\Admin\UpdateWhitelistSettingsRequest;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -123,12 +125,9 @@ class WhitelistController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(AddWhitelistRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'username' => 'required|string|min:3|max:50',
-            'password' => 'required|string|min:4|max:100',
-        ]);
+        $validated = $request->validated();
 
         $added = $this->whitelistManager->add($validated['username'], $validated['password']);
 
@@ -170,7 +169,7 @@ class WhitelistController extends Controller
         ]);
     }
 
-    public function toggle(Request $request, string $username): JsonResponse
+    public function toggle(ToggleWhitelistRequest $request, string $username): JsonResponse
     {
         $isWhitelisted = $this->whitelistManager->exists($username);
 
@@ -195,11 +194,15 @@ class WhitelistController extends Controller
 
         if (! $restored) {
             // No stored hash — require a password
-            $validated = $request->validate([
-                'password' => 'required|string|min:4|max:100',
-            ]);
+            $password = $request->validated('password');
 
-            $this->whitelistManager->add($username, $validated['password']);
+            if (empty($password)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'password' => ['The password field is required.'],
+                ]);
+            }
+
+            $this->whitelistManager->add($username, $password);
         }
 
         $this->auditLogger->log(

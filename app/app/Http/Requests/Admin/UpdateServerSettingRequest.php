@@ -18,7 +18,7 @@ class UpdateServerSettingRequest extends FormRequest
     {
         return [
             'server_ip' => ['required', 'string', 'max:255'],
-            'server_port' => ['required', 'string', 'max:10'],
+            'server_port' => ['required', 'integer', 'min:1024', 'max:65535'],
         ];
     }
 }

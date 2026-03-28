@@ -51,8 +51,11 @@ RUN npm ci
 # Copy application code
 COPY . .
 
-# Generate autoload BEFORE npm build (Wayfinder plugin needs artisan)
-RUN composer dump-autoload --optimize --no-dev
+# Generate autoload & discover packages (purges dev-only providers from cache)
+RUN composer dump-autoload --optimize --no-dev \
+    && APP_KEY=base64:dGVtcG9yYXJ5LWJ1aWxkLWtleS1mb3ItZG9ja2VyMTIzNA== \
+       DB_CONNECTION=sqlite DB_DATABASE=":memory:" \
+       php artisan package:discover --ansi
 
 # Build frontend assets
 # Wayfinder plugin runs `php artisan wayfinder:generate` which needs APP_KEY

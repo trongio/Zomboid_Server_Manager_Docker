@@ -14,7 +14,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-[Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [API Reference](#rest-api-reference) · [Architecture](#architecture)
+[Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [API Reference](#rest-api-reference) · [Architecture](#architecture) · [Security](#security)
 
 </div>
 
@@ -28,7 +28,7 @@ Zomboid Manager wraps a Dockerized Project Zomboid dedicated server with a Larav
 - **Docker Engine API** — Container lifecycle control (start, stop, restart, update) via the Docker socket
 - **File I/O** — Direct read/write access to PZ config files (`server.ini`, sandbox Lua) mounted from the game server volume
 
-20+ admin pages, a public status page, player portal, item shop, 30+ API endpoints, Discord notifications, an interactive player map, inventory management, safe zones, and more — all from a browser.
+19 admin pages, a public status page, player portal, item shop, 40+ API endpoints, Discord notifications, an interactive player map, inventory management, safe zones, and more — all from a browser.
 
 ## Feature Status
 
@@ -345,49 +345,63 @@ Schedule daily restart times with timezone support, configurable in-game countdo
 
 ## Architecture
 
-Five Docker services across two networks:
+Seven Docker services across two networks:
 
 ```
-                        Internet
-                           │
-              ┌────────────┼────────────────────────────────────┐
-              │            │                                    │
-              │   UDP 16261-16262          TCP 8000              │
-              │            │                  │                  │
-              │   ┌────────▼────────┐  ┌──────▼──────────────┐  │
-              │   │  game-server    │  │  app                │  │Renegade-Master
-  zomboid-net │   │  PZ Dedicated   │◄─│  Laravel + Nginx    │  │
-   (bridge)   │   │  SteamCMD       │  │  React dashboard    │  │
-              │   │                 │  │  Docker socket      │  │
-              │   │  RCON 27015 ◄───│──│  (container ctrl)   │  │
-              │   └─────────────────┘  └──────┬──────────────┘  │
-              │                               │                 │
-              │                        ┌──────▼──────────────┐  │
-              │                        │  queue              │  │
-              │                        │  Backup jobs        │  │
-              │                        │  Restart jobs       │  │
-              │                        │  Scheduled tasks    │  │
-              │                        └──────┬──────────────┘  │
-              └───────────────────────────────┼─────────────────┘
+                          Internet
+                             │
+                ┌────────────┼──────────────────────────────────────┐
+                │            │                                      │
+                │  UDP 16261-16262        TCP 80/443                │
+                │            │               │                      │
+                │  ┌─────────▼────────┐  ┌───▼──────────────────┐   │
+                │  │  game-server     │  │  caddy               │   │
+  zomboid-net   │  │  PZ Dedicated    │  │  Reverse proxy       │   │
+   (bridge)     │  │  SteamCMD        │  │  Auto-TLS            │   │
+                │  │                  │  └───┬──────────────────┘   │
+                │  │  RCON 27015 ◄────│──┐   │                      │
+                │  └──────────────────┘  │ ┌─▼──────────────────┐   │
+                │                        │ │  app               │   │
+                │                        └─│  Laravel + Nginx   │   │
+                │                          │  React dashboard   │   │
+                │                          └──┬─────────────────┘   │
+                │                             │                     │
+                │                       ┌─────▼─────────────────┐   │
+                │                       │  queue                │   │
+                │                       │  Backup jobs          │   │
+                │                       │  Restart jobs         │   │
+                │                       │  Scheduled tasks      │   │
+                │                       └─────┬─────────────────┘   │
+                └─────────────────────────────┼─────────────────────┘
                                               │
-              ┌───────────────────────────────┼─────────────────┐
-              │                               │                 │
-  backend-net │   ┌──────────────┐     ┌──────▼──────┐          │
-  (internal)  │   │  db           │     │  redis      │          │
-              │   │  PostgreSQL 16│     │  Queue      │          │
-              │   │  App data     │     │  Cache      │          │
-              │   └──────────────┘     │  Sessions   │          │
-              │                        └─────────────┘          │
-              └─────────────────────────────────────────────────┘
+                ┌─────────────────────────────┼─────────────────────┐
+                │                             │                     │
+  backend-net   │  ┌──────────────┐    ┌──────▼──────┐              │
+  (internal)    │  │  db          │    │  redis      │              │
+                │  │  PgSQL 16    │    │  Queue      │              │
+                │  │  App data    │    │  Cache      │              │
+                │  └──────────────┘    │  Sessions   │              │
+                │                      └─────────────┘              │
+                │                                                   │
+                │        ┌──────────────────────────────────────┐   │
+                │        │  docker-socket-proxy                 │   │
+                │        │  Tecnativa — restricted Docker API   │   │
+                │        │  (containers, logs, start/stop only) │   │
+                │        └──────────────────────────────────────┘   │
+                └───────────────────────────────────────────────────┘
 
-Volumes: pz-data, pz-server-files, pz-backups, pz-lua-bridge, pz-map-tiles, pz-postgres, pz-redis
+Volumes: pz-data, pz-server-files, pz-backups, pz-lua-bridge, pz-map-tiles,
+         pz-postgres (external), pz-redis, pz-app-vendor, pz-app-node-modules,
+         pz-app-build, pz-caddy-data, pz-caddy-config
 ```
 
 - **game-server** — PZ dedicated server via SteamCMD. Auto-detects ARM64/AMD64 and selects the correct image.
-- **app** — Laravel 12 + React web panel. Mounts the Docker socket for container lifecycle control and PZ data volumes for config/save file access.
+- **app** — Laravel 12 + React web panel. Controls the game server container via the Docker socket proxy and accesses PZ data volumes for config/save files.
 - **queue** — Background job worker for backups, scheduled restarts, server updates, and other long-running tasks.
 - **db** — PostgreSQL 16. Users, backups, audit logs, PvP violations, settings.
 - **redis** — Job queue, cache, sessions, rate limiting.
+- **docker-socket-proxy** — Tecnativa proxy restricting Docker API access to container inspect, start/stop, and log endpoints. Prevents dangerous operations (exec, image pull, volume mount).
+- **caddy** — Reverse proxy with automatic TLS via Let's Encrypt. Terminates HTTPS and forwards to the app container. Optional for development — the app is also accessible directly on port 8000.
 
 ## Quick Start
 
@@ -698,7 +712,10 @@ Authenticated via `X-API-Key` header. The key is auto-generated in `.env` during
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/audit` | Yes | Audit log entries |
-| `GET` | `/api/health` | No | App health check |
+| `GET` | `/api/health` | No | App health check (status only) |
+| `GET` | `/api/health/detailed` | Yes | Detailed health check (RCON, DB, Redis status) |
+
+> **Note:** Features added in Stages 4–6 (item shop, wallets, safe zones, Discord webhooks, auto restart, rankings, respawn delay, moderation) are managed through the web dashboard only and do not have REST API equivalents.
 
 ## Commands
 
@@ -747,30 +764,37 @@ Authenticated via `X-API-Key` header. The key is auto-generated in `.env` during
 Zomboid_Server/
 ├── app/                          # Laravel application
 │   ├── app/
-│   │   ├── Console/Commands/     # Artisan commands (ProcessRespawnKicks, etc.)
+│   │   ├── Console/Commands/     # 12 Artisan commands (stats sync, deliveries, PvP import, etc.)
 │   │   ├── Http/Controllers/
-│   │   │   ├── Admin/            # Web dashboard controllers (13 controllers)
+│   │   │   ├── Admin/            # Web dashboard controllers (22 controllers)
 │   │   │   ├── Api/              # REST API controllers
 │   │   │   └── Settings/         # User settings controllers
-│   │   ├── Jobs/                 # Queue jobs (backups, restarts, server updates)
+│   │   ├── Jobs/                 # 9 queue jobs (backups, restarts, updates, Discord, etc.)
 │   │   ├── Models/               # Eloquent models
-│   │   └── Services/             # Core services
+│   │   └── Services/             # 33 core services
 │   │       ├── RconClient.php        # Source RCON TCP client
 │   │       ├── DockerManager.php     # Docker Engine API client
 │   │       ├── ServerIniParser.php   # server.ini read/write
 │   │       ├── SandboxLuaParser.php  # Sandbox Lua read/write
+│   │       ├── BackupManager.php     # Backup creation + retention
+│   │       ├── WalletService.php     # Player wallet + transactions
+│   │       ├── ShopDeliveryService.php  # Item delivery via RCON/Lua
 │   │       ├── SafeZoneManager.php   # Safe zone CRUD + violations
-│   │       ├── RespawnDelayManager.php
 │   │       ├── DiscordWebhookService.php
-│   │       └── AuditLogger.php
+│   │       └── AuditLogger.php       # + 23 more
 │   ├── resources/js/
-│   │   ├── pages/                # React + Inertia pages (29 total)
-│   │   │   ├── admin/            # 13 admin pages
-│   │   │   ├── auth/             # 7 auth pages
+│   │   ├── pages/                # React + Inertia pages (40 total)
+│   │   │   ├── admin/            # 19 admin pages
+│   │   │   ├── auth/             # 6 auth pages
 │   │   │   ├── settings/         # 4 settings pages
+│   │   │   ├── shop/             # 4 shop pages (browse, item, wallet, purchases)
+│   │   │   ├── welcome.tsx
 │   │   │   ├── dashboard.tsx
 │   │   │   ├── status.tsx
-│   │   │   └── portal.tsx
+│   │   │   ├── rankings.tsx
+│   │   │   ├── portal.tsx
+│   │   │   ├── player-profile.tsx
+│   │   │   └── error.tsx
 │   │   ├── components/           # Reusable UI components (shadcn/ui)
 │   │   └── lib/                  # Utilities (fetchAction, etc.)
 │   ├── routes/
@@ -779,7 +803,11 @@ Zomboid_Server/
 │   │   └── settings.php          # Settings routes
 │   └── tests/                    # Pest PHP tests
 ├── game-server/
-│   └── mods/ZomboidManager/      # Lua bridge mod (safe zones, respawn delay)
+│   └── mods/ZomboidManager/      # Lua bridge mod (14 modules: inventory export,
+│                                 #   item delivery, money deposit, player tracking,
+│                                 #   PvP tracking, safe zones, respawn delay, etc.)
+├── caddy/
+│   └── Caddyfile                 # Reverse proxy config (auto-TLS)
 ├── docker-compose.yml            # Base Docker config
 ├── docker-compose.arm64.yml      # ARM64 game server override
 ├── docker-compose.amd64.yml      # AMD64 game server override
@@ -792,7 +820,9 @@ Zomboid_Server/
 
 | Port | Protocol | Service | Exposure |
 |---|---|---|---|
-| `8000` | TCP | Web panel (Nginx) | Host — configurable via `APP_PORT` |
+| `80` | TCP | Caddy (HTTP) | Host — redirects to HTTPS |
+| `443` | TCP | Caddy (HTTPS) | Host — auto-TLS via Let's Encrypt |
+| `8000` | TCP | Web panel (Nginx) | localhost only — use Caddy for public access |
 | `16261` | UDP | Game server | Host — Steam game traffic |
 | `16262` | UDP | Game server (direct connect) | Host — Steam direct connect |
 | `27015` | TCP | RCON | Internal only — never exposed |
@@ -838,15 +868,73 @@ make up
 make nuke        # Requires typing NUKE_ALL
 ```
 
-## Security Notes
+## Security
 
-- RCON port (27015/tcp) is never exposed to the host — only accessible on the internal Docker network between containers
-- The `backend-net` network is marked `internal: true` — PostgreSQL and Redis are unreachable from outside Docker
-- API endpoints require an `X-API-Key` header; the key is auto-generated with 48 characters of entropy
-- All admin actions are recorded in the audit log with user, IP, and full request payload
-- Two-factor authentication available via TOTP with recovery codes
-- PZ passwords are hashed as `bcrypt(md5(password))` with a fixed salt — the app handles this separately from Laravel's auth system
-- Destructive operations (wipe, nuke, db-reset) require explicit confirmation strings
+### Network Isolation
+
+- **RCON port** (27015/tcp) is never exposed to the host — only accessible on the internal Docker network between containers
+- **`backend-net`** is marked `internal: true` — PostgreSQL and Redis are unreachable from outside Docker
+- **Docker socket proxy** restricts Docker API access to containers, logs, and start/stop only — blocks all other endpoints (image pull, exec, volume mount, etc.)
+- **Caddy reverse proxy** available for auto-TLS termination with HTTP→HTTPS redirect
+- **Trusted proxies** restricted to RFC 1918 private ranges (`127.0.0.1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) to prevent header spoofing
+
+### Authentication & Access Control
+
+- **Web auth** — Laravel Fortify with session-based login
+- **Two-factor authentication** — TOTP with QR code setup, manual key entry, and recovery codes
+- **API auth** — `X-API-Key` header with 48 characters of entropy (auto-generated)
+- **Token auth** — Laravel Sanctum for token-based API access
+- **Role-based access** — Admin middleware protects all management routes
+- **PZ passwords** — Hashed as `bcrypt(md5(password))` with a fixed salt, handled separately from Laravel's auth system
+
+### HTTP Security Headers
+
+- **Content Security Policy** — Nonce-based `script-src` generated per request via Vite; restricts `object-src`, `frame-ancestors`, `form-action`, and `base-uri` to `'self'`
+- **X-Frame-Options:** `DENY` (clickjacking protection)
+- **X-Content-Type-Options:** `nosniff` (MIME sniffing prevention)
+- **Referrer-Policy:** `strict-origin-when-cross-origin`
+- **Permissions-Policy:** Disables camera, microphone, and geolocation
+- **HSTS:** `max-age=31536000; includeSubDomains` at the Nginx layer
+
+### Input Validation & Injection Prevention
+
+- **RCON injection prevention** — All RCON arguments are sanitized through `RconSanitizer` with per-type validation: player names (`[a-zA-Z0-9_]{1,50}`), item IDs (`[a-zA-Z0-9_.]{1,100}`), skills (alphanumeric), access levels (whitelist of 6 values), and messages (no `"`, `\n`, `\r` to prevent command boundary breakage)
+- **Config injection prevention** — `SafeConfigValue` rule uses an allowlist-based pattern, rejects Lua concatenation operators (`..`), and blocks newline injection in INI files
+- **Form Request validation** — All admin controller methods use dedicated Form Request classes with `RconSafeIdentifier` and `RconSafeMessage` rules; no inline `$request->validate()`
+- **Route parameter patterns** — `name` and `username` parameters enforce `[a-zA-Z0-9_]{1,50}` at the routing layer via `AppServiceProvider`
+
+### Rate Limiting
+
+Three tiers of rate limiting protect against abuse:
+
+| Tier | Limit | Applies To |
+|---|---|---|
+| `admin` | 60/min | General admin actions |
+| `admin-sensitive` | 10/min | Kick, ban, RCON, server control, password changes |
+| `admin-destructive` | 2/min | Server wipe |
+| `api` (authenticated) | 60/min | API key requests |
+| `api` (anonymous) | 15/min | Unauthenticated API requests |
+
+Sensitive operations stack both `admin` and `admin-sensitive` limiters for an effective 10/min cap.
+
+### Audit & Compliance
+
+- Every admin action is recorded with timestamp, user, action type, IP address, and full request payload
+- **Immutable audit trail** — Audit log deletion is blocked at the model layer (`AuditLogObserver` throws `RuntimeException`)
+- **Sensitive field filtering** — Passwords, API keys, tokens, secrets, and 2FA codes are stripped from audit log payloads automatically
+- Discord webhook notifications on audit log creation (optional)
+
+### Backup Security
+
+- **Tar slip protection** — Archive contents are validated before extraction; rejects entries with `..` path traversal or absolute paths
+- **`--no-absolute-names`** flag as a secondary safeguard during tar extraction
+
+### Infrastructure
+
+- **Entrypoint validation** — Container startup fails fast if `DB_PASSWORD`, `PZ_RCON_PASSWORD`, `ADMIN_PASSWORD`, or `PZ_ADMIN_PASSWORD` are empty
+- **Destructive operations** (wipe, nuke, db-reset) require explicit confirmation strings
+- **Health endpoint split** — `/api/health` is public (status only), `/api/health/detailed` requires API key (returns internal service details)
+- **No `.env` comments** — Environment files omit inline comments to prevent PZ server parsing issues
 
 ---
 

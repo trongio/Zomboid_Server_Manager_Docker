@@ -323,7 +323,7 @@ class MoneyDepositManager
             mkdir($dir, 0755, true);
         }
 
-        $tmpPath = $path.'.tmp.'.getmypid();
+        $tmpPath = $path.'.tmp.'.getmypid().'.'.bin2hex(random_bytes(4));
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
         if (file_put_contents($tmpPath, $json) === false) {

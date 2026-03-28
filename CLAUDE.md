@@ -107,6 +107,17 @@ The Laravel app is the single control plane wrapping three integration points:
   - `WalletService::getAvailableBalance()` subtracts pending purchase holds to prevent double-spending
   - If debit fails after delivery (rare race), items are rolled back via `removeItem` queue
 
+## Security Conventions
+
+- **CSP with Vite nonces:** `SecurityHeaders` middleware generates a nonce per request via `Vite::useCspNonce()`. Inline scripts in Blade must use `nonce="{{ Vite::cspNonce() }}"`. `style-src 'unsafe-inline'` is required for Tailwind.
+- **Rate limiting:** Three tiers — `admin` (60/min general), `admin-sensitive` (10/min for kick/ban/password/RCON/server control), `admin-destructive` (2/min for wipe). Sensitive routes stack both admin + admin-sensitive limiters.
+- **Trusted proxies:** Restricted to RFC 1918 ranges (`127.0.0.1`, `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`) in `bootstrap/app.php`. Update if deploying behind a cloud LB with public IPs.
+- **Form Requests:** All admin controller methods must use Form Request classes — no inline `$request->validate()`. Omit `authorize()` method (defaults to `true`); routes are already behind `auth + admin` middleware.
+- **Audit log filtering:** `AuditApiActions` middleware excludes sensitive fields via denylist (`password`, `api_key`, `token`, `secret`, `current_password`, `two_factor_*`). Add new sensitive fields to this list.
+- **Entrypoint validation:** `app/docker/entrypoint.sh` fails fast if `DB_PASSWORD`, `PZ_RCON_PASSWORD`, `ADMIN_PASSWORD`, or `PZ_ADMIN_PASSWORD` are empty.
+- **Health endpoint:** `/api/health` is public (returns `status` only), `/api/health/detailed` requires API key (returns rcon/db details).
+- **Route patterns:** Defined in `AppServiceProvider::boot()` (not `bootstrap/app.php`). Patterns: `name` and `username` = `[a-zA-Z0-9_]{1,50}`.
+
 ## Implementation Phases
 
 Detailed plan with acceptance criteria in `IMPLEMENTATION_PLAN.md`. Status tracked in the table at the bottom of that file.

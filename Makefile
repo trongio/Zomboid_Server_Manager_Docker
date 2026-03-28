@@ -98,16 +98,30 @@ up: db-check
 down:
 	$(COMPOSE) down
 
+VOLUMES := pz-postgres pz-app-vendor pz-app-node-modules pz-app-build \
+	pz-server-files pz-data pz-redis pz-backups pz-lua-bridge pz-map-tiles \
+	pz-caddy-data pz-caddy-config
+
 nuke:
-	@echo "WARNING: This will destroy ALL data (database, game saves, backups)."
+	@echo "WARNING: This will destroy ALL data (database, game saves, backups, config)."
 	@echo "Type NUKE_ALL and press Enter to continue:"
 	@read confirm; \
 	if [ "$$confirm" != "NUKE_ALL" ]; then \
 		echo "Cancelled."; \
 		exit 1; \
 	fi
-	$(COMPOSE) down -v
-	@docker volume rm pz-postgres 2>/dev/null || true
+	$(COMPOSE) down -v --remove-orphans
+	@for vol in $(VOLUMES); do \
+		docker volume rm $$vol 2>/dev/null || true; \
+	done
+	@REMAINING=$$(docker volume ls -q --filter name=pz- 2>/dev/null); \
+	if [ -n "$$REMAINING" ]; then \
+		echo "Removing leftover volumes: $$REMAINING"; \
+		echo "$$REMAINING" | xargs docker volume rm 2>/dev/null || true; \
+	fi
+	@rm -f .env app/.env
+	@rm -f caddy/Caddyfile caddy/certs/cert.pem caddy/certs/key.pem
+	@echo "Nuke complete. All volumes and config removed."
 
 build:
 	$(COMPOSE) build
@@ -153,7 +167,9 @@ migrate: db-backup
 	$(COMPOSE) exec app php artisan migrate --force
 
 test:
-	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=sqlite -e DB_DATABASE=:memory: app php artisan test --parallel
+	@$(COMPOSE) exec -T db psql -U zomboid -tc "SELECT 1 FROM pg_database WHERE datname='zomboid_test'" | grep -q 1 \
+		|| $(COMPOSE) exec -T db psql -U zomboid -c "CREATE DATABASE zomboid_test OWNER zomboid" 2>/dev/null || true
+	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=pgsql -e DB_DATABASE=zomboid_test app php artisan test --compact
 
 exec:
 	$(COMPOSE) exec app $(CMD)

@@ -18,6 +18,7 @@ class GameStateReader
      *     time: array{year: int, month: int, day: int, hour: int, minute: int, day_of_year: int, is_night: bool, formatted: string, date: string},
      *     season: string,
      *     weather: array{temperature: float, rain_intensity: float, fog_intensity: float, wind_intensity: float, snow_intensity: float, is_raining: bool, is_foggy: bool, is_snowing: bool, condition: string}|null,
+     *     game_version: string|null,
      *     exported_at: string,
      * }|null
      */

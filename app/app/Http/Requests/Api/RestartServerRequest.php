@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api;
 
+use App\Rules\RconSafeMessage;
 use Illuminate\Foundation\Http\FormRequest;
 
 class RestartServerRequest extends FormRequest
@@ -12,13 +13,13 @@ class RestartServerRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
             'countdown' => ['sometimes', 'integer', 'min:10', 'max:3600'],
-            'message' => ['sometimes', 'string', 'max:500'],
+            'message' => ['sometimes', 'string', 'max:500', new RconSafeMessage],
         ];
     }
 }

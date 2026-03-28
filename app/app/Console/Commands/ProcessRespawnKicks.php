@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use App\Services\RespawnDelayManager;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -55,7 +56,9 @@ class ProcessRespawnKicks extends Command
             $reason = $this->buildKickReason($username, $config, $deathsData, $now);
 
             try {
-                $command = "kickuser \"{$username}\" -r \"{$reason}\"";
+                $safeName = RconSanitizer::playerName($username);
+                $safeReason = RconSanitizer::message($reason);
+                $command = "kickuser \"{$safeName}\" -r \"{$safeReason}\"";
                 $this->rcon->command($command);
                 $kicked++;
                 $this->info("Kicked {$username}: {$reason}");

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Rules\RconSafeMessage;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateServerRequest extends FormRequest
@@ -12,14 +13,14 @@ class UpdateServerRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
             'branch' => ['sometimes', 'string', 'in:public,unstable,iwillbackupmysave'],
             'countdown' => ['sometimes', 'integer', 'min:10', 'max:3600'],
-            'message' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'message' => ['sometimes', 'nullable', 'string', 'max:500', new RconSafeMessage],
         ];
     }
 }

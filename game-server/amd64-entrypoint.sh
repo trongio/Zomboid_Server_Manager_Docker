@@ -8,6 +8,17 @@
 # distributed to connecting players. DoLuaChecksum=false prevents checksum
 # errors. Source files are mounted at /home/steam/Zomboid/mods/ZomboidManager/.
 
+# --- Root-only init: fix volume permissions ---
+# The renegademaster image has no 'steam' user — it runs as root natively.
+# Just ensure volume directories are writable (for shared lua-bridge volume).
+if [ "$(id -u)" = "0" ]; then
+    echo "[entrypoint] Fixing volume permissions..."
+    chmod -R 1777 /home/steam/Zomboid/Lua 2>/dev/null || true
+    chmod 777 /home/steam/Zomboid/Server 2>/dev/null || true
+    chmod 777 /home/steam/Zomboid/db 2>/dev/null || true
+    chmod 777 /home/steam/Zomboid/Saves 2>/dev/null || true
+fi
+
 CONFIGURE_SCRIPT="/home/steam/configure-server.sh"
 
 # Clean up previously injected ZM files and empty mod directory from base game.
@@ -22,7 +33,7 @@ done
 # Note: ZomboidManager Workshop cache at steamapps/workshop/content/108600/3685323705
 # is populated by configure-server.sh — do NOT delete it here.
 
-if [ -f "$CONFIGURE_SCRIPT" ]; then
+if [ -f "$CONFIGURE_SCRIPT" ] && ! grep -q "configure-server.sh" /home/steam/run_server.sh; then
     sed -i '/^start_server$/i bash '"$CONFIGURE_SCRIPT" /home/steam/run_server.sh
     echo "[entrypoint] Patched run_server.sh to run configure-server.sh before start"
 fi

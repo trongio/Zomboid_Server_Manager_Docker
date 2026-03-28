@@ -8,14 +8,10 @@ use RuntimeException;
 
 class DockerManager
 {
-    private readonly string $baseUrl;
-
     public function __construct(
-        private readonly string $socketPath,
+        private readonly string $proxyUrl,
         private readonly string $containerName,
-    ) {
-        $this->baseUrl = 'http://localhost';
-    }
+    ) {}
 
     /**
      * @return array{exists: bool, running: bool, status: string, health_status?: string|null, started_at?: string|null, finished_at?: string|null, restart_count?: int}
@@ -107,14 +103,9 @@ class DockerManager
         try {
             $timeout = $options['timeout'] ?? 30;
 
-            $client = Http::baseUrl($this->baseUrl)
+            $client = Http::baseUrl($this->proxyUrl)
                 ->timeout($timeout)
-                ->connectTimeout(5)
-                ->withOptions([
-                    'curl' => [
-                        CURLOPT_UNIX_SOCKET_PATH => $this->socketPath,
-                    ],
-                ]);
+                ->connectTimeout(5);
 
             $url = $path;
             if (isset($options['query'])) {
@@ -142,19 +133,14 @@ class DockerManager
 
             return null;
         } catch (ConnectionException) {
-            throw new RuntimeException("Cannot connect to Docker daemon at {$this->socketPath}");
+            throw new RuntimeException("Cannot connect to Docker daemon at {$this->proxyUrl}");
         }
     }
 
     private function requestRaw(string $method, string $path, array $options = []): ?string
     {
         try {
-            $client = Http::baseUrl($this->baseUrl)
-                ->withOptions([
-                    'curl' => [
-                        CURLOPT_UNIX_SOCKET_PATH => $this->socketPath,
-                    ],
-                ]);
+            $client = Http::baseUrl($this->proxyUrl);
 
             $url = $path;
             if (isset($options['query'])) {

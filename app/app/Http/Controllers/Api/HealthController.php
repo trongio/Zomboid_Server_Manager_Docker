@@ -8,28 +8,47 @@ use Illuminate\Support\Facades\DB;
 
 class HealthController
 {
-    public function __invoke(RconClient $rcon): JsonResponse
+    public function index(RconClient $rcon): JsonResponse
     {
-        $dbStatus = 'disconnected';
+        [$dbOk, $rconOk] = $this->checkServices($rcon);
+
+        return response()->json([
+            'status' => ($dbOk && $rconOk) ? 'ok' : 'degraded',
+        ]);
+    }
+
+    public function detailed(RconClient $rcon): JsonResponse
+    {
+        [$dbOk, $rconOk] = $this->checkServices($rcon);
+
+        return response()->json([
+            'status' => ($dbOk && $rconOk) ? 'ok' : 'degraded',
+            'rcon' => $rconOk ? 'connected' : 'disconnected',
+            'db' => $dbOk ? 'connected' : 'disconnected',
+        ]);
+    }
+
+    /**
+     * @return array{bool, bool}
+     */
+    private function checkServices(RconClient $rcon): array
+    {
+        $dbOk = false;
         try {
             DB::connection()->getPdo();
-            $dbStatus = 'connected';
+            $dbOk = true;
         } catch (\Throwable) {
             // DB unavailable
         }
 
-        $rconStatus = 'disconnected';
+        $rconOk = false;
         try {
             $rcon->connect();
-            $rconStatus = 'connected';
+            $rconOk = true;
         } catch (\Throwable) {
             // RCON unavailable
         }
 
-        return response()->json([
-            'status' => 'ok',
-            'rcon' => $rconStatus,
-            'db' => $dbStatus,
-        ]);
+        return [$dbOk, $rconOk];
     }
 }

@@ -19,7 +19,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'docker' => [
-        'socket' => env('DOCKER_SOCKET', '/var/run/docker.sock'),
+        'proxy_url' => env('DOCKER_PROXY_URL', 'http://docker-socket-proxy:2375'),
         'container_name' => env('GAME_SERVER_CONTAINER_NAME', 'pz-game-server'),
     ],
 

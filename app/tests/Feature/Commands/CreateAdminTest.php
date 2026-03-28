@@ -23,17 +23,27 @@ it('creates a super admin when none exists', function () {
         ->and($user->email_verified_at)->not->toBeNull();
 });
 
-it('skips when a super admin already exists', function () {
-    User::factory()->create(['role' => UserRole::SuperAdmin]);
+it('updates existing super admin on re-run', function () {
+    User::factory()->create([
+        'role' => UserRole::SuperAdmin,
+        'username' => 'oldadmin',
+        'name' => 'oldadmin',
+    ]);
 
     $this->artisan('zomboid:create-admin', [
-        '--username' => 'another',
-        '--password' => 'secret123',
+        '--username' => 'newadmin',
+        '--password' => 'newpass123',
+        '--email' => 'new@example.com',
     ])
-        ->expectsOutputToContain('Super admin already exists')
+        ->expectsOutputToContain("Super admin 'newadmin' updated successfully.")
         ->assertSuccessful();
 
     expect(User::where('role', UserRole::SuperAdmin)->count())->toBe(1);
+
+    $admin = User::where('role', UserRole::SuperAdmin)->first();
+    expect($admin->username)->toBe('newadmin')
+        ->and($admin->name)->toBe('newadmin')
+        ->and($admin->email)->toBe('new@example.com');
 });
 
 it('works without an email', function () {

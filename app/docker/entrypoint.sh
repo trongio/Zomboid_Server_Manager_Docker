@@ -1,16 +1,14 @@
 #!/bin/sh
 set -e
 
-# ── Docker socket permissions ────────────────────────────────────────
-# Give www-data access to the Docker socket (GID varies by host)
-if [ -S /var/run/docker.sock ]; then
-    DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
-    if ! getent group "$DOCKER_GID" > /dev/null 2>&1; then
-        addgroup -g "$DOCKER_GID" -S docker
+# ── Required env vars ─────────────────────────────────────────────
+for var in DB_PASSWORD PZ_RCON_PASSWORD ADMIN_PASSWORD PZ_ADMIN_PASSWORD; do
+    val=$(printenv "$var" 2>/dev/null || true)
+    if [ -z "$val" ]; then
+        echo "[entrypoint] FATAL: $var is not set. Set it in .env before starting."
+        exit 1
     fi
-    DOCKER_GROUP=$(getent group "$DOCKER_GID" | cut -d: -f1)
-    addgroup www-data "$DOCKER_GROUP" 2>/dev/null || true
-fi
+done
 
 # ── Storage permissions ──────────────────────────────────────────────
 # Bind mounts override Dockerfile permissions — fix at runtime
@@ -26,11 +24,9 @@ find /var/www/html/storage /var/www/html/bootstrap/cache -type f -not -name '.gi
 PZ_DATA="${PZ_DATA_PATH:-/pz-data}"
 PZ_SERVER_NAME_VAL="${PZ_SERVER_NAME:-ZomboidServer}"
 if [ -d "$PZ_DATA/Server" ]; then
-    chmod 775 "$PZ_DATA/Server" 2>/dev/null || true
-    chmod 664 "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}.ini" 2>/dev/null || true
-    chmod 664 "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}_SandboxVars.lua" 2>/dev/null || true
-    chown www-data:www-data "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}.ini" 2>/dev/null || true
-    chown www-data:www-data "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}_SandboxVars.lua" 2>/dev/null || true
+    chmod 777 "$PZ_DATA/Server" 2>/dev/null || true
+    chmod 666 "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}.ini" 2>/dev/null || true
+    chmod 666 "$PZ_DATA/Server/${PZ_SERVER_NAME_VAL}_SandboxVars.lua" 2>/dev/null || true
 fi
 # Saves and db directories need to be writable for backup rollback
 for dir in "$PZ_DATA/Saves" "$PZ_DATA/db"; do
@@ -41,11 +37,13 @@ for dir in "$PZ_DATA/Saves" "$PZ_DATA/db"; do
 done
 
 # ── Lua bridge permissions ────────────────────────────────────────────
-# Shared volume between game server and app — www-data needs write access
+# Shared volume between game server and app — both www-data and steam (UID 1001)
+# need write access. Using world-writable with sticky bit (1777) so either
+# container can write regardless of who created the files. chown doesn't work
+# here because the game server recreates files as UID 1001 after app startup.
 LUA_BRIDGE_DIR="${LUA_BRIDGE_PATH:-/lua-bridge}"
 if [ -d "$LUA_BRIDGE_DIR" ]; then
-    chown -R www-data:www-data "$LUA_BRIDGE_DIR" 2>/dev/null || true
-    chmod -R 775 "$LUA_BRIDGE_DIR" 2>/dev/null || true
+    chmod -R 1777 "$LUA_BRIDGE_DIR" 2>/dev/null || true
 fi
 
 # ── Backup directory permissions ─────────────────────────────────────
@@ -64,6 +62,11 @@ if [ -z "$APP_KEY" ] || [ "$APP_KEY" = "base64:" ]; then
     echo "[entrypoint] Add this to your .env to persist across restarts."
 fi
 
+# ── Package discovery ──────────────────────────────────────────────
+# Host bind-mount may contain stale bootstrap/cache from dev deps — purge and regenerate
+rm -f /var/www/html/bootstrap/cache/packages.php /var/www/html/bootstrap/cache/services.php
+php artisan package:discover --no-interaction 2>/dev/null || true
+
 # ── Only run setup tasks for the main app (not queue worker) ─────────
 if echo "$@" | grep -q "supervisord"; then
 
@@ -76,10 +79,16 @@ if echo "$@" | grep -q "supervisord"; then
     if php artisan migrate:status --no-interaction 2>/dev/null | grep -q "Ran"; then
         BACKUP_FILE="/backups/db-pre-migrate-$(date +%Y%m%d-%H%M%S).sql"
         echo "[entrypoint] Backing up database before migrations..."
-        PGPASSWORD="${DB_PASSWORD}" pg_dump -h "${DB_HOST:-db}" -U "${DB_USERNAME:-zomboid}" \
+        PGPASSFILE="$(mktemp)"
+        echo "*:*:${DB_DATABASE:-zomboid}:${DB_USERNAME:-zomboid}:${DB_PASSWORD}" > "$PGPASSFILE"
+        chmod 600 "$PGPASSFILE"
+        export PGPASSFILE
+        pg_dump -h "${DB_HOST:-db}" -U "${DB_USERNAME:-zomboid}" \
             -d "${DB_DATABASE:-zomboid}" --no-owner > "$BACKUP_FILE" 2>/dev/null \
             && echo "[entrypoint] Backup saved to $BACKUP_FILE" \
             || echo "[entrypoint] Backup skipped (pg_dump not available or DB empty)"
+        rm -f "$PGPASSFILE"
+        unset PGPASSFILE
     fi
 
     # Database migrations
@@ -99,6 +108,18 @@ if echo "$@" | grep -q "supervisord"; then
         echo "[entrypoint] Map tiles not found — generating in background..."
         php artisan zomboid:generate-map-tiles \
             >> /var/www/html/storage/logs/map-tiles.log 2>&1 &
+    fi
+
+    # Item icons — download in background if catalog exists but icons are missing
+    ICON_DIR="/var/www/html/public/images/items"
+    CATALOG="${LUA_BRIDGE_DIR}/items_catalog.json"
+    if [ -f "$CATALOG" ]; then
+        ICON_COUNT=$(find "$ICON_DIR" -name '*.png' 2>/dev/null | head -1 | wc -l)
+        if [ "$ICON_COUNT" -eq 0 ]; then
+            echo "[entrypoint] Item icons not found — downloading in background..."
+            php artisan zomboid:download-item-icons \
+                >> /var/www/html/storage/logs/item-icons.log 2>&1 &
+        fi
     fi
 
     # Start Vite dev server only in non-production environments

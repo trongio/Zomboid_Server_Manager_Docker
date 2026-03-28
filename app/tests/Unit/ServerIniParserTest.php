@@ -93,3 +93,38 @@ it('handles empty values', function () {
 it('throws when config file not found for write', function () {
     $this->parser->write('/nonexistent/path/server.ini', ['MaxPlayers' => '32']);
 })->throws(RuntimeException::class, 'Config file not found');
+
+// ── Security: Newline Injection Defense-in-Depth ────────────────────
+
+it('strips newlines from values on write', function () {
+    $this->parser->write($this->tempPath, [
+        'MaxPlayers' => "32\nRCONPassword=hacked",
+    ]);
+
+    $data = $this->parser->read($this->tempPath);
+
+    expect($data['MaxPlayers'])->toBe('32RCONPassword=hacked')
+        ->and($data['RCONPassword'])->toBe('changeme');
+});
+
+it('strips carriage returns from values on write', function () {
+    $this->parser->write($this->tempPath, [
+        'MaxPlayers' => "32\r\nRCONPassword=hacked",
+    ]);
+
+    $data = $this->parser->read($this->tempPath);
+
+    expect($data['MaxPlayers'])->toBe('32RCONPassword=hacked')
+        ->and($data['RCONPassword'])->toBe('changeme');
+});
+
+it('strips newlines from appended keys', function () {
+    $this->parser->write($this->tempPath, [
+        "NewKey\nRCONPassword" => 'hacked',
+    ]);
+
+    $data = $this->parser->read($this->tempPath);
+
+    expect($data)->toHaveKey('NewKeyRCONPassword')
+        ->and($data['RCONPassword'])->toBe('changeme');
+});

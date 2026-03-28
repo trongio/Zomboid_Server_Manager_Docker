@@ -11,7 +11,8 @@ use App\Http\Controllers\Api\WhitelistController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/health', HealthController::class);
+Route::get('/health', [HealthController::class, 'index']);
+Route::get('/health/detailed', [HealthController::class, 'detailed'])->middleware('auth.apikey');
 
 Route::get('/user', function (Request $request) {
     return $request->user();

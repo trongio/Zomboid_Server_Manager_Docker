@@ -16,6 +16,7 @@ use App\Jobs\WipeGameServer;
 use App\Services\AuditLogger;
 use App\Services\DockerManager;
 use App\Services\RconClient;
+use App\Services\RconSanitizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use function Illuminate\Support\defer;
@@ -67,7 +68,7 @@ class ServerController extends Controller
         $message = $request->validated('message');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server shutting down in {$countdown} seconds";
+            $warningMessage = RconSanitizer::message($message ?? "Server shutting down in {$countdown} seconds");
 
             try {
                 $this->rcon->connect();
@@ -124,7 +125,7 @@ class ServerController extends Controller
         $message = $request->validated('message');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server restarting in {$countdown} seconds";
+            $warningMessage = RconSanitizer::message($message ?? "Server restarting in {$countdown} seconds");
 
             try {
                 $this->rcon->connect();
@@ -208,7 +209,7 @@ class ServerController extends Controller
         $message = $request->validated('message');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server wiping in {$countdown} seconds — all save data will be deleted";
+            $warningMessage = RconSanitizer::message($message ?? "Server wiping in {$countdown} seconds — all save data will be deleted");
 
             try {
                 $this->rcon->connect();
@@ -254,7 +255,7 @@ class ServerController extends Controller
         $branch = $request->validated('branch');
 
         if ($countdown) {
-            $warningMessage = $message ?? "Server updating in {$countdown} seconds — you will be disconnected";
+            $warningMessage = RconSanitizer::message($message ?? "Server updating in {$countdown} seconds — you will be disconnected");
 
             try {
                 $this->rcon->connect();

@@ -14,7 +14,9 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -39,7 +41,7 @@ class AppServiceProvider extends ServiceProvider
             $config = $app['config']['zomboid.docker'];
 
             return new DockerManager(
-                socketPath: $config['socket'],
+                proxyUrl: $config['proxy_url'],
                 containerName: $config['container_name'],
             );
         });
@@ -51,8 +53,13 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Global route patterns — enforce max length to match RconSanitizer limits
+        Route::pattern('name', '[a-zA-Z0-9_]{1,50}');
+        Route::pattern('username', '[a-zA-Z0-9_]{1,50}');
+
         $this->configureDefaults();
         $this->configureRateLimiting();
+        $this->validateApiKeyLength();
 
         AuditLog::observe(AuditLogObserver::class);
     }
@@ -86,6 +93,38 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return Limit::perMinute(15)->by($request->ip());
+        });
+
+        RateLimiter::for('admin', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('admin-sensitive', function (Request $request) {
+            return Limit::perMinute(10)->by($request->user()?->id ?: $request->ip());
+        });
+
+        RateLimiter::for('admin-destructive', function (Request $request) {
+            return Limit::perMinute(2)->by($request->user()?->id ?: $request->ip());
+        });
+    }
+
+    protected function validateApiKeyLength(): void
+    {
+        if (! app()->isProduction()) {
+            return;
+        }
+
+        app()->booted(function () {
+            static $checked = false;
+            if ($checked) {
+                return;
+            }
+            $checked = true;
+
+            $apiKey = (string) config('zomboid.api_key', '');
+            if ($apiKey !== '' && strlen($apiKey) < 32) {
+                Log::warning('API_KEY is shorter than 32 characters. This is insecure for production.');
+            }
         });
     }
 }

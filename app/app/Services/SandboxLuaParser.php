@@ -273,6 +273,10 @@ class SandboxLuaParser
             return $value;
         }
 
-        return "\"{$value}\"";
+        // Defense-in-depth: escape backslashes first, then double quotes
+        $escaped = str_replace('\\', '\\\\', $value);
+        $escaped = str_replace('"', '\\"', $escaped);
+
+        return "\"{$escaped}\"";
     }
 }

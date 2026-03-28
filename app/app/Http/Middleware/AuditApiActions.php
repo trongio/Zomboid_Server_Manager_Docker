@@ -37,7 +37,16 @@ class AuditApiActions
             'status' => $response->getStatusCode(),
         ];
 
-        $body = $request->except(['password', 'api_key', 'token']);
+        $body = $request->except([
+            'password',
+            'password_confirmation',
+            'api_key',
+            'token',
+            'secret',
+            'current_password',
+            'two_factor_secret',
+            'two_factor_recovery_codes',
+        ]);
         if ($body !== []) {
             $details['body'] = $body;
         }

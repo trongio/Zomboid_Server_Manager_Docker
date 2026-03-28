@@ -140,22 +140,22 @@ class SyncPzAccounts extends Command
             foreach ($networkPlayers as $player) {
                 $username = $player->username;
 
-                if (User::where('username', $username)->exists()) {
-                    continue;
+                $user = User::firstOrCreate(
+                    ['username' => $username],
+                    [
+                        'name' => $player->name ?: $username,
+                        'password' => Hash::make(bin2hex(random_bytes(16))),
+                        'role' => UserRole::Player,
+                    ]
+                );
+
+                if ($user->wasRecentlyCreated) {
+                    $playersCreated++;
+
+                    Log::info('Auto-created web user from networkPlayers', [
+                        'username' => $username,
+                    ]);
                 }
-
-                User::create([
-                    'username' => $username,
-                    'name' => $player->name ?: $username,
-                    'password' => Hash::make(bin2hex(random_bytes(16))),
-                    'role' => UserRole::Player,
-                ]);
-
-                $playersCreated++;
-
-                Log::info('Auto-created web user from networkPlayers', [
-                    'username' => $username,
-                ]);
             }
 
             $this->info("Network players sync: {$playersCreated} new players discovered.");

@@ -38,17 +38,13 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-Route::middleware(['auth', 'admin'])->group(function () {
+Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 
     Route::prefix('admin')->name('admin.')->group(function () {
         // Players
         Route::get('players', [Admin\PlayerController::class, 'index'])->name('players');
         Route::get('players/map', Admin\PlayerMapController::class)->name('players.map');
-        Route::post('players/{name}/kick', [Admin\PlayerController::class, 'kick'])->name('players.kick');
-        Route::post('players/{name}/ban', [Admin\PlayerController::class, 'ban'])->name('players.ban');
-        Route::post('players/{name}/access', [Admin\PlayerController::class, 'setAccessLevel'])->name('players.access');
-        Route::post('players/{name}/password', [Admin\PlayerController::class, 'setPassword'])->name('players.password');
 
         // Player Inventory
         Route::get('players/{username}/inventory', [Admin\InventoryController::class, 'show'])->name('players.inventory');
@@ -75,7 +71,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
         Route::post('backups', [Admin\BackupController::class, 'store'])->name('backups.store');
         Route::delete('backups', [Admin\BackupController::class, 'destroyBulk'])->name('backups.destroy-bulk');
         Route::delete('backups/{backup}', [Admin\BackupController::class, 'destroy'])->name('backups.destroy');
-        Route::post('backups/{backup}/rollback', [Admin\BackupController::class, 'rollback'])->name('backups.rollback');
 
         // Whitelist
         Route::get('whitelist', [Admin\WhitelistController::class, 'index'])->name('whitelist');
@@ -90,7 +85,6 @@ Route::middleware(['auth', 'admin'])->group(function () {
 
         // RCON Console
         Route::get('rcon', [Admin\RconController::class, 'index'])->name('rcon');
-        Route::post('rcon', [Admin\RconController::class, 'execute'])->name('rcon.execute');
 
         // Server Logs
         Route::get('logs', [Admin\LogController::class, 'index'])->name('logs');
@@ -158,13 +152,25 @@ Route::middleware(['auth', 'admin'])->group(function () {
         // Server Settings (connection info)
         Route::patch('server-settings', [Admin\ServerSettingController::class, 'update'])->name('server-settings.update');
 
-        // Server Control
-        Route::post('server/start', [Admin\ServerController::class, 'start'])->name('server.start');
-        Route::post('server/stop', [Admin\ServerController::class, 'stop'])->name('server.stop');
-        Route::post('server/restart', [Admin\ServerController::class, 'restart'])->name('server.restart');
-        Route::post('server/save', [Admin\ServerController::class, 'save'])->name('server.save');
-        Route::post('server/wipe', [Admin\ServerController::class, 'wipe'])->name('server.wipe');
-        Route::post('server/update', [Admin\ServerController::class, 'update'])->name('server.update');
+        // Sensitive admin actions — stricter rate limit
+        Route::middleware('throttle:admin-sensitive')->group(function () {
+            Route::post('players/{name}/access', [Admin\PlayerController::class, 'setAccessLevel'])->name('players.access');
+            Route::post('players/{name}/kick', [Admin\PlayerController::class, 'kick'])->name('players.kick');
+            Route::post('players/{name}/ban', [Admin\PlayerController::class, 'ban'])->name('players.ban');
+            Route::post('players/{name}/password', [Admin\PlayerController::class, 'setPassword'])->name('players.password');
+            Route::post('backups/{backup}/rollback', [Admin\BackupController::class, 'rollback'])->name('backups.rollback');
+            Route::post('rcon', [Admin\RconController::class, 'execute'])->name('rcon.execute');
+            Route::post('server/start', [Admin\ServerController::class, 'start'])->name('server.start');
+            Route::post('server/stop', [Admin\ServerController::class, 'stop'])->name('server.stop');
+            Route::post('server/restart', [Admin\ServerController::class, 'restart'])->name('server.restart');
+            Route::post('server/save', [Admin\ServerController::class, 'save'])->name('server.save');
+            Route::post('server/update', [Admin\ServerController::class, 'update'])->name('server.update');
+        });
+
+        // Destructive actions — very strict rate limit
+        Route::post('server/wipe', [Admin\ServerController::class, 'wipe'])
+            ->name('server.wipe')
+            ->middleware('throttle:admin-destructive');
     });
 });
 

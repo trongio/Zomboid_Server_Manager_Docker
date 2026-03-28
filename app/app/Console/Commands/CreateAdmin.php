@@ -16,16 +16,10 @@ class CreateAdmin extends Command
         {--password= : Admin password}';
 
     /** @var string */
-    protected $description = 'Create the initial super admin user (idempotent — skips if one exists)';
+    protected $description = 'Create or update the super admin user';
 
     public function handle(): int
     {
-        if (User::where('role', UserRole::SuperAdmin)->exists()) {
-            $this->info('Super admin already exists — skipping.');
-
-            return self::SUCCESS;
-        }
-
         $username = $this->option('username') ?: config('zomboid.admin.username');
         $password = $this->option('password') ?: config('zomboid.admin.password');
         $email = $this->option('email') ?: config('zomboid.admin.email') ?: null;
@@ -34,6 +28,26 @@ class CreateAdmin extends Command
             $this->error('Username and password are required. Provide via --username/--password options or ADMIN_USERNAME/ADMIN_PASSWORD env vars.');
 
             return self::FAILURE;
+        }
+
+        $existing = User::where('role', UserRole::SuperAdmin)->first();
+
+        if ($existing) {
+            $existing->update([
+                'username' => $username,
+                'name' => $username,
+                'email' => $email,
+                'password' => $password,
+            ]);
+
+            if ($email) {
+                $existing->forceFill(['email_verified_at' => now()])->save();
+            }
+
+            Log::info('Super admin user updated', ['username' => $username]);
+            $this->info("Super admin '{$username}' updated successfully.");
+
+            return self::SUCCESS;
         }
 
         $user = User::create([

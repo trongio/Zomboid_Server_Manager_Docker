@@ -113,13 +113,19 @@ class InventoryReader
             mkdir($dir, 0755, true);
         }
 
-        $tmpPath = $this->exportRequestsPath.'.tmp.'.getmypid();
+        $tmpPath = $this->exportRequestsPath.'.tmp.'.getmypid().'.'.bin2hex(random_bytes(4));
         $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-        if (file_put_contents($tmpPath, $json) === false) {
+        try {
+            if (file_put_contents($tmpPath, $json) === false) {
+                return false;
+            }
+
+            return rename($tmpPath, $this->exportRequestsPath);
+        } catch (\Throwable) {
+            @unlink($tmpPath);
+
             return false;
         }
-
-        return rename($tmpPath, $this->exportRequestsPath);
     }
 }
