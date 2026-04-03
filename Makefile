@@ -129,8 +129,9 @@ nuke:
 	fi
 	@rm -f .env app/.env .firewall.conf
 	@rm -f caddy/Caddyfile caddy/certs/cert.pem caddy/certs/key.pem
-	@rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || \
-		sudo rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || true
+	@for dir in app/bootstrap/cache app/storage/logs app/storage/framework/cache app/storage/framework/sessions app/storage/framework/views; do \
+		chown -R $$(id -u):$$(id -g) $$dir 2>/dev/null || sudo chown -R $$(id -u):$$(id -g) $$dir 2>/dev/null || true; \
+	done
 	@echo "Nuke complete. All volumes and config removed."
 
 build:
@@ -293,9 +294,10 @@ help:
 	@echo "    exec CMD=...   - Run a command in the app container"
 	@echo ""
 	@echo "  Other:"
-	@echo "    info           - Show URLs, public IP, and firewall status"
-	@echo "    arch           - Show detected CPU architecture"
-	@echo "    nuke           - Destroy ALL data and stop services (DANGER)"
+	@echo "    info             - Show URLs, public IP, and firewall status"
+	@echo "    arch             - Show detected CPU architecture"
+	@echo "    update-version   - Update game-version.conf after a PZ game update"
+	@echo "    nuke             - Destroy ALL data and stop services (DANGER)"
 	@echo ""
 	@echo "  Supported firewall backends: firewalld (Fedora/RHEL), ufw (Ubuntu/Debian), manual"
 	@echo "  See docs/firewall-*.md for per-OS documentation."

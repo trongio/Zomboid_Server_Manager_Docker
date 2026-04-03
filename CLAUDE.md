@@ -59,6 +59,9 @@ make exec CMD="npm run build"
 
 # Check detected architecture
 make arch
+
+# Update game version after a PZ update (edits game-version.conf)
+make update-version
 ```
 
 **Important:** All PHP/artisan commands must run inside the Docker container via `make exec CMD="..."`. Never run them directly on the host.

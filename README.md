@@ -803,6 +803,7 @@ Authenticated via `X-API-Key` header. The key is auto-generated in `.env` during
 |---|---|
 | `make test` | Run the test suite (isolated SQLite, safe for production) |
 | `make exec CMD="..."` | Run a command inside the app container |
+| `make update-version` | Update `game-version.conf` with the current PZ build version |
 
 ### Danger Zone
 
