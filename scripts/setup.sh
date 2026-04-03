@@ -286,7 +286,7 @@ else
 
                 echo -e "  ${GREEN}✓ Using ${SITE_HOST}${NC}"
                 APP_URL="https://${SITE_HOST}"
-                CADDY_SITE=":443"
+                CADDY_SITE="${SITE_HOST}:443"
                 CADDY_TLS=$'\ttls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem'
                 GENERATE_SELF_SIGNED=true
                 break
@@ -600,6 +600,10 @@ fi
 echo ""
 echo -e "${BOLD}Starting services...${NC}"
 make down 2>/dev/null || true
+
+# Clean stale bootstrap cache files (may be root-owned from previous Docker run)
+rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || \
+    sudo rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || true
 
 # Remove build/cache volumes that may have stale state from a previous run
 # (game data, DB, and backups are intentionally preserved)

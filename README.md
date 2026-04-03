@@ -427,9 +427,29 @@ The interactive setup wizard will:
 
 All prompts have sensible defaults — press Enter through everything for a working setup.
 
+### Access Modes
+
+During `make init`, you choose how the admin panel is accessed:
+
+| Mode | When to use | TLS |
+|---|---|---|
+| **Public — Domain** | Production server with a domain pointed at it | Auto (Let's Encrypt) |
+| **Public — IP address** | Server without a domain (public or LAN IP) | Self-signed cert (browser will warn) |
+| **Local only** | Development or when you only need `localhost:8000` | Internal cert |
+
+Public modes set up [Caddy](https://caddyserver.com/) as an HTTPS reverse proxy. You also choose the Caddy listening ports (default 80/443 — change these if your router or another service already uses them).
+
+The admin panel is **always** available locally at `http://localhost:8000`, regardless of which mode you pick.
+
 ### Open the Panel
 
 Navigate to the URL shown at the end of setup and log in with the displayed credentials.
+
+### Troubleshooting
+
+- **Can't reach the public URL?** The panel is always accessible at `http://localhost:8000` on the server itself. If the public URL doesn't work, check `make info` for your configured ports, run `make admin-expose` to open the firewall, and verify router port forwarding.
+- **Browser shows a certificate warning?** Expected with IP-address mode (self-signed cert). Click through to proceed.
+- **Want to change access mode?** Re-run `make init` — it will detect existing config and offer to reconfigure.
 
 ## Configuration
 

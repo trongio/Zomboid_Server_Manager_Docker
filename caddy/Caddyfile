@@ -2,9 +2,8 @@
 	# Managed by setup.sh — edit freely or re-run make init
 }
 
-:443 {
-	# Use Caddy's internal CA by default so fresh environments work without external cert files.
-	tls internal
+105.224.24.94:443 {
+	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 	reverse_proxy app:8000
 }
 

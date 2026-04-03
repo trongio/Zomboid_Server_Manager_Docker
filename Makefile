@@ -17,7 +17,7 @@ CADDY_HTTPS_PORT ?= 443
 
 FW_DISPATCH := bash scripts/firewall/dispatch.sh
 
-.PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package \
+.PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version \
 	admin-expose admin-hide expose hide info
 
 # ── First-run setup ──────────────────────────────────────────────────
@@ -129,6 +129,8 @@ nuke:
 	fi
 	@rm -f .env app/.env .firewall.conf
 	@rm -f caddy/Caddyfile caddy/certs/cert.pem caddy/certs/key.pem
+	@rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || \
+		sudo rm -f app/bootstrap/cache/packages.php app/bootstrap/cache/services.php 2>/dev/null || true
 	@echo "Nuke complete. All volumes and config removed."
 
 build:
@@ -226,6 +228,33 @@ db-restore:
 # ── Workshop ────────────────────────────────────────────────────────
 workshop-package:
 	bash scripts/workshop-package.sh
+
+# ── Game version ────────────────────────────────────────────────────
+# Updates game-version.conf with the current PZ version.
+# This file is used by tests — it does NOT control which version SteamCMD downloads.
+update-version:
+	@echo "Current version:"
+	@if [ -f game-version.conf ]; then \
+		. ./game-version.conf; \
+		echo "  $$PZ_VERSION"; \
+		echo "  $$PZ_VERSION_FULL"; \
+	else \
+		echo "  (not set)"; \
+	fi
+	@echo ""
+	@echo "Paste the full version string from the game"
+	@echo "(e.g. 42.16.1 679520210a22497d1cb91ca6105ed544637604c6 2026-04-02 14:57:34 (ZB))"
+	@echo ""
+	@echo -n "> "; read FULL; \
+	if [ -z "$$FULL" ]; then echo "Cancelled."; exit 1; fi; \
+	VER=$$(echo "$$FULL" | grep -oP '^\d+\.\d+(\.\d+)*'); \
+	if [ -z "$$VER" ]; then echo "Error: could not parse version number."; exit 1; fi; \
+	sed -i "s|^PZ_VERSION=.*|PZ_VERSION=$$VER|" game-version.conf; \
+	sed -i "s|^PZ_VERSION_FULL=.*|PZ_VERSION_FULL=$$FULL|" game-version.conf; \
+	echo ""; \
+	echo "Updated game-version.conf:"; \
+	echo "  PZ_VERSION=$$VER"; \
+	echo "  PZ_VERSION_FULL=$$FULL"
 
 help:
 	@echo "Available targets:"
