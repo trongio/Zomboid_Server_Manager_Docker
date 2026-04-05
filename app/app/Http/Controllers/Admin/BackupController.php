@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\BackupType;
 use App\Http\Controllers\Concerns\SortsQuery;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportWorldRequest;
 use App\Http\Resources\BackupResource;
 use App\Jobs\CreateBackupJob;
+use App\Jobs\ImportWorldSave;
 use App\Jobs\RollbackGameServer;
 use App\Jobs\SendServerWarning;
 use App\Models\Backup;
@@ -20,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BackupController extends Controller
 {
@@ -181,5 +184,69 @@ class BackupController extends Controller
                 ? "Rollback scheduled in {$countdown} seconds"
                 : 'Rollback initiated — server will restart shortly',
         ]);
+    }
+
+    public function download(Backup $backup): BinaryFileResponse
+    {
+        $backupRoot = realpath(config('zomboid.backups.path'));
+        $resolvedPath = realpath($backup->path);
+
+        if ($backupRoot === false || $resolvedPath === false || ! is_file($resolvedPath)) {
+            abort(404, 'Backup file not found on disk.');
+        }
+
+        if (! str_starts_with($resolvedPath, rtrim($backupRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR)) {
+            abort(403, 'Backup file is outside the configured backup directory.');
+        }
+
+        return response()->download($resolvedPath, $backup->filename, [
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
+    public function importWorld(ImportWorldRequest $request): JsonResponse
+    {
+        $file = $request->file('file');
+
+        $backupDir = config('zomboid.backups.path');
+        $importsDir = rtrim($backupDir, '/').'/imports';
+
+        if (! is_dir($importsDir)) {
+            mkdir($importsDir, 0755, true);
+        }
+
+        $filename = 'import_'.now()->format('Y-m-d_H-i-s').'.zip';
+        $storedPath = $file->move($importsDir, $filename)->getPathname();
+
+        try {
+            $metadata = $this->backupManager->validateImportZip($storedPath);
+        } catch (\Throwable $e) {
+            @unlink($storedPath);
+
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+
+        $this->auditLogger->log(
+            actor: $request->user()->name ?? 'admin',
+            action: 'world.import.initiated',
+            target: $file->getClientOriginalName(),
+            details: [
+                'layout' => $metadata['layout'],
+                'entry_count' => $metadata['entry_count'],
+                'detected_server_name' => $metadata['detected_server_name'],
+            ],
+            ip: $request->ip(),
+        );
+
+        ImportWorldSave::dispatch(
+            $storedPath,
+            $request->user()->name ?? 'admin',
+            $request->ip(),
+        );
+
+        return response()->json([
+            'message' => 'World import started — server will restart shortly',
+            'layout' => $metadata['layout'],
+        ], 202);
     }
 }

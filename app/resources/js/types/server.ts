@@ -56,7 +56,7 @@ export type BackupEntry = {
     filename: string;
     size_bytes: number;
     size_human: string;
-    type: 'manual' | 'scheduled' | 'daily' | 'pre_rollback' | 'pre_update';
+    type: 'manual' | 'scheduled' | 'daily' | 'pre_rollback' | 'pre_update' | 'pre_import';
     game_version: string | null;
     steam_branch: string | null;
     notes: string | null;

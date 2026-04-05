@@ -89,6 +89,7 @@ return [
             'daily' => (int) env('BACKUP_RETENTION_DAILY', 7),
             'pre_rollback' => (int) env('BACKUP_RETENTION_PRE_ROLLBACK', 5),
             'pre_update' => (int) env('BACKUP_RETENTION_PRE_UPDATE', 3),
+            'pre_import' => (int) env('BACKUP_RETENTION_PRE_IMPORT', 3),
         ],
     ],
 

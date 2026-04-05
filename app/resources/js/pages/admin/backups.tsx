@@ -1,5 +1,5 @@
 import { Deferred, Head, router } from '@inertiajs/react';
-import { AlertTriangle, Archive, ChevronLeft, ChevronRight, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronDown, ChevronLeft, ChevronRight, Download, HelpCircle, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
 import { formatDateTime } from '@/lib/dates';
 import { useMemo, useState } from 'react';
 import { SortableHeader } from '@/components/sortable-header';
@@ -63,6 +63,7 @@ const typeColors: Record<string, string> = {
     daily: 'bg-purple-500/10 text-purple-500',
     pre_rollback: 'bg-yellow-500/10 text-yellow-500',
     pre_update: 'bg-orange-500/10 text-orange-500',
+    pre_import: 'bg-cyan-500/10 text-cyan-500',
 };
 
 type BackupsProps = {
@@ -97,6 +98,11 @@ export default function Backups({ backups, current_version, current_branch, filt
     const [search, setSearch] = useState('');
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [showBulkDelete, setShowBulkDelete] = useState(false);
+    const [showImport, setShowImport] = useState(false);
+    const [importFile, setImportFile] = useState<File | null>(null);
+    const [importConfirm, setImportConfirm] = useState(false);
+    const [importLoading, setImportLoading] = useState(false);
+    const [showImportHelp, setShowImportHelp] = useState(false);
 
     const filteredBackups = useMemo(() => {
         if (!backups?.data || !search) return backups?.data ?? [];
@@ -198,6 +204,42 @@ export default function Backups({ backups, current_version, current_branch, filt
         router.reload();
     }
 
+    async function importWorld() {
+        if (!importFile) return;
+        setImportLoading(true);
+
+        const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const formData = new FormData();
+        formData.append('file', importFile);
+        formData.append('confirm', importConfirm ? '1' : '0');
+
+        try {
+            const res = await fetch('/admin/backups/import', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: formData,
+            });
+            const json = await res.json().catch(() => ({}));
+
+            if (res.ok) {
+                const { toast } = await import('sonner');
+                toast.success(json.message || 'World import started');
+                setShowImport(false);
+                setImportFile(null);
+                setImportConfirm(false);
+                router.reload();
+            } else {
+                const { toast } = await import('sonner');
+                toast.error(json.error || json.message || `Import failed (${res.status})`);
+            }
+        } catch {
+            const { toast } = await import('sonner');
+            toast.error('Network error — could not reach the server');
+        }
+
+        setImportLoading(false);
+    }
+
     function goToPage(page: number) {
         const params: Record<string, unknown> = { page };
         if (backups?.per_page && backups.per_page !== 15) {
@@ -234,6 +276,10 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 Delete {selectedIds.size} Selected
                             </Button>
                         )}
+                        <Button variant="outline" onClick={() => setShowImport(true)}>
+                            <Upload className="mr-1.5 size-4" />
+                            Import World
+                        </Button>
                         <Button onClick={() => setShowCreate(true)}>
                             <Plus className="mr-1.5 size-4" />
                             Create Backup
@@ -358,6 +404,19 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={`/admin/backups/${backup.id}/download`}
+                                                                download
+                                                                aria-label={`Download ${backup.filename}`}
+                                                            >
+                                                                <Download className="size-4" />
+                                                            </a>
+                                                        </Button>
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
@@ -627,6 +686,146 @@ export default function Backups({ backups, current_version, current_branch, filt
                             onClick={deleteBulk}
                         >
                             Delete {selectedIds.size} Backup{selectedIds.size !== 1 ? 's' : ''}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            {/* Import World Dialog */}
+            <Dialog open={showImport} onOpenChange={(open) => {
+                setShowImport(open);
+                if (!open) {
+                    setImportFile(null);
+                    setImportConfirm(false);
+                    setShowImportHelp(false);
+                }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Import World Save</DialogTitle>
+                        <DialogDescription>
+                            Upload a zip file containing PZ world save data. The server will be
+                            stopped automatically, a safety backup created, the save extracted,
+                            and the server restarted.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                            <div className="space-y-1">
+                                <p className="font-medium">This will stop the server and overwrite save data</p>
+                                <p>A pre-import safety backup is created automatically. The server will restart after import completes. Players will be disconnected during this process.</p>
+                                {current_version && (
+                                    <p>
+                                        The server is running <strong>v{current_version}</strong>
+                                        {current_branch && <> ({current_branch})</>}.
+                                        Ensure the imported save is compatible with this version.
+                                        Importing a save from a different game version may cause the server to fail to start.
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="import-file">Zip file</Label>
+                            <Input
+                                id="import-file"
+                                type="file"
+                                accept=".zip"
+                                onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                            />
+                            {importFile && (
+                                <p className="text-xs text-muted-foreground">
+                                    {importFile.name} ({(importFile.size / 1024 / 1024).toFixed(1)} MB)
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-md border p-2.5 text-left text-xs text-muted-foreground hover:bg-accent/50 transition-colors"
+                            onClick={() => setShowImportHelp(!showImportHelp)}
+                        >
+                            <HelpCircle className="size-3.5 shrink-0" />
+                            <span className="flex-1 font-medium">How to create the zip file</span>
+                            <ChevronDown className={`size-3.5 transition-transform ${showImportHelp ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showImportHelp && (
+                            <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-2.5 max-h-[40vh] overflow-y-auto">
+                                <p>
+                                    On your existing PZ server, find the Zomboid data folder
+                                    (typically <code className="rounded bg-muted px-1">~/Zomboid/</code> on Linux
+                                    or <code className="rounded bg-muted px-1">C:\Users\YourName\Zomboid\</code> on Windows).
+                                    Zip the contents using one of these layouts:
+                                </p>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 1: Full server (recommended)</p>
+                                        <p>Zip the <code className="rounded bg-muted px-1">Server/</code>, <code className="rounded bg-muted px-1">Saves/</code>, and <code className="rounded bg-muted px-1">db/</code> folders together. This imports config, world, and whitelist.</p>
+                                        <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+{`your-server.zip
+├── Server/
+│   ├── YourServer.ini
+│   └── YourServer_SandboxVars.lua
+├── Saves/
+│   └── Multiplayer/
+│       └── YourServer/
+│           ├── map_meta.bin
+│           ├── players.db
+│           └── ...
+└── db/
+    └── YourServer.db`}
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 2: World save only</p>
+                                        <p>Zip just the <code className="rounded bg-muted px-1">Saves/</code> folder. Config and whitelist stay unchanged.</p>
+                                        <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+{`your-world.zip
+└── Saves/
+    └── Multiplayer/
+        └── YourServer/
+            ├── map_meta.bin
+            ├── players.db
+            └── ...`}
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 3: Flat save files</p>
+                                        <p>Zip the contents of the save folder directly (map files, players.db at the root of the zip).</p>
+                                    </div>
+                                </div>
+                                <p>If the server name in the zip differs from the current server, it will be renamed automatically.</p>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="import-confirm"
+                                checked={importConfirm}
+                                onCheckedChange={(checked) => setImportConfirm(checked === true)}
+                            />
+                            <Label htmlFor="import-confirm" className="cursor-pointer text-sm">
+                                I understand this will stop the server and overwrite save data
+                            </Label>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowImport(false)} disabled={importLoading}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            disabled={!importFile || !importConfirm || importLoading}
+                            onClick={importWorld}
+                        >
+                            {importLoading ? (
+                                <>
+                                    <Loader2 className="mr-2 size-4 animate-spin" />
+                                    Uploading...
+                                </>
+                            ) : (
+                                <>
+                                    <Upload className="mr-2 size-4" />
+                                    Import World
+                                </>
+                            )}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -157,3 +157,34 @@ it('escapes backslashes in string values', function () {
 
     expect($result)->toBe('"test\\\\value"');
 });
+
+// ── parseContent() ────────────────────────────────────────────────
+
+it('parses content string same as file', function () {
+    $content = file_get_contents($this->fixturePath);
+    $fromFile = $this->parser->read($this->fixturePath);
+    $fromContent = $this->parser->parseContent($content);
+
+    expect($fromContent)->toBe($fromFile);
+});
+
+it('returns empty array for empty content via parseContent', function () {
+    expect($this->parser->parseContent(''))->toBe([]);
+});
+
+it('parses minimal sandbox content', function () {
+    $content = "SandboxVars = {\n    Zombies = 4,\n    DayLength = 2,\n}\n";
+    $data = $this->parser->parseContent($content);
+
+    expect($data)
+        ->toHaveKey('Zombies', 4)
+        ->toHaveKey('DayLength', 2);
+});
+
+it('parses nested tables in content', function () {
+    $content = "SandboxVars = {\n    ZombieLore = {\n        Speed = 3,\n    },\n}\n";
+    $data = $this->parser->parseContent($content);
+
+    expect($data)->toHaveKey('ZombieLore')
+        ->and($data['ZombieLore'])->toHaveKey('Speed', 3);
+});

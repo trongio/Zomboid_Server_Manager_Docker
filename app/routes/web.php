@@ -59,6 +59,9 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         Route::get('config', [Admin\ConfigController::class, 'index'])->name('config');
         Route::patch('config/server', [Admin\ConfigController::class, 'updateServer'])->name('config.server.update');
         Route::patch('config/sandbox', [Admin\ConfigController::class, 'updateSandbox'])->name('config.sandbox.update');
+        Route::post('config/import/preview', [Admin\ConfigController::class, 'importPreview'])->name('config.import.preview');
+        Route::post('config/import/apply', [Admin\ConfigController::class, 'importApply'])->name('config.import.apply');
+        Route::get('config/export/{type}', [Admin\ConfigController::class, 'export'])->name('config.export')->where('type', 'server|sandbox');
 
         // Mods
         Route::get('mods', [Admin\ModController::class, 'index'])->name('mods');
@@ -68,6 +71,7 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
 
         // Backups
         Route::get('backups', [Admin\BackupController::class, 'index'])->name('backups');
+        Route::get('backups/{backup}/download', [Admin\BackupController::class, 'download'])->name('backups.download');
         Route::post('backups', [Admin\BackupController::class, 'store'])->name('backups.store');
         Route::delete('backups', [Admin\BackupController::class, 'destroyBulk'])->name('backups.destroy-bulk');
         Route::delete('backups/{backup}', [Admin\BackupController::class, 'destroy'])->name('backups.destroy');
@@ -154,6 +158,7 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
 
         // Sensitive admin actions — stricter rate limit
         Route::middleware('throttle:admin-sensitive')->group(function () {
+            Route::post('backups/import', [Admin\BackupController::class, 'importWorld'])->name('backups.import');
             Route::post('players/{name}/access', [Admin\PlayerController::class, 'setAccessLevel'])->name('players.access');
             Route::post('players/{name}/kick', [Admin\PlayerController::class, 'kick'])->name('players.kick');
             Route::post('players/{name}/ban', [Admin\PlayerController::class, 'ban'])->name('players.ban');

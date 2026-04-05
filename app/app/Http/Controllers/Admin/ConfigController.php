@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\ImportConfigApplyRequest;
+use App\Http\Requests\Admin\ImportConfigPreviewRequest;
 use App\Rules\SafeConfigValue;
 use App\Services\AuditLogger;
+use App\Services\ConfigImporter;
 use App\Services\ConfigStateManager;
 use App\Services\RespawnDelayManager;
 use App\Services\SandboxLuaParser;
@@ -13,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConfigController extends Controller
 {
@@ -22,6 +26,7 @@ class ConfigController extends Controller
         private readonly AuditLogger $auditLogger,
         private readonly RespawnDelayManager $respawnDelay,
         private readonly ConfigStateManager $configState,
+        private readonly ConfigImporter $configImporter,
     ) {}
 
     public function index(): Response
@@ -108,6 +113,66 @@ class ConfigController extends Controller
         return response()->json([
             'updated_fields' => array_keys($settings),
             'restart_required' => true,
+        ]);
+    }
+
+    public function importPreview(ImportConfigPreviewRequest $request): JsonResponse
+    {
+        $preview = $this->configImporter->preview(
+            $request->validated('type'),
+            $request->validated('content'),
+        );
+
+        return response()->json($preview);
+    }
+
+    public function importApply(ImportConfigApplyRequest $request): JsonResponse
+    {
+        $type = $request->validated('type');
+        $settings = $request->validated('settings');
+
+        $updatedFields = $this->configImporter->apply($type, $settings);
+
+        if ($type === 'server') {
+            $appliedSettings = array_intersect_key($settings, array_flip($updatedFields));
+            $this->configState->persistSettings($appliedSettings, config('zomboid.paths.server_ini'));
+        }
+
+        $this->auditLogger->log(
+            actor: $request->user()->name ?? 'admin',
+            action: "config.{$type}.import",
+            target: $type === 'server' ? 'server.ini' : 'SandboxVars.lua',
+            details: [
+                'updated_fields' => $updatedFields,
+                'imported_count' => count($updatedFields),
+            ],
+            ip: $request->ip(),
+        );
+
+        return response()->json([
+            'updated_fields' => $updatedFields,
+            'restart_required' => true,
+        ]);
+    }
+
+    public function export(Request $request, string $type): BinaryFileResponse
+    {
+        if ($type === 'server') {
+            $path = config('zomboid.paths.server_ini');
+            $filename = basename($path);
+        } elseif ($type === 'sandbox') {
+            $path = config('zomboid.paths.sandbox_lua');
+            $filename = basename($path);
+        } else {
+            abort(404);
+        }
+
+        if (! is_file($path)) {
+            abort(404, 'Config file not available. The server may not have been started yet.');
+        }
+
+        return response()->download($path, $filename, [
+            'Cache-Control' => 'no-store',
         ]);
     }
 }

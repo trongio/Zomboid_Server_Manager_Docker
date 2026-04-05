@@ -128,3 +128,36 @@ it('strips newlines from appended keys', function () {
     expect($data)->toHaveKey('NewKeyRCONPassword')
         ->and($data['RCONPassword'])->toBe('changeme');
 });
+
+// ── parseContent() ────────────────────────────────────────────────
+
+it('parses content string same as file', function () {
+    $content = file_get_contents($this->fixturePath);
+    $fromFile = $this->parser->read($this->fixturePath);
+    $fromContent = $this->parser->parseContent($content);
+
+    expect($fromContent)->toBe($fromFile);
+});
+
+it('parses content with Windows line endings', function () {
+    $content = "MaxPlayers=32\r\nPublic=true\r\nPassword=\r\n";
+    $data = $this->parser->parseContent($content);
+
+    expect($data)
+        ->toHaveKey('MaxPlayers', '32')
+        ->toHaveKey('Public', 'true')
+        ->toHaveKey('Password', '');
+});
+
+it('returns empty array for empty content', function () {
+    expect($this->parser->parseContent(''))->toBe([]);
+});
+
+it('skips comments and blank lines in content', function () {
+    $content = "# Comment\n\nMaxPlayers=16\n# Another comment\nPublic=true\n";
+    $data = $this->parser->parseContent($content);
+
+    expect($data)->toHaveCount(2)
+        ->toHaveKey('MaxPlayers', '16')
+        ->toHaveKey('Public', 'true');
+});
