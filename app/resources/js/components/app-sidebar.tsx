@@ -10,6 +10,7 @@ import {
     LayoutGrid,
     MapPin,
     Package,
+    Palette,
     ScrollText,
     Shield,
     ShieldAlert,
@@ -111,6 +112,7 @@ export function AppSidebar() {
         items: [
             { title: 'Discord', href: '/admin/discord', icon: Bell },
             { title: 'Audit Log', href: '/admin/audit', icon: ScrollText },
+            { title: 'Site Settings', href: '/admin/site-settings', icon: Palette },
             { title: 'Rankings', href: '/rankings', icon: Trophy },
             myStatsItem,
         ],

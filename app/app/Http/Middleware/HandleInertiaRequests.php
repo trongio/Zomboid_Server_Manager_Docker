@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -35,6 +36,10 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $siteSettings = SiteSetting::cached();
+
+        view()->share('siteFavicon', $siteSettings->faviconUrl());
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -45,6 +50,14 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
+            ],
+            'site' => fn () => [
+                'name' => $siteSettings->site_name,
+                'logo_url' => $siteSettings->logoUrl(),
+                'favicon_url' => $siteSettings->faviconUrl(),
+                'footer_text' => $siteSettings->footer_text,
+                'theme_colors' => $siteSettings->theme_colors,
+                'default_locale' => $siteSettings->default_locale,
             ],
         ];
     }

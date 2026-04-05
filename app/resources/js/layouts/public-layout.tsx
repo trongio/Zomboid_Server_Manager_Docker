@@ -70,6 +70,7 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
 }
 
 export default function PublicLayout({ children }: PropsWithChildren) {
+    const { site } = usePage().props;
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
@@ -77,8 +78,12 @@ export default function PublicLayout({ children }: PropsWithChildren) {
             <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
                     <Link href="/" className="flex items-center gap-2">
-                        <Skull className="size-6" />
-                        <span className="text-lg font-semibold tracking-tight">Zomboid Manager</span>
+                        {site.logo_url ? (
+                            <img src={site.logo_url} alt={site.name} className="size-6 object-contain" />
+                        ) : (
+                            <Skull className="size-6" />
+                        )}
+                        <span className="text-lg font-semibold tracking-tight">{site.name}</span>
                     </Link>
 
                     {/* Desktop nav */}
@@ -103,8 +108,12 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                     <SheetHeader>
                         <SheetTitle>
                             <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-                                <Skull className="size-5" />
-                                <span className="font-semibold">Zomboid Manager</span>
+                                {site.logo_url ? (
+                                    <img src={site.logo_url} alt={site.name} className="size-5 object-contain" />
+                                ) : (
+                                    <Skull className="size-5" />
+                                )}
+                                <span className="font-semibold">{site.name}</span>
                             </Link>
                         </SheetTitle>
                     </SheetHeader>
@@ -119,7 +128,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
 
             <footer className="border-t border-border/40 py-8">
                 <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground">
-                    Powered by Zomboid Manager
+                    {site.footer_text}
                 </div>
             </footer>
         </div>

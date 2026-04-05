@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ServerSetting;
+use App\Models\SiteSetting;
 use App\Services\PlayerStatsService;
 use App\Services\ServerStatusResolver;
 use Inertia\Inertia;
@@ -28,6 +29,8 @@ class WelcomeController extends Controller
             'map' => $resolved['map'],
         ];
 
+        $siteSettings = SiteSetting::cached();
+
         return Inertia::render('welcome', [
             'canRegister' => Features::enabled(Features::registration()),
             'server' => $server,
@@ -38,6 +41,15 @@ class WelcomeController extends Controller
                 'ip' => ServerSetting::instance()->server_ip,
                 'port' => ServerSetting::instance()->server_port,
             ],
+            'hero' => [
+                'badge' => $siteSettings->hero_badge,
+                'title' => $siteSettings->hero_title,
+                'subtitle' => $siteSettings->hero_subtitle,
+                'description' => $siteSettings->hero_description,
+                'button_text' => $siteSettings->hero_button_text,
+            ],
+            'features' => $siteSettings->features ?? SiteSetting::defaultFeatures(),
+            'landing_sections' => $siteSettings->landing_sections ?? SiteSetting::defaultLandingSections(),
         ]);
     }
 }

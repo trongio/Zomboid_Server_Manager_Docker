@@ -156,6 +156,12 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         // Server Settings (connection info)
         Route::patch('server-settings', [Admin\ServerSettingController::class, 'update'])->name('server-settings.update');
 
+        // Site Settings (branding, landing page, theme)
+        Route::get('site-settings', [Admin\SiteSettingController::class, 'index'])->name('site-settings');
+        Route::post('site-settings', [Admin\SiteSettingController::class, 'update'])->name('site-settings.update');
+        Route::delete('site-settings/logo', [Admin\SiteSettingController::class, 'removeLogo'])->name('site-settings.remove-logo');
+        Route::delete('site-settings/favicon', [Admin\SiteSettingController::class, 'removeFavicon'])->name('site-settings.remove-favicon');
+
         // Sensitive admin actions — stricter rate limit
         Route::middleware('throttle:admin-sensitive')->group(function () {
             Route::post('backups/import', [Admin\BackupController::class, 'importWorld'])->name('backups.import');

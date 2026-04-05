@@ -215,6 +215,26 @@ export type PlayerProfilePageData = {
     is_admin: boolean;
 };
 
+export type HeroContent = {
+    badge: string;
+    title: string;
+    subtitle: string;
+    description: string;
+    button_text: string;
+};
+
+export type FeatureEntry = {
+    icon: string;
+    title: string;
+    description: string;
+};
+
+export type LandingSection = {
+    id: string;
+    enabled: boolean;
+    order: number;
+};
+
 export type WelcomePageData = {
     canRegister: boolean;
     server: WelcomeServerStatus;
@@ -222,6 +242,9 @@ export type WelcomePageData = {
     top_players: PlayerStatEntry[];
     server_name: string;
     connection: { ip: string; port: string };
+    hero: HeroContent;
+    features: FeatureEntry[];
+    landing_sections: LandingSection[];
 };
 
 export type StatusServerStatus = {
