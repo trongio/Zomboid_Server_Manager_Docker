@@ -188,11 +188,18 @@ class BackupController extends Controller
 
     public function download(Backup $backup): BinaryFileResponse
     {
-        if (! file_exists($backup->path)) {
+        $backupRoot = realpath(config('zomboid.backups.path'));
+        $resolvedPath = realpath($backup->path);
+
+        if ($backupRoot === false || $resolvedPath === false || ! is_file($resolvedPath)) {
             abort(404, 'Backup file not found on disk.');
         }
 
-        return response()->download($backup->path, $backup->filename, [
+        if (! str_starts_with($resolvedPath, rtrim($backupRoot, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR)) {
+            abort(403, 'Backup file is outside the configured backup directory.');
+        }
+
+        return response()->download($resolvedPath, $backup->filename, [
             'Cache-Control' => 'no-store',
         ]);
     }
