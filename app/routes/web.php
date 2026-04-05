@@ -162,6 +162,14 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         Route::delete('site-settings/logo', [Admin\SiteSettingController::class, 'removeLogo'])->name('site-settings.remove-logo');
         Route::delete('site-settings/favicon', [Admin\SiteSettingController::class, 'removeFavicon'])->name('site-settings.remove-favicon');
 
+        // Translations & Languages
+        Route::get('translations', [Admin\TranslationController::class, 'index'])->name('translations');
+        Route::patch('translations', [Admin\TranslationController::class, 'updateTranslation'])->name('translations.update');
+        Route::delete('translations', [Admin\TranslationController::class, 'deleteTranslation'])->name('translations.delete');
+        Route::post('languages', [Admin\TranslationController::class, 'storeLanguage'])->name('languages.store');
+        Route::patch('languages/{language}', [Admin\TranslationController::class, 'updateLanguage'])->name('languages.update');
+        Route::delete('languages/{language}', [Admin\TranslationController::class, 'destroyLanguage'])->name('languages.destroy');
+
         // Sensitive admin actions — stricter rate limit
         Route::middleware('throttle:admin-sensitive')->group(function () {
             Route::post('backups/import', [Admin\BackupController::class, 'importWorld'])->name('backups.import');

@@ -9,6 +9,12 @@ export type SiteSettings = {
     default_locale: string;
 };
 
+export type AvailableLocale = {
+    code: string;
+    name: string;
+    native_name: string;
+};
+
 declare module '@inertiajs/core' {
     export interface InertiaConfig {
         sharedPageProps: {
@@ -16,6 +22,9 @@ declare module '@inertiajs/core' {
             auth: Auth;
             sidebarOpen: boolean;
             site: SiteSettings;
+            locale: string;
+            translations: Record<string, string>;
+            available_locales: AvailableLocale[];
             [key: string]: unknown;
         };
     }

@@ -2,6 +2,7 @@ import { Link, usePage } from '@inertiajs/react';
 import { Menu, Skull } from 'lucide-react';
 import { useState, type PropsWithChildren } from 'react';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/language-switcher';
 import {
     Sheet,
     SheetContent,
@@ -87,7 +88,10 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                     </Link>
 
                     {/* Desktop nav */}
-                    <NavLinks className="hidden items-center gap-3 md:flex" />
+                    <div className="hidden items-center gap-3 md:flex">
+                        <NavLinks className="flex items-center gap-3" />
+                        <LanguageSwitcher />
+                    </div>
 
                     {/* Mobile hamburger */}
                     <Button

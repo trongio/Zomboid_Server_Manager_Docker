@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Language;
 use App\Models\SiteSetting;
+use App\Services\TranslationService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -59,6 +62,12 @@ class HandleInertiaRequests extends Middleware
                 'theme_colors' => $siteSettings->theme_colors,
                 'default_locale' => $siteSettings->default_locale,
             ],
+            'locale' => fn () => App::getLocale(),
+            'translations' => fn () => TranslationService::getForLocale(App::getLocale()),
+            'available_locales' => fn () => Language::query()
+                ->where('is_active', true)
+                ->get(['code', 'name', 'native_name'])
+                ->toArray(),
         ];
     }
 }
