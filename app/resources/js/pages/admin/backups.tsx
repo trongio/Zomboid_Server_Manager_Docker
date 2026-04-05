@@ -697,16 +697,17 @@ export default function Backups({ backups, current_version, current_branch, filt
                     <DialogHeader>
                         <DialogTitle>Import World Save</DialogTitle>
                         <DialogDescription>
-                            Upload a zip file containing PZ world save data. The server will be stopped,
-                            a safety backup created, and the uploaded save extracted.
+                            Upload a zip file containing PZ world save data. The server will be
+                            stopped automatically, a safety backup created, the save extracted,
+                            and the server restarted.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
                             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                             <div>
-                                <p className="font-medium">This will overwrite current save data</p>
-                                <p>A pre-import safety backup will be created automatically before any changes are made.</p>
+                                <p className="font-medium">This will stop the server and overwrite save data</p>
+                                <p>A pre-import safety backup is created automatically. The server will restart after import completes. Players will be disconnected during this process.</p>
                             </div>
                         </div>
                         <div className="grid gap-2">

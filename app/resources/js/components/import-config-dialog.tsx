@@ -32,9 +32,11 @@ type DialogStep = 'input' | 'preview' | 'applying';
 export function ImportConfigDialog({
     open,
     onOpenChange,
+    onImportComplete,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    onImportComplete?: () => void;
 }) {
     const [step, setStep] = useState<DialogStep>('input');
     const [type, setType] = useState<string>('server');
@@ -115,6 +117,7 @@ export function ImportConfigDialog({
         if (result) {
             handleClose(false);
             router.reload({ only: ['server_config', 'sandbox_config'] });
+            onImportComplete?.();
         } else {
             setStep('preview');
         }

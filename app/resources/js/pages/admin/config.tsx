@@ -598,7 +598,11 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
             </div>
 
             {/* Import dialog */}
-            <ImportConfigDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
+            <ImportConfigDialog
+                open={showImportDialog}
+                onOpenChange={setShowImportDialog}
+                onImportComplete={() => setShowRestartDialog(true)}
+            />
 
             {/* Restart dialog */}
             <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
