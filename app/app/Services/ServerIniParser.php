@@ -15,15 +15,28 @@ class ServerIniParser
             return [];
         }
 
-        $lines = file($path, FILE_IGNORE_NEW_LINES);
+        $content = file_get_contents($path);
 
-        if ($lines === false) {
+        if ($content === false) {
             return [];
         }
 
+        return $this->parseContent($content);
+    }
+
+    /**
+     * Parse raw server.ini content string into an associative array.
+     *
+     * @return array<string, string>
+     */
+    public function parseContent(string $content): array
+    {
+        $lines = explode("\n", $content);
         $data = [];
 
         foreach ($lines as $line) {
+            $line = rtrim($line, "\r");
+
             if ($line === '' || str_starts_with($line, '#')) {
                 continue;
             }

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, Eye, EyeOff, Loader2, Save, Search, Timer } from 'lucide-react';
+import { ChevronDown, Eye, EyeOff, Loader2, Save, Search, Timer, Upload } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import {
     
 } from '@/lib/config-metadata';
 import type {SettingMeta} from '@/lib/config-metadata';
+import { ImportConfigDialog } from '@/components/import-config-dialog';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 
@@ -367,6 +368,9 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
     const [serverDirty, setServerDirty] = useState(0);
     const [sandboxDirty, setSandboxDirty] = useState(0);
 
+    // Import dialog state
+    const [showImportDialog, setShowImportDialog] = useState(false);
+
     // Restart dialog state
     const [showRestartDialog, setShowRestartDialog] = useState(false);
     const [restartCountdown, setRestartCountdown] = useState('0');
@@ -460,14 +464,20 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                             Edit server.ini and SandboxVars.lua settings
                         </p>
                     </div>
-                    <div className="relative w-full sm:w-72">
-                        <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search settings..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9"
-                        />
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => setShowImportDialog(true)}>
+                            <Upload className="mr-2 size-4" />
+                            Import
+                        </Button>
+                        <div className="relative w-full sm:w-72">
+                            <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                placeholder="Search settings..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -574,6 +584,9 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                     {saving ? 'Saving...' : `Save ${totalDirty} change${totalDirty !== 1 ? 's' : ''}`}
                 </Button>
             </div>
+
+            {/* Import dialog */}
+            <ImportConfigDialog open={showImportDialog} onOpenChange={setShowImportDialog} />
 
             {/* Restart dialog */}
             <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>

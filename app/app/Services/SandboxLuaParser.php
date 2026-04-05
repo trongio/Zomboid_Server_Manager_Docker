@@ -25,6 +25,16 @@ class SandboxLuaParser
     }
 
     /**
+     * Parse raw SandboxVars.lua content string into a nested array.
+     *
+     * @return array<string, mixed>
+     */
+    public function parseContent(string $content): array
+    {
+        return $this->parseTable($content);
+    }
+
+    /**
      * Write a nested array back to a PZ SandboxVars.lua file.
      * Only updates keys that exist in $updates, preserving all other lines.
      *

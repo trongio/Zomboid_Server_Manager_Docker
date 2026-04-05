@@ -59,6 +59,8 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         Route::get('config', [Admin\ConfigController::class, 'index'])->name('config');
         Route::patch('config/server', [Admin\ConfigController::class, 'updateServer'])->name('config.server.update');
         Route::patch('config/sandbox', [Admin\ConfigController::class, 'updateSandbox'])->name('config.sandbox.update');
+        Route::post('config/import/preview', [Admin\ConfigController::class, 'importPreview'])->name('config.import.preview');
+        Route::post('config/import/apply', [Admin\ConfigController::class, 'importApply'])->name('config.import.apply');
 
         // Mods
         Route::get('mods', [Admin\ModController::class, 'index'])->name('mods');
