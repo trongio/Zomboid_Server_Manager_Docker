@@ -427,9 +427,29 @@ The interactive setup wizard will:
 
 All prompts have sensible defaults — press Enter through everything for a working setup.
 
+### Access Modes
+
+During `make init`, you choose how the admin panel is accessed:
+
+| Mode | When to use | TLS |
+|---|---|---|
+| **Public — Domain** | Production server with a domain pointed at it | Auto (Let's Encrypt) |
+| **Public — IP address** | Server without a domain (public or LAN IP) | Self-signed cert (browser will warn) |
+| **Local only** | Development or when you only need `localhost:8000` | Internal cert |
+
+Public modes set up [Caddy](https://caddyserver.com/) as an HTTPS reverse proxy. You also choose the Caddy listening ports (default 80/443 — change these if your router or another service already uses them).
+
+The admin panel is **always** available locally at `http://localhost:8000`, regardless of which mode you pick.
+
 ### Open the Panel
 
 Navigate to the URL shown at the end of setup and log in with the displayed credentials.
+
+### Troubleshooting
+
+- **Can't reach the public URL?** The panel is always accessible at `http://localhost:8000` on the server itself. If the public URL doesn't work, check `make info` for your configured ports, run `make admin-expose` to open the firewall, and verify router port forwarding.
+- **Browser shows a certificate warning?** Expected with IP-address mode (self-signed cert). Click through to proceed.
+- **Want to change access mode?** Re-run `make init` — it will detect existing config and offer to reconfigure.
 
 ## Configuration
 
@@ -476,6 +496,41 @@ After editing `.env`, restart to apply:
 ```bash
 make down && make up
 ```
+
+## Firewall & Network Access
+
+The setup wizard (`make init`) detects your OS and firewall backend automatically. Configuration is saved to `.firewall.conf` (gitignored).
+
+### Supported Backends
+
+| Backend | OS | Auto-managed |
+|---|---|---|
+| **firewalld** | Fedora, RHEL, CentOS | Yes |
+| **ufw** | Ubuntu, Debian | Yes |
+| **manual** | Everything else | Prints guidance |
+
+### Quick Reference
+
+| Command | What it does |
+|---|---|
+| `make expose` | Opens game ports (16261-16262/udp) in host firewall |
+| `make hide` | Closes game ports |
+| `make admin-expose` | Opens Caddy web ports in host firewall for public admin HTTPS |
+| `make admin-hide` | Closes Caddy web ports |
+| `make info` | Shows local/public URLs, configured ports, firewall status |
+
+- **Local admin** is always available at `http://localhost:8000` — no firewall changes needed.
+- **Public admin** goes through Caddy (HTTPS), not through port 8000 directly.
+- **Caddy ports** are configurable during `make init` (default 80/443). Use custom ports if your router uses 80/443.
+- **Game ports** are closed by default. Run `make expose` to let players connect.
+- All firewall rules are **runtime only** (non-permanent) on firewalld. ufw rules persist across reboots.
+- **Router port forwarding** is not automated — see the per-OS docs below.
+
+### Per-OS Documentation
+
+- [firewalld (Fedora/RHEL)](docs/firewall-firewalld.md)
+- [ufw (Ubuntu/Debian)](docs/firewall-ufw.md)
+- [Manual / Unsupported OS](docs/firewall-manual.md)
 
 ## Screenshots
 
@@ -748,6 +803,7 @@ Authenticated via `X-API-Key` header. The key is auto-generated in `.env` during
 |---|---|
 | `make test` | Run the test suite (isolated SQLite, safe for production) |
 | `make exec CMD="..."` | Run a command inside the app container |
+| `make update-version` | Update `game-version.conf` with the current PZ build version |
 
 ### Danger Zone
 

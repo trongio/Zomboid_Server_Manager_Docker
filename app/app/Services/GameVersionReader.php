@@ -80,8 +80,8 @@ class GameVersionReader
      * Extract the numeric version from a full PZ version string.
      *
      * PZ's getCore():getVersion() returns strings like:
-     * "42.15.3 aa7f064af2a82d8070ccc6c7fa7c11f89da23b06 2026-03-20 09:33:06 (ZB)"
-     * This extracts just "42.15.3".
+     * "<major>.<minor>.<patch> <hash> <date> <time> (ZB)"
+     * This extracts just the numeric prefix (e.g. "42.16.1").
      */
     private function extractVersionNumber(string $raw): string
     {
