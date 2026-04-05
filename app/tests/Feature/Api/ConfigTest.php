@@ -13,11 +13,15 @@ function apiKey(): array
 beforeEach(function () {
     config(['zomboid.api_key' => 'test-key-12345']);
 
-    // Set up temp config files from fixtures
-    $this->iniPath = tempnam(sys_get_temp_dir(), 'pz_ini_');
-    $this->luaPath = tempnam(sys_get_temp_dir(), 'pz_lua_');
+    // Set up temp config files from fixtures inside a directory structure
+    // that matches production: {dataDir}/Server/{name}.ini
+    $this->tempDir = sys_get_temp_dir().'/pz_config_api_test_'.uniqid();
+    mkdir($this->tempDir.'/Server', 0777, true);
+    $this->iniPath = $this->tempDir.'/Server/ZomboidServer.ini';
+    $this->luaPath = $this->tempDir.'/Server/ZomboidServer_SandboxVars.lua';
     copy(base_path('tests/fixtures/server.ini'), $this->iniPath);
     copy(base_path('tests/fixtures/sandbox.lua'), $this->luaPath);
+    $this->stateFile = $this->tempDir.'/.config_state';
 
     config(['zomboid.paths.server_ini' => $this->iniPath]);
     config(['zomboid.paths.sandbox_lua' => $this->luaPath]);
@@ -26,6 +30,12 @@ beforeEach(function () {
 afterEach(function () {
     @unlink($this->iniPath);
     @unlink($this->luaPath);
+    @unlink($this->stateFile);
+    foreach (glob($this->tempDir.'/.config_state.*') as $f) {
+        @unlink($f);
+    }
+    @rmdir($this->tempDir.'/Server');
+    @rmdir($this->tempDir);
 });
 
 // ── GET /api/config/server ───────────────────────────────────────────
@@ -156,4 +166,36 @@ it('creates audit log for sandbox config update', function () {
 
     expect($auditLog)->not->toBeNull()
         ->and($auditLog->target)->toBe('SandboxVars.lua');
+});
+
+// ── .config_state persistence (issue #18) ───────────────────────────
+
+it('writes .config_state when updating server config with allowlisted keys', function () {
+    $this->patchJson('/api/config/server', [
+        'settings' => [
+            'MaxPlayers' => '32',
+            'Public' => 'false',
+        ],
+    ], apiKey())
+        ->assertOk();
+
+    expect($this->stateFile)->toBeFile();
+
+    $contents = file_get_contents($this->stateFile);
+    expect($contents)->toContain('MaxPlayers=32')
+        ->and($contents)->toContain('Public=false');
+});
+
+it('does not write RCON settings to .config_state', function () {
+    $this->patchJson('/api/config/server', [
+        'settings' => [
+            'MaxPlayers' => '32',
+            'RCONPassword' => 'newsecret',
+        ],
+    ], apiKey())
+        ->assertOk();
+
+    $contents = file_get_contents($this->stateFile);
+    expect($contents)->toContain('MaxPlayers=32')
+        ->and($contents)->not->toContain('RCONPassword');
 });

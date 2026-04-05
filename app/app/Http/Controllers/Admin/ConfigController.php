@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Rules\SafeConfigValue;
 use App\Services\AuditLogger;
+use App\Services\ConfigStateManager;
 use App\Services\RespawnDelayManager;
 use App\Services\SandboxLuaParser;
 use App\Services\ServerIniParser;
@@ -20,6 +21,7 @@ class ConfigController extends Controller
         private readonly SandboxLuaParser $luaParser,
         private readonly AuditLogger $auditLogger,
         private readonly RespawnDelayManager $respawnDelay,
+        private readonly ConfigStateManager $configState,
     ) {}
 
     public function index(): Response
@@ -57,6 +59,7 @@ class ConfigController extends Controller
         $before = $this->iniParser->read($path);
 
         $this->iniParser->write($path, $settings);
+        $this->configState->persistSettings($settings, $path);
 
         $after = $this->iniParser->read($path);
 
