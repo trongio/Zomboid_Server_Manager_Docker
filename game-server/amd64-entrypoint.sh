@@ -64,4 +64,18 @@ if [ -z "${MOD_WORKSHOP_IDS:-}" ]; then
     unset MOD_WORKSHOP_IDS
 fi
 
+# Snapshot current Mods/WorkshopItems from INI before handing off to
+# run_server.sh (which may overwrite them). configure-server.sh uses this
+# as a last-resort fallback when no .mod_state file exists yet.
+INI_FILE="/home/steam/Zomboid/Server/${SERVER_NAME:-ZomboidServer}.ini"
+MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
+if [ -f "$INI_FILE" ]; then
+    CURRENT_MODS=$(grep "^Mods=" "$INI_FILE" | head -1)
+    CURRENT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | head -1)
+    if [ -n "$CURRENT_MODS" ] || [ -n "$CURRENT_WORKSHOP" ]; then
+        printf '%s\n%s\n' "$CURRENT_MODS" "$CURRENT_WORKSHOP" > "$MOD_STATE_BACKUP"
+        echo "[entrypoint] Saved INI mod state to .mod_state_backup"
+    fi
+fi
+
 exec /home/steam/run_server.sh

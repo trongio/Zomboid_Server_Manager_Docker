@@ -66,6 +66,7 @@ class ModManager
         }
 
         $this->iniParser->write($iniPath, $updates);
+        $this->writeModState($iniPath);
     }
 
     /**
@@ -106,6 +107,7 @@ class ModManager
         }
 
         $this->iniParser->write($iniPath, $updates);
+        $this->writeModState($iniPath);
 
         return $removed;
     }
@@ -124,6 +126,26 @@ class ModManager
             'WorkshopItems' => implode(';', $workshopIds),
             'Mods' => implode(';', $modIds),
         ]);
+        $this->writeModState($iniPath);
+    }
+
+    /**
+     * Write a mod state snapshot to the shared volume.
+     *
+     * This file is read by configure-server.sh on container restart
+     * to restore web-UI mod changes that would otherwise be overwritten
+     * by the game server image's own configuration logic.
+     */
+    private function writeModState(string $iniPath): void
+    {
+        $config = $this->iniParser->read($iniPath);
+
+        $mods = $config['Mods'] ?? '';
+        $workshopItems = $config['WorkshopItems'] ?? '';
+
+        $stateFile = dirname($iniPath, 2).'/.mod_state';
+
+        file_put_contents($stateFile, "Mods=$mods\nWorkshopItems=$workshopItems\n");
     }
 
     /**
