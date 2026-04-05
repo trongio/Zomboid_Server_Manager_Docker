@@ -29,6 +29,7 @@ type Settings = {
 };
 
 type Feature = {
+    _id: string;
     icon: string;
     title: string;
     description: string;
@@ -66,7 +67,9 @@ export default function SiteSettings({ settings, available_icons, available_sect
     const [heroSubtitle, setHeroSubtitle] = useState(settings.hero_subtitle);
     const [heroDescription, setHeroDescription] = useState(settings.hero_description);
     const [heroButtonText, setHeroButtonText] = useState(settings.hero_button_text);
-    const [features, setFeatures] = useState<Feature[]>(settings.features);
+    const [features, setFeatures] = useState<Feature[]>(
+        settings.features.map((f, i) => ({ ...f, _id: f._id ?? `f-${i}-${Date.now()}` })),
+    );
     const [landingSections, setLandingSections] = useState<LandingSection[]>(settings.landing_sections);
     const [themeColors, setThemeColors] = useState<Record<string, string>>(settings.theme_colors ?? {});
 
@@ -108,11 +111,15 @@ export default function SiteSettings({ settings, available_icons, available_sect
         if (logoFile) formData.append('logo', logoFile);
         if (faviconFile) formData.append('favicon', faviconFile);
 
-        features.forEach((feature, i) => {
-            formData.append(`features[${i}][icon]`, feature.icon);
-            formData.append(`features[${i}][title]`, feature.title);
-            formData.append(`features[${i}][description]`, feature.description);
-        });
+        if (features.length === 0) {
+            formData.append('features', '[]');
+        } else {
+            features.forEach((feature, i) => {
+                formData.append(`features[${i}][icon]`, feature.icon);
+                formData.append(`features[${i}][title]`, feature.title);
+                formData.append(`features[${i}][description]`, feature.description);
+            });
+        }
 
         landingSections.forEach((section, i) => {
             formData.append(`landing_sections[${i}][id]`, section.id);
@@ -120,12 +127,14 @@ export default function SiteSettings({ settings, available_icons, available_sect
             formData.append(`landing_sections[${i}][order]`, String(section.order));
         });
 
-        // Theme colors
+        // Theme colors — send explicit null when cleared so backend removes them
         const activeColors = Object.entries(themeColors).filter(([, v]) => v);
         if (activeColors.length > 0) {
             activeColors.forEach(([key, value]) => {
                 formData.append(`theme_colors[${key}]`, value);
             });
+        } else {
+            formData.append('theme_colors', '');
         }
 
         try {
@@ -167,7 +176,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     function addFeature() {
         if (features.length >= 8) return;
-        setFeatures([...features, { icon: 'Star', title: '', description: '' }]);
+        setFeatures([...features, { _id: `f-${Date.now()}`, icon: 'Star', title: '', description: '' }]);
     }
 
     function removeFeature(index: number) {
@@ -292,7 +301,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 <input
                                     ref={logoInputRef}
                                     type="file"
-                                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                                    accept="image/png,image/jpeg,image/webp"
                                     className="hidden"
                                     onChange={(e) => setLogoFile(e.target.files?.[0] ?? null)}
                                 />
@@ -341,7 +350,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 <input
                                     ref={faviconInputRef}
                                     type="file"
-                                    accept=".ico,image/png,image/svg+xml"
+                                    accept=".ico,image/png"
                                     className="hidden"
                                     onChange={(e) => setFaviconFile(e.target.files?.[0] ?? null)}
                                 />
@@ -498,7 +507,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {features.map((feature, index) => (
-                            <div key={index} className="rounded-lg border border-border/50 p-4 space-y-3">
+                            <div key={feature._id} className="rounded-lg border border-border/50 p-4 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium text-muted-foreground">Feature {index + 1}</span>
                                     <Button variant="ghost" size="sm" onClick={() => removeFeature(index)}>
@@ -556,7 +565,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        {landingSections
+                        {[...landingSections]
                             .sort((a, b) => a.order - b.order)
                             .map((section, index) => (
                                 <div

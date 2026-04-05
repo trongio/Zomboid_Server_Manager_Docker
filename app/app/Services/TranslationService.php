@@ -72,18 +72,39 @@ class TranslationService
      */
     private static function loadJsonFile(string $locale): array
     {
-        $path = lang_path("{$locale}.json");
+        if (! self::isValidLocale($locale)) {
+            return [];
+        }
+
+        $langDirectory = realpath(lang_path());
+
+        if ($langDirectory === false) {
+            return [];
+        }
+
+        $path = $langDirectory.DIRECTORY_SEPARATOR.$locale.'.json';
 
         if (! file_exists($path)) {
             return [];
         }
 
-        $contents = file_get_contents($path);
+        $resolvedPath = realpath($path);
+
+        if ($resolvedPath === false || ! str_starts_with($resolvedPath, $langDirectory.DIRECTORY_SEPARATOR)) {
+            return [];
+        }
+
+        $contents = file_get_contents($resolvedPath);
 
         if ($contents === false) {
             return [];
         }
 
         return json_decode($contents, true) ?: [];
+    }
+
+    private static function isValidLocale(string $locale): bool
+    {
+        return $locale !== '' && strlen($locale) <= 10 && preg_match('/\A[a-zA-Z0-9_-]+\z/', $locale);
     }
 }

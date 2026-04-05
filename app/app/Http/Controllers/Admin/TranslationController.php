@@ -181,6 +181,14 @@ class TranslationController extends Controller
      */
     public function exportLocale(string $locale): StreamedResponse
     {
+        if (strlen($locale) > 10 || ! preg_match('/\A[a-zA-Z0-9_-]+\z/', $locale)) {
+            abort(404);
+        }
+
+        if ($locale !== 'en' && ! Language::query()->where('code', $locale)->exists()) {
+            abort(404);
+        }
+
         $translations = TranslationService::getForLocale($locale);
 
         // Sort keys alphabetically for readability

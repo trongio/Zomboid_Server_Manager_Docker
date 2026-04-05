@@ -245,6 +245,7 @@ describe('Translation export', function () {
     });
 
     it('exports English keys as template for new locale', function () {
+        Language::factory()->create(['code' => 'ka', 'name' => 'Georgian', 'native_name' => 'ქართული', 'is_default' => false]);
         TranslationService::bustCache('ka');
 
         $response = $this->actingAs($this->admin)
@@ -258,6 +259,7 @@ describe('Translation export', function () {
     });
 
     it('exports with DB overrides merged in', function () {
+        Language::factory()->create(['code' => 'ka', 'name' => 'Georgian', 'native_name' => 'ქართული', 'is_default' => false]);
         Translation::create(['locale' => 'ka', 'key' => 'nav.dashboard', 'value' => 'მართვის პანელი']);
         TranslationService::bustCache('ka');
 

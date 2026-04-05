@@ -13,8 +13,8 @@ class UpdateSiteSettingRequest extends FormRequest
     {
         return [
             'site_name' => ['sometimes', 'string', 'max:100'],
-            'logo' => ['sometimes', 'nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,svg,webp'],
-            'favicon' => ['sometimes', 'nullable', 'file', 'max:512', 'mimes:ico,png,svg'],
+            'logo' => ['sometimes', 'nullable', 'file', 'max:2048', 'mimes:png,jpg,jpeg,webp'],
+            'favicon' => ['sometimes', 'nullable', 'file', 'max:512', 'mimes:ico,png'],
             'footer_text' => ['sometimes', 'string', 'max:200'],
             'hero_badge' => ['sometimes', 'string', 'max:100'],
             'hero_title' => ['sometimes', 'string', 'max:100'],
