@@ -154,11 +154,26 @@ run_silent() {
     # Preserve existing admin settings if config exists
     local prev_host="" prev_http="80" prev_https="443"
     if [ -f "$CONF_FILE" ]; then
-        # shellcheck source=/dev/null
-        source "$CONF_FILE"
-        prev_host="${ADMIN_PUBLIC_HOST:-}"
-        prev_http="${ADMIN_HTTP_PORT:-80}"
-        prev_https="${ADMIN_HTTPS_PORT:-443}"
+        while IFS='=' read -r key value; do
+            case "$key" in
+                ''|\#*) continue ;;
+            esac
+            # Strip surrounding quotes
+            value="${value%$'\r'}"
+            value="${value#"${value%%[![:space:]]*}"}"
+            value="${value%"${value##*[![:space:]]}"}"
+            if [[ ${#value} -ge 2 ]]; then
+                if [[ ${value:0:1} == '"' && ${value: -1} == '"' ]] || \
+                   [[ ${value:0:1} == "'" && ${value: -1} == "'" ]]; then
+                    value="${value:1:-1}"
+                fi
+            fi
+            case "$key" in
+                ADMIN_PUBLIC_HOST) prev_host="$value" ;;
+                ADMIN_HTTP_PORT) prev_http="$value" ;;
+                ADMIN_HTTPS_PORT) prev_https="$value" ;;
+            esac
+        done < "$CONF_FILE"
     fi
     os=$(detect_os)
     backend=$(detect_backend)

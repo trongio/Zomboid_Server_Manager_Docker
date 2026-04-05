@@ -177,11 +177,11 @@ CADDY_HTTPS_PORT=443
 ADMIN_PUBLIC_ENABLED=false
 
 echo ""
-echo -ne "  Enable public admin access (via Caddy reverse proxy)? ${DIM}[Y/n]${NC}: "
+echo -ne "  Enable public admin access (via Caddy reverse proxy)? ${DIM}[y/N]${NC}: "
 read -r enable_public || true
-enable_public="${enable_public:-y}"
+enable_public="${enable_public:-n}"
 
-if [ "${enable_public,,}" = "n" ]; then
+if [ "${enable_public,,}" != "y" ]; then
     # Local-only mode
     SITE_HOST="localhost"
     APP_URL="https://localhost"
@@ -264,23 +264,62 @@ else
                     if [[ "$ip_pick" =~ ^[0-9]+$ ]] && [ "$ip_pick" -ge 1 ] && [ "$ip_pick" -le "${#IP_OPTIONS[@]}" ]; then
                         SITE_HOST="${IP_OPTIONS[$((ip_pick-1))]}"
                     else
-                        # Manual entry
+                        # Manual entry with validation
                         while true; do
                             prompt SITE_HOST "IP address" ""
-                            if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                                break
+                            if [ -z "$SITE_HOST" ] || ! [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                                echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                                continue
                             fi
-                            echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                            # Verify IP belongs to this server (public or LAN)
+                            LOCAL_IPS=$(hostname -I 2>/dev/null || true)
+                            IP_VALID=false
+                            if [ -n "$SERVER_IP" ] && [ "$SITE_HOST" = "$SERVER_IP" ]; then
+                                IP_VALID=true
+                                echo -e "  ${GREEN}✓ Matches server public IP${NC}"
+                            elif echo "$LOCAL_IPS" | grep -qw "$SITE_HOST"; then
+                                IP_VALID=true
+                                echo -e "  ${GREEN}✓ Matches local network interface${NC}"
+                            fi
+                            if [ "$IP_VALID" = "false" ]; then
+                                echo -e "  ${YELLOW}${SITE_HOST} is not assigned to this server.${NC}"
+                                if [ -n "$SERVER_IP" ]; then
+                                    echo -e "  ${YELLOW}Public IP: ${SERVER_IP} | Local IPs: ${LOCAL_IPS}${NC}"
+                                else
+                                    echo -e "  ${YELLOW}Local IPs: ${LOCAL_IPS}${NC}"
+                                fi
+                                echo -ne "  ${YELLOW}Use anyway? ${DIM}[y/N]${NC}: "
+                                read -r force_ip || true
+                                if [ "${force_ip,,}" != "y" ]; then continue; fi
+                            fi
+                            break
                         done
                     fi
                 else
-                    # No IPs detected — fall back to manual entry
+                    # No IPs detected — fall back to manual entry with validation
                     while true; do
                         prompt SITE_HOST "Server IP address" ""
-                        if [ -n "$SITE_HOST" ] && [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                            break
+                        if [ -z "$SITE_HOST" ] || ! [[ "$SITE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                            echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                            continue
                         fi
-                        echo -e "  ${RED}Invalid IP address. Try again.${NC}"
+                        # Verify IP belongs to this server
+                        LOCAL_IPS=$(hostname -I 2>/dev/null || true)
+                        IP_VALID=false
+                        if [ -n "$SERVER_IP" ] && [ "$SITE_HOST" = "$SERVER_IP" ]; then
+                            IP_VALID=true
+                            echo -e "  ${GREEN}✓ Matches server public IP${NC}"
+                        elif echo "$LOCAL_IPS" | grep -qw "$SITE_HOST"; then
+                            IP_VALID=true
+                            echo -e "  ${GREEN}✓ Matches local network interface${NC}"
+                        fi
+                        if [ "$IP_VALID" = "false" ]; then
+                            echo -e "  ${YELLOW}${SITE_HOST} is not assigned to this server.${NC}"
+                            echo -ne "  ${YELLOW}Use anyway? ${DIM}[y/N]${NC}: "
+                            read -r force_ip || true
+                            if [ "${force_ip,,}" != "y" ]; then continue; fi
+                        fi
+                        break
                     done
                 fi
 

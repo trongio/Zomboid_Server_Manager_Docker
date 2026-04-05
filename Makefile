@@ -100,8 +100,7 @@ info:
 # ── Core commands ────────────────────────────────────────────────────
 # Default startup keeps the admin UI local-only and does not change firewall rules.
 up: db-check
-	APP_BIND_IP=127.0.0.1 VITE_BIND_IP=127.0.0.1 $(COMPOSE) up -d --build
-	@$(MAKE) info
+	$(COMPOSE) up -d --build
 
 down:
 	$(COMPOSE) down
@@ -248,7 +247,7 @@ update-version:
 	@echo ""
 	@echo -n "> "; read FULL; \
 	if [ -z "$$FULL" ]; then echo "Cancelled."; exit 1; fi; \
-	VER=$$(echo "$$FULL" | grep -oP '^\d+\.\d+(\.\d+)*'); \
+	VER=$$(echo "$$FULL" | grep -oE '^[0-9]+\.[0-9]+(\.[0-9]+)*'); \
 	if [ -z "$$VER" ]; then echo "Error: could not parse version number."; exit 1; fi; \
 	sed -i "s|^PZ_VERSION=.*|PZ_VERSION=$$VER|" game-version.conf; \
 	sed -i "s|^PZ_VERSION_FULL=.*|PZ_VERSION_FULL=$$FULL|" game-version.conf; \
