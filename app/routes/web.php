@@ -156,6 +156,7 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
 
         // Sensitive admin actions — stricter rate limit
         Route::middleware('throttle:admin-sensitive')->group(function () {
+            Route::post('backups/import', [Admin\BackupController::class, 'importWorld'])->name('backups.import');
             Route::post('players/{name}/access', [Admin\PlayerController::class, 'setAccessLevel'])->name('players.access');
             Route::post('players/{name}/kick', [Admin\PlayerController::class, 'kick'])->name('players.kick');
             Route::post('players/{name}/ban', [Admin\PlayerController::class, 'ban'])->name('players.ban');

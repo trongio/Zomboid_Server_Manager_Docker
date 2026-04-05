@@ -257,6 +257,186 @@ class BackupManager
         }
     }
 
+    /**
+     * Validate an uploaded zip file for world import.
+     *
+     * Detects the zip layout (full backup, save-only, or flat save) and
+     * checks for path traversal attacks.
+     *
+     * @return array{layout: string, detected_server_name: ?string, entry_count: int, has_server_config: bool, has_db: bool}
+     */
+    public function validateImportZip(string $zipPath): array
+    {
+        if (! file_exists($zipPath)) {
+            throw new \RuntimeException('Import zip file not found.');
+        }
+
+        $result = Process::timeout(30)->run(['unzip', '-l', $zipPath]);
+
+        if (! $result->successful()) {
+            throw new \RuntimeException('File is not a valid zip archive.');
+        }
+
+        // Parse unzip -l output: skip header (3 lines) and footer (2 lines)
+        $lines = array_filter(explode("\n", trim($result->output())));
+        $entries = [];
+
+        foreach ($lines as $line) {
+            // unzip -l format: "  Length  Date  Time  Name" — extract the name (last column)
+            if (preg_match('/^\s*\d+\s+\d{2}-\d{2}-\d{2,4}\s+\d{2}:\d{2}\s+(.+)$/', $line, $m)) {
+                $entry = trim($m[1]);
+                if ($entry !== '') {
+                    $entries[] = $entry;
+                }
+            }
+        }
+
+        if ($entries === []) {
+            throw new \RuntimeException('Zip archive is empty.');
+        }
+
+        // Path traversal check (mirrors tar validation pattern)
+        foreach ($entries as $entry) {
+            if (preg_match('#(^|/)\.\.(/|$)#', $entry) || str_starts_with($entry, '/')) {
+                throw new \RuntimeException("Zip contains unsafe path: {$entry}");
+            }
+        }
+
+        // Detect layout
+        $hasServer = false;
+        $hasSaves = false;
+        $hasDb = false;
+        $detectedServerName = null;
+
+        foreach ($entries as $entry) {
+            if (str_starts_with($entry, 'Server/')) {
+                $hasServer = true;
+            }
+            if (str_starts_with($entry, 'Saves/')) {
+                $hasSaves = true;
+            }
+            if (str_starts_with($entry, 'db/')) {
+                $hasDb = true;
+            }
+            // Detect server name from save directory path
+            if (preg_match('#^Saves/Multiplayer/([^/]+)/#', $entry, $m)) {
+                $detectedServerName = $m[1];
+            }
+        }
+
+        if ($hasServer || $hasSaves || $hasDb) {
+            $layout = ($hasServer && $hasSaves) ? 'full' : 'save_only';
+        } else {
+            // Check for flat save layout (map files, players.db at root)
+            $hasSaveFiles = false;
+            foreach ($entries as $entry) {
+                if (str_starts_with($entry, 'map_') || $entry === 'players.db' || str_starts_with($entry, 'worldZone-')) {
+                    $hasSaveFiles = true;
+                    break;
+                }
+            }
+
+            if (! $hasSaveFiles) {
+                throw new \RuntimeException('Zip does not contain recognizable PZ save data. Expected Server/, Saves/, or map files.');
+            }
+
+            $layout = 'flat_save';
+        }
+
+        return [
+            'layout' => $layout,
+            'detected_server_name' => $detectedServerName,
+            'entry_count' => count($entries),
+            'has_server_config' => $hasServer,
+            'has_db' => $hasDb,
+        ];
+    }
+
+    /**
+     * Import a world save from a zip file.
+     *
+     * Creates a pre-import safety backup, stops the server, extracts the zip,
+     * handles server name mismatches, and starts the server.
+     *
+     * @return array{pre_import_backup: Backup, metadata: array}
+     */
+    public function importWorld(string $zipPath): array
+    {
+        $metadata = $this->validateImportZip($zipPath);
+        $dataPath = config('zomboid.paths.data');
+        $serverName = config('zomboid.server_name', env('PZ_SERVER_NAME', 'ZomboidServer'));
+
+        // 1. Create pre-import safety backup
+        $preImport = $this->createBackup(BackupType::PreImport, 'Pre-import safety backup');
+
+        // 2. Stop the game server
+        $this->stopServer();
+        sleep(3);
+
+        // 3. Extract zip based on detected layout
+        $this->extractImportZip($zipPath, $metadata, $dataPath, $serverName);
+
+        // 4. Start the game server
+        $this->docker->startContainer();
+
+        return [
+            'pre_import_backup' => $preImport['backup'],
+            'metadata' => $metadata,
+        ];
+    }
+
+    /**
+     * Extract an import zip to the appropriate location based on layout.
+     */
+    private function extractImportZip(string $zipPath, array $metadata, string $dataPath, string $serverName): void
+    {
+        $layout = $metadata['layout'];
+
+        if ($layout === 'full' || $layout === 'save_only') {
+            // Extract directly to the PZ data directory
+            $result = Process::timeout(300)->run([
+                'unzip', '-o', $zipPath, '-d', $dataPath,
+            ]);
+        } else {
+            // Flat save: extract into the save directory
+            $saveDir = "{$dataPath}/Saves/Multiplayer/{$serverName}";
+            $this->ensureDirectoryExists($saveDir);
+
+            $result = Process::timeout(300)->run([
+                'unzip', '-o', $zipPath, '-d', $saveDir,
+            ]);
+        }
+
+        if (! $result->successful()) {
+            $stderr = $result->errorOutput();
+            // unzip returns 1 for warnings (e.g., overwrite confirmations) — only fail on code >= 2
+            if ($result->exitCode() >= 2) {
+                throw new \RuntimeException("Failed to extract import zip: {$stderr}");
+            }
+
+            Log::warning('Import zip extraction had warnings', ['warnings' => $stderr]);
+        }
+
+        // Handle server name mismatch for save_only layout
+        if ($layout === 'save_only' && $metadata['detected_server_name'] !== null && $metadata['detected_server_name'] !== $serverName) {
+            $oldPath = "{$dataPath}/Saves/Multiplayer/{$metadata['detected_server_name']}";
+            $newPath = "{$dataPath}/Saves/Multiplayer/{$serverName}";
+
+            if (is_dir($oldPath)) {
+                // Remove existing target if present (backup was already created)
+                if (is_dir($newPath)) {
+                    Process::timeout(30)->run(['rm', '-rf', $newPath]);
+                }
+                rename($oldPath, $newPath);
+
+                Log::info('Import: renamed server save directory', [
+                    'from' => $metadata['detected_server_name'],
+                    'to' => $serverName,
+                ]);
+            }
+        }
+    }
+
     private function ensureDirectoryExists(string $path): void
     {
         if (! is_dir($path)) {

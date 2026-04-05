@@ -9,4 +9,5 @@ enum BackupType: string
     case Daily = 'daily';
     case PreRollback = 'pre_rollback';
     case PreUpdate = 'pre_update';
+    case PreImport = 'pre_import';
 }
