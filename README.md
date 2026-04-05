@@ -532,6 +532,28 @@ The setup wizard (`make init`) detects your OS and firewall backend automaticall
 - [ufw (Ubuntu/Debian)](docs/firewall-ufw.md)
 - [Manual / Unsupported OS](docs/firewall-manual.md)
 
+### Cloud Deployments
+
+Cloud providers have their own network firewalls **in addition to** the OS-level firewall. You must allow traffic in both layers.
+
+| Provider | Where to configure | Docs |
+|---|---|---|
+| **Oracle Cloud** | VCN → Subnet → Security List → Ingress Rules | [Security Lists](https://docs.oracle.com/en-us/iaas/Content/Network/Concepts/securitylists.htm) |
+| **AWS** | EC2 → Security Groups → Inbound Rules | [Security Groups](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html) |
+| **Google Cloud** | VPC → Firewall Rules | [Firewall Rules](https://cloud.google.com/vpc/docs/firewalls) |
+| **Azure** | VM → Networking → NSG → Inbound Rules | [NSG Rules](https://learn.microsoft.com/en-us/azure/virtual-network/network-security-groups-overview) |
+| **Hetzner** | Cloud Console → Firewalls | [Firewalls](https://docs.hetzner.com/cloud/firewalls/getting-started) |
+
+**Ports to open:**
+
+| Port | Protocol | Purpose |
+|---|---|---|
+| Caddy HTTP port (default 80) | TCP | HTTP → HTTPS redirect |
+| Caddy HTTPS port (default 443) | TCP | Admin panel |
+| 16261–16262 | UDP | Game server |
+
+> **Tip:** Use the **public** IP of your cloud instance when prompted during `make init` — not the internal/private IP. Run `curl -4 ifconfig.me` on the server to find it.
+
 ## Screenshots
 
 <details open>
