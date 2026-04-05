@@ -732,11 +732,52 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 </p>
                             )}
                         </div>
-                        <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-1">
-                            <p className="font-medium text-foreground">Accepted zip layouts:</p>
-                            <p><strong>Full backup</strong> — Server/, Saves/, db/ at root</p>
-                            <p><strong>Save only</strong> — Saves/Multiplayer/&lt;Name&gt;/ at root</p>
-                            <p><strong>Flat save</strong> — map files and players.db at root</p>
+                        <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-2.5">
+                            <p className="font-medium text-foreground">How to create the zip file</p>
+                            <p>
+                                On your existing PZ server, find the Zomboid data folder
+                                (typically <code className="rounded bg-muted px-1">~/Zomboid/</code> on Linux
+                                or <code className="rounded bg-muted px-1">C:\Users\YourName\Zomboid\</code> on Windows).
+                                Zip the contents using one of these layouts:
+                            </p>
+                            <div className="space-y-2">
+                                <div>
+                                    <p className="font-medium text-foreground">Option 1: Full server (recommended)</p>
+                                    <p>Zip the <code className="rounded bg-muted px-1">Server/</code>, <code className="rounded bg-muted px-1">Saves/</code>, and <code className="rounded bg-muted px-1">db/</code> folders together. This imports config, world, and whitelist.</p>
+                                    <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+{`your-server.zip
+├── Server/
+│   ├── YourServer.ini
+│   └── YourServer_SandboxVars.lua
+├── Saves/
+│   └── Multiplayer/
+│       └── YourServer/
+│           ├── map_meta.bin
+│           ├── players.db
+│           └── ...
+└── db/
+    └── YourServer.db`}
+                                    </pre>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-foreground">Option 2: World save only</p>
+                                    <p>Zip just the <code className="rounded bg-muted px-1">Saves/</code> folder. Config and whitelist stay unchanged.</p>
+                                    <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+{`your-world.zip
+└── Saves/
+    └── Multiplayer/
+        └── YourServer/
+            ├── map_meta.bin
+            ├── players.db
+            └── ...`}
+                                    </pre>
+                                </div>
+                                <div>
+                                    <p className="font-medium text-foreground">Option 3: Flat save files</p>
+                                    <p>Zip the contents of the save folder directly (map files, players.db at the root of the zip).</p>
+                                </div>
+                            </div>
+                            <p>If the server name in the zip differs from the current server, it will be renamed automatically.</p>
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox
