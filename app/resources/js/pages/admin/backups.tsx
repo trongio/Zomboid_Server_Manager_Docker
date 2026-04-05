@@ -1,5 +1,5 @@
 import { Deferred, Head, router } from '@inertiajs/react';
-import { AlertTriangle, Archive, ChevronLeft, ChevronRight, Download, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronDown, ChevronLeft, ChevronRight, Download, HelpCircle, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
 import { formatDateTime } from '@/lib/dates';
 import { useMemo, useState } from 'react';
 import { SortableHeader } from '@/components/sortable-header';
@@ -102,6 +102,7 @@ export default function Backups({ backups, current_version, current_branch, filt
     const [importFile, setImportFile] = useState<File | null>(null);
     const [importConfirm, setImportConfirm] = useState(false);
     const [importLoading, setImportLoading] = useState(false);
+    const [showImportHelp, setShowImportHelp] = useState(false);
 
     const filteredBackups = useMemo(() => {
         if (!backups?.data || !search) return backups?.data ?? [];
@@ -691,6 +692,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                 if (!open) {
                     setImportFile(null);
                     setImportConfirm(false);
+                    setShowImportHelp(false);
                 }
             }}>
                 <DialogContent>
@@ -732,19 +734,28 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 </p>
                             )}
                         </div>
-                        <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-2.5">
-                            <p className="font-medium text-foreground">How to create the zip file</p>
-                            <p>
-                                On your existing PZ server, find the Zomboid data folder
-                                (typically <code className="rounded bg-muted px-1">~/Zomboid/</code> on Linux
-                                or <code className="rounded bg-muted px-1">C:\Users\YourName\Zomboid\</code> on Windows).
-                                Zip the contents using one of these layouts:
-                            </p>
-                            <div className="space-y-2">
-                                <div>
-                                    <p className="font-medium text-foreground">Option 1: Full server (recommended)</p>
-                                    <p>Zip the <code className="rounded bg-muted px-1">Server/</code>, <code className="rounded bg-muted px-1">Saves/</code>, and <code className="rounded bg-muted px-1">db/</code> folders together. This imports config, world, and whitelist.</p>
-                                    <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+                        <button
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-md border p-2.5 text-left text-xs text-muted-foreground hover:bg-accent/50 transition-colors"
+                            onClick={() => setShowImportHelp(!showImportHelp)}
+                        >
+                            <HelpCircle className="size-3.5 shrink-0" />
+                            <span className="flex-1 font-medium">How to create the zip file</span>
+                            <ChevronDown className={`size-3.5 transition-transform ${showImportHelp ? 'rotate-180' : ''}`} />
+                        </button>
+                        {showImportHelp && (
+                            <div className="rounded-md border p-3 text-xs text-muted-foreground space-y-2.5 max-h-[40vh] overflow-y-auto">
+                                <p>
+                                    On your existing PZ server, find the Zomboid data folder
+                                    (typically <code className="rounded bg-muted px-1">~/Zomboid/</code> on Linux
+                                    or <code className="rounded bg-muted px-1">C:\Users\YourName\Zomboid\</code> on Windows).
+                                    Zip the contents using one of these layouts:
+                                </p>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 1: Full server (recommended)</p>
+                                        <p>Zip the <code className="rounded bg-muted px-1">Server/</code>, <code className="rounded bg-muted px-1">Saves/</code>, and <code className="rounded bg-muted px-1">db/</code> folders together. This imports config, world, and whitelist.</p>
+                                        <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
 {`your-server.zip
 ├── Server/
 │   ├── YourServer.ini
@@ -757,12 +768,12 @@ export default function Backups({ backups, current_version, current_branch, filt
 │           └── ...
 └── db/
     └── YourServer.db`}
-                                    </pre>
-                                </div>
-                                <div>
-                                    <p className="font-medium text-foreground">Option 2: World save only</p>
-                                    <p>Zip just the <code className="rounded bg-muted px-1">Saves/</code> folder. Config and whitelist stay unchanged.</p>
-                                    <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 2: World save only</p>
+                                        <p>Zip just the <code className="rounded bg-muted px-1">Saves/</code> folder. Config and whitelist stay unchanged.</p>
+                                        <pre className="mt-1 rounded bg-muted p-1.5 text-[11px] leading-relaxed">
 {`your-world.zip
 └── Saves/
     └── Multiplayer/
@@ -770,15 +781,16 @@ export default function Backups({ backups, current_version, current_branch, filt
             ├── map_meta.bin
             ├── players.db
             └── ...`}
-                                    </pre>
+                                        </pre>
+                                    </div>
+                                    <div>
+                                        <p className="font-medium text-foreground">Option 3: Flat save files</p>
+                                        <p>Zip the contents of the save folder directly (map files, players.db at the root of the zip).</p>
+                                    </div>
                                 </div>
-                                <div>
-                                    <p className="font-medium text-foreground">Option 3: Flat save files</p>
-                                    <p>Zip the contents of the save folder directly (map files, players.db at the root of the zip).</p>
-                                </div>
+                                <p>If the server name in the zip differs from the current server, it will be renamed automatically.</p>
                             </div>
-                            <p>If the server name in the zip differs from the current server, it will be renamed automatically.</p>
-                        </div>
+                        )}
                         <div className="flex items-center gap-2">
                             <Checkbox
                                 id="import-confirm"
