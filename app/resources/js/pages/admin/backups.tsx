@@ -705,9 +705,17 @@ export default function Backups({ backups, current_version, current_branch, filt
                     <div className="grid gap-4 py-4">
                         <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
                             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                            <div>
+                            <div className="space-y-1">
                                 <p className="font-medium">This will stop the server and overwrite save data</p>
                                 <p>A pre-import safety backup is created automatically. The server will restart after import completes. Players will be disconnected during this process.</p>
+                                {current_version && (
+                                    <p>
+                                        The server is running <strong>v{current_version}</strong>
+                                        {current_branch && <> ({current_branch})</>}.
+                                        Ensure the imported save is compatible with this version.
+                                        Importing a save from a different game version may cause the server to fail to start.
+                                    </p>
+                                )}
                             </div>
                         </div>
                         <div className="grid gap-2">
