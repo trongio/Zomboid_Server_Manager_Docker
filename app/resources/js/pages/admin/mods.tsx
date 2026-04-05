@@ -30,10 +30,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 function SortableModRow({
     mod,
+    index,
     onDelete,
     isDragDisabled,
 }: {
     mod: ModEntry;
+    index: number;
     onDelete: (mod: ModEntry) => void;
     isDragDisabled: boolean;
 }) {
@@ -54,14 +56,15 @@ function SortableModRow({
                 {!isDragDisabled ? (
                     <button
                         type="button"
-                        className="cursor-grab touch-none text-muted-foreground hover:text-foreground"
+                        aria-label={`Reorder ${mod.mod_id}`}
+                        className="cursor-grab touch-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         {...attributes}
                         {...listeners}
                     >
                         <GripVertical className="size-4" />
                     </button>
                 ) : (
-                    <span className="font-mono text-xs text-muted-foreground">{mod.position + 1}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{index + 1}</span>
                 )}
             </TableCell>
             <TableCell className="font-medium">{mod.mod_id}</TableCell>
@@ -130,9 +133,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
             successMessage: 'Mod load order updated',
         });
 
-        if (result?.restart_required) {
-            setRestartRequired(true);
-        }
+        setRestartRequired(Boolean(result?.restart_required));
 
         router.reload({ only: ['mods'] });
     }
@@ -227,10 +228,11 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                                         strategy={verticalListSortingStrategy}
                                     >
                                         <TableBody>
-                                            {filteredMods.map((mod) => (
+                                            {filteredMods.map((mod, index) => (
                                                 <SortableModRow
                                                     key={mod.workshop_id}
                                                     mod={mod}
+                                                    index={index}
                                                     onDelete={setDeleteTarget}
                                                     isDragDisabled={isFiltering}
                                                 />
