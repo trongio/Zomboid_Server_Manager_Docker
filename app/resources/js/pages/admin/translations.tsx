@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
-import { Globe, Languages, Plus, Search, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { Download, Globe, Languages, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { fetchAction } from '@/lib/fetch-action';
 import AppLayout from '@/layouts/app-layout';
@@ -53,6 +53,9 @@ export default function Translations({ languages, keys, defaults, overrides, sea
     const [newLangCode, setNewLangCode] = useState('');
     const [newLangName, setNewLangName] = useState('');
     const [newLangNative, setNewLangNative] = useState('');
+
+    const importInputRef = useRef<HTMLInputElement>(null);
+    const [importLocale, setImportLocale] = useState('');
 
     const activeLocales = languages.filter((l) => l.is_active);
 
@@ -129,6 +132,46 @@ export default function Translations({ languages, keys, defaults, overrides, sea
             successMessage: `${language.name} deleted`,
         });
         router.reload();
+    }
+
+    function downloadLocale(code: string) {
+        window.location.href = `/admin/translations/export/${code}`;
+    }
+
+    function triggerImport(code: string) {
+        setImportLocale(code);
+        importInputRef.current?.click();
+    }
+
+    async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (!file || !importLocale) return;
+
+        const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const formData = new FormData();
+        formData.append('locale', importLocale);
+        formData.append('file', file);
+
+        try {
+            const res = await fetch('/admin/translations/import', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' },
+                body: formData,
+            });
+            const json = await res.json().catch(() => ({}));
+            if (res.ok) {
+                toast.success(json.message || 'Translations imported');
+                router.reload();
+            } else {
+                toast.error(json.message || `Import failed (${res.status})`);
+            }
+        } catch {
+            toast.error('Network error — could not reach the server');
+        }
+
+        // Reset the input so the same file can be re-selected
+        e.target.value = '';
+        setImportLocale('');
     }
 
     function getCellValue(key: string, locale: string): string {
@@ -235,6 +278,22 @@ export default function Translations({ languages, keys, defaults, overrides, sea
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => downloadLocale(lang.code)}
+                                        title="Download translations as JSON"
+                                    >
+                                        <Download className="size-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => triggerImport(lang.code)}
+                                        title="Upload translated JSON"
+                                    >
+                                        <Upload className="size-4" />
+                                    </Button>
                                     {!lang.is_default && (
                                         <Button
                                             variant="ghost"
@@ -416,6 +475,15 @@ export default function Translations({ languages, keys, defaults, overrides, sea
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Hidden file input for JSON import */}
+            <input
+                ref={importInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={handleImportFile}
+            />
         </AppLayout>
     );
 }

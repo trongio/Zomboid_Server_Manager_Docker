@@ -3,6 +3,7 @@ import { Menu, Skull } from 'lucide-react';
 import { useState, type PropsWithChildren } from 'react';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from '@/components/language-switcher';
+import { ThemeProvider } from '@/components/theme-provider';
 import {
     Sheet,
     SheetContent,
@@ -75,6 +76,7 @@ export default function PublicLayout({ children }: PropsWithChildren) {
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
+        <ThemeProvider>
         <div className="min-h-screen bg-background">
             <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
@@ -125,6 +127,9 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                         className="flex flex-col gap-1 px-4"
                         onClick={() => setMobileOpen(false)}
                     />
+                    <div className="px-4 pt-2">
+                        <LanguageSwitcher />
+                    </div>
                 </SheetContent>
             </Sheet>
 
@@ -136,5 +141,6 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                 </div>
             </footer>
         </div>
+        </ThemeProvider>
     );
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Language;
+use App\Models\SiteSetting;
 use App\Models\Translation;
 use App\Services\AuditLogger;
 use App\Services\TranslationService;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TranslationController extends Controller
 {
@@ -128,9 +130,14 @@ class TranslationController extends Controller
             'is_default' => ['sometimes', 'boolean'],
         ]);
 
-        // If setting as default, unset other defaults
+        // If setting as default, unset other defaults and sync SiteSetting
         if (($validated['is_default'] ?? false) && ! $language->is_default) {
             Language::query()->where('is_default', true)->update(['is_default' => false]);
+
+            $siteSettings = SiteSetting::instance();
+            $siteSettings->default_locale = $language->code;
+            $siteSettings->save();
+            SiteSetting::bustCache();
         }
 
         $language->update($validated);
@@ -166,5 +173,73 @@ class TranslationController extends Controller
         );
 
         return response()->json(['message' => 'Language deleted']);
+    }
+
+    /**
+     * Export all translations for a locale as a downloadable JSON file.
+     * Always starts from English base so the file serves as a complete template.
+     */
+    public function exportLocale(string $locale): StreamedResponse
+    {
+        $translations = TranslationService::getForLocale($locale);
+
+        // Sort keys alphabetically for readability
+        ksort($translations);
+
+        return response()->streamDownload(function () use ($translations) {
+            echo json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        }, "translations-{$locale}.json", [
+            'Content-Type' => 'application/json',
+        ]);
+    }
+
+    /**
+     * Import translations from an uploaded JSON file for a locale.
+     */
+    public function importLocale(Request $request): JsonResponse
+    {
+        $request->validate([
+            'locale' => ['required', 'string', 'max:10'],
+            'file' => ['required', 'file', 'max:1024', 'mimes:json,txt'],
+        ]);
+
+        $locale = $request->input('locale');
+        $contents = file_get_contents($request->file('file')->getRealPath());
+        $data = json_decode($contents, true);
+
+        if (! is_array($data)) {
+            return response()->json(['message' => 'Invalid JSON file'], 422);
+        }
+
+        // Validate all values are strings
+        foreach ($data as $key => $value) {
+            if (! is_string($key) || ! is_string($value)) {
+                return response()->json(['message' => 'JSON must be a flat key-value object with string values'], 422);
+            }
+        }
+
+        $count = 0;
+
+        foreach ($data as $key => $value) {
+            Translation::query()->updateOrCreate(
+                ['locale' => $locale, 'group' => null, 'key' => $key],
+                ['value' => $value],
+            );
+            $count++;
+        }
+
+        TranslationService::bustCache($locale);
+
+        $this->auditLogger->log(
+            actor: $request->user()->name ?? 'admin',
+            action: 'translation.import',
+            details: ['locale' => $locale, 'keys_imported' => $count],
+            ip: $request->ip(),
+        );
+
+        return response()->json([
+            'message' => "{$count} translations imported for '{$locale}'",
+            'count' => $count,
+        ]);
     }
 }

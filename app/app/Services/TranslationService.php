@@ -15,22 +15,25 @@ class TranslationService
     public static function getForLocale(string $locale): array
     {
         return Cache::remember("translations.{$locale}", 3600, function () use ($locale) {
-            // Load JSON file defaults
-            $defaults = self::loadJsonFile($locale);
+            // Always start from English as the base (fallback for all untranslated keys)
+            $result = self::loadJsonFile('en');
 
-            // Fall back to English defaults if the requested locale file doesn't exist
-            if (empty($defaults) && $locale !== 'en') {
-                $defaults = self::loadJsonFile('en');
+            // Overlay the requested locale's JSON file (if different from English)
+            if ($locale !== 'en') {
+                $localeDefaults = self::loadJsonFile($locale);
+                if (! empty($localeDefaults)) {
+                    $result = array_merge($result, $localeDefaults);
+                }
             }
 
-            // Overlay DB overrides
+            // Overlay DB overrides for this locale
             $overrides = Translation::query()
                 ->where('locale', $locale)
                 ->whereNull('group')
                 ->pluck('value', 'key')
                 ->all();
 
-            return array_merge($defaults, $overrides);
+            return array_merge($result, $overrides);
         });
     }
 

@@ -166,6 +166,8 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         Route::get('translations', [Admin\TranslationController::class, 'index'])->name('translations');
         Route::patch('translations', [Admin\TranslationController::class, 'updateTranslation'])->name('translations.update');
         Route::delete('translations', [Admin\TranslationController::class, 'deleteTranslation'])->name('translations.delete');
+        Route::get('translations/export/{locale}', [Admin\TranslationController::class, 'exportLocale'])->name('translations.export');
+        Route::post('translations/import', [Admin\TranslationController::class, 'importLocale'])->name('translations.import');
         Route::post('languages', [Admin\TranslationController::class, 'storeLanguage'])->name('languages.store');
         Route::patch('languages/{language}', [Admin\TranslationController::class, 'updateLanguage'])->name('languages.update');
         Route::delete('languages/{language}', [Admin\TranslationController::class, 'destroyLanguage'])->name('languages.destroy');

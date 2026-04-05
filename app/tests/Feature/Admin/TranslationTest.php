@@ -213,4 +213,105 @@ describe('TranslationService', function () {
 
         expect($translations)->toHaveKey('nav.dashboard');
     });
+
+    it('always includes English keys as fallback for any locale', function () {
+        // Even for a locale with DB overrides, English keys should be present as fallback
+        Translation::create(['locale' => 'ka', 'key' => 'nav.dashboard', 'value' => 'მართვის პანელი']);
+        TranslationService::bustCache('ka');
+
+        $translations = TranslationService::getForLocale('ka');
+
+        // The overridden key has the Georgian value
+        expect($translations['nav.dashboard'])->toBe('მართვის პანელი');
+        // Other English keys are still present as fallback
+        expect($translations)->toHaveKey('nav.players');
+        expect($translations['nav.players'])->toBe('Players');
+    });
+});
+
+// ── Export / Import ─────────────────────────────────────────────────
+
+describe('Translation export', function () {
+    beforeEach(function () {
+        TranslationService::bustCache();
+    });
+
+    it('exports translations as JSON download', function () {
+        $this->actingAs($this->admin)
+            ->get(route('admin.translations.export', 'en'))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/json')
+            ->assertHeader('content-disposition', 'attachment; filename=translations-en.json');
+    });
+
+    it('exports English keys as template for new locale', function () {
+        TranslationService::bustCache('ka');
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.translations.export', 'ka'));
+
+        $data = json_decode($response->streamedContent(), true);
+
+        // Should contain English defaults as base template
+        expect($data)->toHaveKey('nav.dashboard');
+        expect($data['nav.dashboard'])->toBe('Dashboard');
+    });
+
+    it('exports with DB overrides merged in', function () {
+        Translation::create(['locale' => 'ka', 'key' => 'nav.dashboard', 'value' => 'მართვის პანელი']);
+        TranslationService::bustCache('ka');
+
+        $response = $this->actingAs($this->admin)
+            ->get(route('admin.translations.export', 'ka'));
+
+        $data = json_decode($response->streamedContent(), true);
+
+        expect($data['nav.dashboard'])->toBe('მართვის პანელი');
+        // English fallback keys still present
+        expect($data)->toHaveKey('nav.players');
+    });
+});
+
+describe('Translation import', function () {
+    it('imports translations from JSON file', function () {
+        $json = json_encode(['nav.dashboard' => 'მართვის პანელი', 'nav.players' => 'მოთამაშეები']);
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('ka.json', $json);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.translations.import'), [
+                'locale' => 'ka',
+                'file' => $file,
+            ])
+            ->assertOk()
+            ->assertJson(['count' => 2]);
+
+        expect(Translation::where('locale', 'ka')->count())->toBe(2);
+        expect(Translation::where('locale', 'ka')->where('key', 'nav.dashboard')->first()->value)
+            ->toBe('მართვის პანელი');
+    });
+
+    it('rejects invalid JSON', function () {
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('bad.json', 'not json');
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.translations.import'), [
+                'locale' => 'ka',
+                'file' => $file,
+            ])
+            ->assertUnprocessable();
+    });
+
+    it('creates audit log on import', function () {
+        $json = json_encode(['nav.dashboard' => 'Test']);
+        $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('en.json', $json);
+
+        $this->actingAs($this->admin)
+            ->post(route('admin.translations.import'), [
+                'locale' => 'en',
+                'file' => $file,
+            ])
+            ->assertOk();
+
+        expect(\App\Models\AuditLog::where('action', 'translation.import')->exists())->toBeTrue();
+    });
 });
