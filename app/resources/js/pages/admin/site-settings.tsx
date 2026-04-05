@@ -89,7 +89,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
         heroSubtitle !== settings.hero_subtitle ||
         heroDescription !== settings.hero_description ||
         heroButtonText !== settings.hero_button_text ||
-        JSON.stringify(features) !== JSON.stringify(settings.features) ||
+        JSON.stringify(features.map(({ _id, ...f }) => f)) !== JSON.stringify(settings.features.map(({ _id, ...f }) => f)) ||
         JSON.stringify(landingSections) !== JSON.stringify(settings.landing_sections) ||
         JSON.stringify(themeColors) !== JSON.stringify(settings.theme_colors ?? {}) ||
         logoFile !== null ||
@@ -310,7 +310,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                     Upload
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">PNG, JPG, SVG, or WebP. Max 2 MB.</p>
+                            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 2 MB.</p>
                         </div>
 
                         {/* Favicon upload */}
@@ -359,7 +359,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                     Upload
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">ICO, PNG, or SVG. Max 512 KB.</p>
+                            <p className="text-xs text-muted-foreground">ICO or PNG. Max 512 KB.</p>
                         </div>
                     </CardContent>
                 </Card>
