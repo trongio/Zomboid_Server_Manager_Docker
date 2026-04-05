@@ -1,5 +1,5 @@
 import { Deferred, Head, router } from '@inertiajs/react';
-import { AlertTriangle, Archive, ChevronLeft, ChevronRight, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, Archive, ChevronLeft, ChevronRight, Download, Loader2, Plus, RotateCcw, Search, Trash2, Upload } from 'lucide-react';
 import { formatDateTime } from '@/lib/dates';
 import { useMemo, useState } from 'react';
 import { SortableHeader } from '@/components/sortable-header';
@@ -403,6 +403,15 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <a href={`/admin/backups/${backup.id}/download`} download>
+                                                                <Download className="size-4" />
+                                                            </a>
+                                                        </Button>
                                                         <Button
                                                             variant="outline"
                                                             size="sm"

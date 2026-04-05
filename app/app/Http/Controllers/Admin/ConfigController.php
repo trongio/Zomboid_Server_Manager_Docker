@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ConfigController extends Controller
 {
@@ -151,5 +152,24 @@ class ConfigController extends Controller
             'updated_fields' => $updatedFields,
             'restart_required' => true,
         ]);
+    }
+
+    public function export(Request $request, string $type): BinaryFileResponse
+    {
+        if ($type === 'server') {
+            $path = config('zomboid.paths.server_ini');
+            $filename = basename($path);
+        } elseif ($type === 'sandbox') {
+            $path = config('zomboid.paths.sandbox_lua');
+            $filename = basename($path);
+        } else {
+            abort(404);
+        }
+
+        if (! is_file($path)) {
+            abort(404, 'Config file not available. The server may not have been started yet.');
+        }
+
+        return response()->download($path, $filename);
     }
 }

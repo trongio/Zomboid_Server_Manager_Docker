@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, Eye, EyeOff, Loader2, Save, Search, Timer, Upload } from 'lucide-react';
+import { ChevronDown, Download, Eye, EyeOff, Loader2, Save, Search, Timer, Upload } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -465,6 +465,18 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <a href="/admin/config/export/server" download>
+                                <Download className="mr-1.5 size-3.5" />
+                                server.ini
+                            </a>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <a href="/admin/config/export/sandbox" download>
+                                <Download className="mr-1.5 size-3.5" />
+                                SandboxVars.lua
+                            </a>
+                        </Button>
                         <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                             <Upload className="mr-2 size-4" />
                             Import

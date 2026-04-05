@@ -22,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BackupController extends Controller
 {
@@ -183,6 +184,15 @@ class BackupController extends Controller
                 ? "Rollback scheduled in {$countdown} seconds"
                 : 'Rollback initiated — server will restart shortly',
         ]);
+    }
+
+    public function download(Backup $backup): BinaryFileResponse
+    {
+        if (! file_exists($backup->path)) {
+            abort(404, 'Backup file not found on disk.');
+        }
+
+        return response()->download($backup->path, $backup->filename);
     }
 
     public function importWorld(ImportWorldRequest $request): JsonResponse
