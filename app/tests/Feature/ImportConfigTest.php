@@ -254,6 +254,33 @@ it('persists server config state after import', function () {
         ]);
 });
 
+it('filters out skipped keys on server import apply', function () {
+    $iniParser = Mockery::mock(\App\Services\ServerIniParser::class);
+    $iniParser->shouldReceive('read')->andReturn(['MaxPlayers' => '16'])->byDefault();
+    $iniParser->shouldReceive('write')
+        ->once()
+        ->with(Mockery::type('string'), Mockery::on(function (array $settings) {
+            // RCONPassword should be filtered out, only MaxPlayers should remain
+            return array_key_exists('MaxPlayers', $settings)
+                && ! array_key_exists('RCONPassword', $settings)
+                && ! array_key_exists('Mods', $settings);
+        }));
+    app()->instance(\App\Services\ServerIniParser::class, $iniParser);
+
+    mockImportLuaParser();
+    mockImportConfigState();
+
+    $this->actingAs(importAdmin())
+        ->postJson('/admin/config/import/apply', [
+            'type' => 'server',
+            'settings' => [
+                'MaxPlayers' => '32',
+                'RCONPassword' => 'hacked',
+                'Mods' => 'EvilMod',
+            ],
+        ])->assertOk();
+});
+
 it('does not persist config state for sandbox import', function () {
     $state = Mockery::mock(ConfigStateManager::class);
     $state->shouldNotReceive('persistSettings');

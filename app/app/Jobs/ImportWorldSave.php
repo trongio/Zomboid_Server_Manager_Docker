@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Jobs\WaitForServerReady;
 use App\Services\AuditLogger;
 use App\Services\BackupManager;
 use Illuminate\Contracts\Queue\ShouldQueue;

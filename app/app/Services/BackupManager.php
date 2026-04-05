@@ -295,7 +295,7 @@ class BackupManager
             throw new \RuntimeException('Zip archive is empty.');
         }
 
-        // Path traversal check (mirrors tar validation pattern)
+        // Path traversal check (mirrors zip validation pattern)
         foreach ($entries as $entry) {
             if (preg_match('#(^|/)\.\.(/|$)#', $entry) || str_starts_with($entry, '/')) {
                 throw new \RuntimeException("Zip contains unsafe path: {$entry}");
@@ -320,7 +320,17 @@ class BackupManager
             }
             // Detect server name from save directory path
             if (preg_match('#^Saves/Multiplayer/([^/]+)/#', $entry, $m)) {
-                $detectedServerName = $m[1];
+                $name = $m[1];
+
+                if (! preg_match('/^[a-zA-Z0-9_-]+$/', $name)) {
+                    throw new \RuntimeException("Zip contains unsafe server name: {$name}");
+                }
+
+                if ($detectedServerName !== null && $detectedServerName !== $name) {
+                    throw new \RuntimeException("Zip contains saves from multiple servers: {$detectedServerName}, {$name}. Only single-server zips are supported.");
+                }
+
+                $detectedServerName = $name;
             }
         }
 
@@ -420,6 +430,16 @@ class BackupManager
             }
 
             Log::warning('Import zip extraction had warnings', ['warnings' => $stderr]);
+        }
+
+        // Remove any symlinks extracted from the zip (prevents symlink attacks)
+        $targetDir = $layout === 'flat_save' ? "{$dataPath}/Saves/Multiplayer/{$serverName}" : $dataPath;
+        $symlinkResult = Process::timeout(30)->run(['find', $targetDir, '-type', 'l', '-delete']);
+
+        if ($symlinkResult->successful() && trim($symlinkResult->output()) !== '') {
+            Log::warning('Import: removed symlinks from extracted zip', [
+                'target' => $targetDir,
+            ]);
         }
 
         // Handle server name mismatch for save_only layout
