@@ -134,7 +134,8 @@ class ConfigController extends Controller
         $updatedFields = $this->configImporter->apply($type, $settings);
 
         if ($type === 'server') {
-            $this->configState->persistSettings($settings, config('zomboid.paths.server_ini'));
+            $appliedSettings = array_intersect_key($settings, array_flip($updatedFields));
+            $this->configState->persistSettings($appliedSettings, config('zomboid.paths.server_ini'));
         }
 
         $this->auditLogger->log(

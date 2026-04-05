@@ -409,7 +409,11 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                             size="sm"
                                                             asChild
                                                         >
-                                                            <a href={`/admin/backups/${backup.id}/download`} download>
+                                                            <a
+                                                                href={`/admin/backups/${backup.id}/download`}
+                                                                download
+                                                                aria-label={`Download ${backup.filename}`}
+                                                            >
                                                                 <Download className="size-4" />
                                                             </a>
                                                         </Button>

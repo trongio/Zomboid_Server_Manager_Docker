@@ -277,15 +277,15 @@ class BackupManager
             throw new \RuntimeException('File is not a valid zip archive.');
         }
 
-        // Parse unzip -l output: skip header (3 lines) and footer (2 lines)
+        // Parse unzip -l output: extract filenames from lines with numeric length prefix.
+        // Handles varying date formats across unzip implementations (MM-DD-YY, YYYY-MM-DD, etc.)
         $lines = array_filter(explode("\n", trim($result->output())));
         $entries = [];
 
         foreach ($lines as $line) {
-            // unzip -l format: "  Length  Date  Time  Name" — extract the name (last column)
-            if (preg_match('/^\s*\d+\s+\d{2}-\d{2}-\d{2,4}\s+\d{2}:\d{2}\s+(.+)$/', $line, $m)) {
-                $entry = trim($m[1]);
-                if ($entry !== '') {
+            if (preg_match('/^\s*(\d+)\s+\S+\s+\S+\s+(.+)$/', $line, $m)) {
+                $entry = trim($m[2]);
+                if ($entry !== '' && $entry !== 'Name') {
                     $entries[] = $entry;
                 }
             }
@@ -407,62 +407,97 @@ class BackupManager
     {
         $layout = $metadata['layout'];
 
-        if ($layout === 'full' || $layout === 'save_only') {
-            // Extract directly to the PZ data directory
-            $result = Process::timeout(300)->run([
-                'unzip', '-o', $zipPath, '-d', $dataPath,
-            ]);
-        } else {
-            // Flat save: extract into the save directory
-            $saveDir = "{$dataPath}/Saves/Multiplayer/{$serverName}";
-            $this->ensureDirectoryExists($saveDir);
+        // Extract to a temp directory first, then validate and move.
+        // This prevents symlink zip-slip attacks — symlinks are rejected before
+        // files reach the target directory.
+        $tempDir = sys_get_temp_dir().'/pz_import_'.uniqid();
+        mkdir($tempDir, 0755, true);
 
+        try {
             $result = Process::timeout(300)->run([
-                'unzip', '-o', $zipPath, '-d', $saveDir,
+                'unzip', '-o', $zipPath, '-d', $tempDir,
             ]);
-        }
 
-        if (! $result->successful()) {
-            $stderr = $result->errorOutput();
-            // unzip returns 1 for warnings (e.g., overwrite confirmations) — only fail on code >= 2
-            if ($result->exitCode() >= 2) {
-                throw new \RuntimeException("Failed to extract import zip: {$stderr}");
+            if (! $result->successful() && $result->exitCode() >= 2) {
+                throw new \RuntimeException("Failed to extract import zip: {$result->errorOutput()}");
             }
 
-            Log::warning('Import zip extraction had warnings', ['warnings' => $stderr]);
+            // Reject any symlinks in extracted content (prevents symlink escape attacks)
+            $symlinkResult = Process::timeout(30)->run(['find', $tempDir, '-type', 'l']);
+
+            if (trim($symlinkResult->output()) !== '') {
+                throw new \RuntimeException('Zip contains symbolic links, which are not allowed for security reasons.');
+            }
+
+            // Move extracted files to the target location
+            if ($layout === 'full' || $layout === 'save_only') {
+                Process::timeout(60)->run("cp -rf {$tempDir}/* {$dataPath}/");
+            } else {
+                $saveDir = "{$dataPath}/Saves/Multiplayer/{$serverName}";
+                $this->ensureDirectoryExists($saveDir);
+                Process::timeout(60)->run("cp -rf {$tempDir}/* {$saveDir}/");
+            }
+        } finally {
+            Process::timeout(30)->run(['rm', '-rf', $tempDir]);
         }
 
-        // Remove any symlinks extracted from the zip (prevents symlink attacks)
-        $targetDir = $layout === 'flat_save' ? "{$dataPath}/Saves/Multiplayer/{$serverName}" : $dataPath;
-        $symlinkResult = Process::timeout(30)->run(['find', $targetDir, '-type', 'l', '-print', '-delete']);
+        // Handle server name mismatch — rename save dir + config files for full imports
+        if (
+            in_array($layout, ['full', 'save_only'], true)
+            && $metadata['detected_server_name'] !== null
+            && $metadata['detected_server_name'] !== $serverName
+        ) {
+            $this->renameImportedServerArtifacts($dataPath, $metadata['detected_server_name'], $serverName, $layout);
+        }
+    }
 
-        if (! $symlinkResult->successful()) {
-            Log::warning('Import: failed to scan for symlinks', [
-                'target' => $targetDir,
-                'error' => $symlinkResult->errorOutput(),
-            ]);
-        } elseif (trim($symlinkResult->output()) !== '') {
-            Log::warning('Import: removed symlinks from extracted zip', [
-                'target' => $targetDir,
-                'removed' => trim($symlinkResult->output()),
+    /**
+     * Rename imported server artifacts when the server name doesn't match PZ_SERVER_NAME.
+     */
+    private function renameImportedServerArtifacts(string $dataPath, string $fromName, string $toName, string $layout): void
+    {
+        // Rename save directory
+        $oldSavePath = "{$dataPath}/Saves/Multiplayer/{$fromName}";
+        $newSavePath = "{$dataPath}/Saves/Multiplayer/{$toName}";
+
+        if (is_dir($oldSavePath)) {
+            if (is_dir($newSavePath)) {
+                Process::timeout(30)->run(['rm', '-rf', $newSavePath]);
+            }
+            rename($oldSavePath, $newSavePath);
+
+            Log::info('Import: renamed server save directory', [
+                'from' => $fromName,
+                'to' => $toName,
             ]);
         }
 
-        // Handle server name mismatch for save_only layout
-        if ($layout === 'save_only' && $metadata['detected_server_name'] !== null && $metadata['detected_server_name'] !== $serverName) {
-            $oldPath = "{$dataPath}/Saves/Multiplayer/{$metadata['detected_server_name']}";
-            $newPath = "{$dataPath}/Saves/Multiplayer/{$serverName}";
+        if ($layout !== 'full') {
+            return;
+        }
 
-            if (is_dir($oldPath)) {
-                // Remove existing target if present (backup was already created)
-                if (is_dir($newPath)) {
-                    Process::timeout(30)->run(['rm', '-rf', $newPath]);
+        // Rename config/db files for full imports
+        $renames = [
+            ["Server/{$fromName}.ini", "Server/{$toName}.ini"],
+            ["Server/{$fromName}_SandboxVars.lua", "Server/{$toName}_SandboxVars.lua"],
+            ["Server/{$fromName}_spawnpoints.lua", "Server/{$toName}_spawnpoints.lua"],
+            ["Server/{$fromName}_spawnregions.lua", "Server/{$toName}_spawnregions.lua"],
+            ["db/{$fromName}.db", "db/{$toName}.db"],
+        ];
+
+        foreach ($renames as [$oldFile, $newFile]) {
+            $oldPath = "{$dataPath}/{$oldFile}";
+            $newPath = "{$dataPath}/{$newFile}";
+
+            if (file_exists($oldPath) && $oldPath !== $newPath) {
+                if (file_exists($newPath)) {
+                    @unlink($newPath);
                 }
                 rename($oldPath, $newPath);
 
-                Log::info('Import: renamed server save directory', [
-                    'from' => $metadata['detected_server_name'],
-                    'to' => $serverName,
+                Log::info('Import: renamed server file', [
+                    'from' => $oldFile,
+                    'to' => $newFile,
                 ]);
             }
         }
