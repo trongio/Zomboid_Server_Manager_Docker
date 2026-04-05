@@ -72,7 +72,9 @@ MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
 if [ -f "$INI_FILE" ]; then
     CURRENT_MODS=$(grep "^Mods=" "$INI_FILE" | head -1)
     CURRENT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | head -1)
-    if [ -n "$CURRENT_MODS" ] || [ -n "$CURRENT_WORKSHOP" ]; then
+    CURRENT_MODS_VALUE="${CURRENT_MODS#Mods=}"
+    CURRENT_WORKSHOP_VALUE="${CURRENT_WORKSHOP#WorkshopItems=}"
+    if [ -n "$CURRENT_MODS_VALUE" ] || [ -n "$CURRENT_WORKSHOP_VALUE" ]; then
         printf '%s\n%s\n' "$CURRENT_MODS" "$CURRENT_WORKSHOP" > "$MOD_STATE_BACKUP"
         echo "[entrypoint] Saved INI mod state to .mod_state_backup"
     fi

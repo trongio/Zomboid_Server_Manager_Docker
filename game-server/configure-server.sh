@@ -87,9 +87,9 @@ apply_setting "RCONPassword"         "${PZ_RCON_PASSWORD:-${RCON_PASSWORD:-chang
 MOD_STATE_FILE="/home/steam/Zomboid/.mod_state"
 MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
 
-if [ -n "${PZ_MOD_IDS:-}" ]; then
+if [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
     # Env vars explicitly set — apply them (operator intent)
-    apply_setting "Mods"          "${PZ_MOD_IDS}"          "$INI_FILE"
+    apply_setting "Mods"          "${PZ_MOD_IDS:-}"        "$INI_FILE"
     apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
     echo "[configure-server] Applied mods from environment variables"
 elif [ -f "$MOD_STATE_FILE" ]; then

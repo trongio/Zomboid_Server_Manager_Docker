@@ -144,8 +144,27 @@ class ModManager
         $workshopItems = $config['WorkshopItems'] ?? '';
 
         $stateFile = dirname($iniPath, 2).'/.mod_state';
+        $stateDir = dirname($stateFile);
+        $contents = "Mods=$mods\nWorkshopItems=$workshopItems\n";
+        $tempFile = tempnam($stateDir, '.mod_state.');
 
-        file_put_contents($stateFile, "Mods=$mods\nWorkshopItems=$workshopItems\n");
+        if ($tempFile === false) {
+            throw new \RuntimeException("Unable to create temporary mod state file in {$stateDir}.");
+        }
+
+        try {
+            if (file_put_contents($tempFile, $contents) === false) {
+                throw new \RuntimeException("Unable to write temporary mod state file {$tempFile}.");
+            }
+
+            if (! rename($tempFile, $stateFile)) {
+                throw new \RuntimeException("Unable to atomically replace mod state file {$stateFile}.");
+            }
+        } finally {
+            if (is_file($tempFile)) {
+                @unlink($tempFile);
+            }
+        }
     }
 
     /**
