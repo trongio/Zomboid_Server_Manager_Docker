@@ -192,7 +192,9 @@ class BackupController extends Controller
             abort(404, 'Backup file not found on disk.');
         }
 
-        return response()->download($backup->path, $backup->filename);
+        return response()->download($backup->path, $backup->filename, [
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     public function importWorld(ImportWorldRequest $request): JsonResponse

@@ -170,6 +170,8 @@ class ConfigController extends Controller
             abort(404, 'Config file not available. The server may not have been started yet.');
         }
 
-        return response()->download($path, $filename);
+        return response()->download($path, $filename, [
+            'Cache-Control' => 'no-store',
+        ]);
     }
 }
