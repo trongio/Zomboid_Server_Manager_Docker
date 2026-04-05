@@ -4,11 +4,14 @@ use App\Services\DockerManager;
 use App\Services\GameStateReader;
 use App\Services\GameVersionReader;
 
+uses(Tests\TestCase::class);
+
 beforeEach(function () {
     $this->tempDir = sys_get_temp_dir().'/game_version_test_'.uniqid();
     mkdir($this->tempDir, 0755, true);
     $this->gameStatePath = $this->tempDir.'/game_state.json';
     $this->consoleLogPath = $this->tempDir.'/server-console.txt';
+    Illuminate\Support\Facades\Cache::flush();
 });
 
 afterEach(function () {

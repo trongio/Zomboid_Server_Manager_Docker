@@ -118,7 +118,7 @@ class GameVersionReader
                 return null;
             }
 
-            if (preg_match('/version\s*=\s*([0-9]+\.[0-9]+(?:\.[0-9]+)*)/', $chunk, $matches)) {
+            if (preg_match('/version(?:Number)?\s*=\s*([0-9]+\.[0-9]+(?:\.[0-9]+)*)/', $chunk, $matches)) {
                 return $matches[1];
             }
         } catch (\Throwable $e) {

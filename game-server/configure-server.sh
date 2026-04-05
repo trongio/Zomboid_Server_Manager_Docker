@@ -83,12 +83,37 @@ apply_setting "AdminPassword"        "${PZ_ADMIN_PASSWORD:-admin}"  "$INI_FILE"
 apply_setting "RCONPort"             "${PZ_RCON_PORT:-${RCON_PORT:-27015}}"         "$INI_FILE"
 apply_setting "RCONPassword"         "${PZ_RCON_PASSWORD:-${RCON_PASSWORD:-changeme}}" "$INI_FILE"
 
-# Mods
-if [ -n "${PZ_MOD_IDS:-}" ]; then
-    apply_setting "Mods"             "${PZ_MOD_IDS}"                "$INI_FILE"
-fi
-if [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
-    apply_setting "WorkshopItems"    "${PZ_WORKSHOP_IDS}"           "$INI_FILE"
+# Mods — env vars take priority; fall back to .mod_state written by web UI.
+MOD_STATE_FILE="/home/steam/Zomboid/.mod_state"
+MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
+
+if [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
+    # Env vars explicitly set — apply them (operator intent)
+    apply_setting "Mods"          "${PZ_MOD_IDS:-}"        "$INI_FILE"
+    apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
+    echo "[configure-server] Applied mods from environment variables"
+elif [ -r "$MOD_STATE_FILE" ]; then
+    # No env vars — restore from web UI's last-known mod state
+    STATE_MODS=$(grep "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//')
+    STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//')
+    if [ -n "$STATE_MODS" ] || [ -n "$STATE_WORKSHOP" ]; then
+        apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
+        apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
+        echo "[configure-server] Restored mods from .mod_state (web UI)"
+    else
+        echo "[configure-server] .mod_state exists but is empty — no mods to restore"
+    fi
+elif [ -r "$MOD_STATE_BACKUP" ]; then
+    # Fallback — restore from INI snapshot taken before image config ran
+    STATE_MODS=$(grep "^Mods=" "$MOD_STATE_BACKUP" | sed 's/^Mods=//')
+    STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_BACKUP" | sed 's/^WorkshopItems=//')
+    if [ -n "$STATE_MODS" ] || [ -n "$STATE_WORKSHOP" ]; then
+        apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
+        apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
+        echo "[configure-server] Restored mods from .mod_state_backup (INI snapshot)"
+    fi
+else
+    echo "[configure-server] No mod env vars or state files — keeping INI mods as-is"
 fi
 
 # Disable Lua checksum — required for ZomboidManager mod.
