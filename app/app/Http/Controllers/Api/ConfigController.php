@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Requests\Api\UpdateSandboxConfigRequest;
 use App\Http\Requests\Api\UpdateServerConfigRequest;
 use App\Services\AuditLogger;
+use App\Services\ConfigStateManager;
 use App\Services\SandboxLuaParser;
 use App\Services\ServerIniParser;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +16,7 @@ class ConfigController
         private readonly ServerIniParser $iniParser,
         private readonly SandboxLuaParser $luaParser,
         private readonly AuditLogger $auditLogger,
+        private readonly ConfigStateManager $configState,
     ) {}
 
     public function showServer(): JsonResponse
@@ -46,6 +48,7 @@ class ConfigController
         }
 
         $this->iniParser->write($path, $settings);
+        $this->configState->persistSettings($settings, $path);
 
         $after = $this->iniParser->read($path);
 

@@ -39,8 +39,20 @@ EOINI
     echo "[configure-server] Initial INI created."
 fi
 
-# Apply settings from environment variables
-echo "[configure-server] Applying configuration from environment..."
+# Apply settings from environment variables (with web UI overrides)
+echo "[configure-server] Applying configuration..."
+
+# Web UI persistence file — written by Laravel when config is saved via dashboard/API.
+# Values here take priority over env var defaults so web UI changes survive restarts.
+CONFIG_STATE_FILE="/home/steam/Zomboid/.config_state"
+
+# Read a value from .config_state, or return empty string.
+read_config_state() {
+    local key="$1"
+    if [ -r "$CONFIG_STATE_FILE" ]; then
+        grep "^${key}=" "$CONFIG_STATE_FILE" 2>/dev/null | sed "s/^${key}=//" | tail -1
+    fi
+}
 
 apply_setting() {
     local key="$1"
@@ -62,21 +74,37 @@ apply_setting() {
     fi
 }
 
-# Core settings
-apply_setting "DefaultPort"          "${PZ_GAME_PORT:-16261}"       "$INI_FILE"
-apply_setting "UDPPort"              "${PZ_DIRECT_PORT:-16262}"     "$INI_FILE"
-apply_setting "MaxPlayers"           "${PZ_MAX_PLAYERS:-16}"        "$INI_FILE"
-apply_setting "Map"                  "${PZ_MAP_NAMES:-Muldraugh, KY}" "$INI_FILE"
-apply_setting "Public"               "${PZ_PUBLIC_SERVER:-true}"    "$INI_FILE"
-apply_setting "PauseEmpty"           "${PZ_PAUSE_ON_EMPTY:-true}"   "$INI_FILE"
-apply_setting "SaveWorldEveryMinutes" "${PZ_AUTOSAVE_INTERVAL:-15}" "$INI_FILE"
-apply_setting "SteamVAC"             "${PZ_STEAM_VAC:-true}"        "$INI_FILE"
-apply_setting "Open"                 "${PZ_OPEN:-true}"             "$INI_FILE"
-apply_setting "AutoCreateUserInWhiteList" "${PZ_AUTO_CREATE_WHITELIST:-true}" "$INI_FILE"
+# Core settings — .config_state (web UI) takes priority over env var defaults
+STATE_VAL=$(read_config_state "DefaultPort")
+apply_setting "DefaultPort"          "${STATE_VAL:-${PZ_GAME_PORT:-16261}}"       "$INI_FILE"
+STATE_VAL=$(read_config_state "UDPPort")
+apply_setting "UDPPort"              "${STATE_VAL:-${PZ_DIRECT_PORT:-16262}}"     "$INI_FILE"
+STATE_VAL=$(read_config_state "MaxPlayers")
+apply_setting "MaxPlayers"           "${STATE_VAL:-${PZ_MAX_PLAYERS:-16}}"        "$INI_FILE"
+STATE_VAL=$(read_config_state "Map")
+apply_setting "Map"                  "${STATE_VAL:-${PZ_MAP_NAMES:-Muldraugh, KY}}" "$INI_FILE"
+STATE_VAL=$(read_config_state "Public")
+apply_setting "Public"               "${STATE_VAL:-${PZ_PUBLIC_SERVER:-true}}"    "$INI_FILE"
+STATE_VAL=$(read_config_state "PauseEmpty")
+apply_setting "PauseEmpty"           "${STATE_VAL:-${PZ_PAUSE_ON_EMPTY:-true}}"   "$INI_FILE"
+STATE_VAL=$(read_config_state "SaveWorldEveryMinutes")
+apply_setting "SaveWorldEveryMinutes" "${STATE_VAL:-${PZ_AUTOSAVE_INTERVAL:-15}}" "$INI_FILE"
+STATE_VAL=$(read_config_state "SteamVAC")
+apply_setting "SteamVAC"             "${STATE_VAL:-${PZ_STEAM_VAC:-true}}"        "$INI_FILE"
+STATE_VAL=$(read_config_state "Open")
+apply_setting "Open"                 "${STATE_VAL:-${PZ_OPEN:-true}}"             "$INI_FILE"
+STATE_VAL=$(read_config_state "AutoCreateUserInWhiteList")
+apply_setting "AutoCreateUserInWhiteList" "${STATE_VAL:-${PZ_AUTO_CREATE_WHITELIST:-true}}" "$INI_FILE"
 
-# Passwords
-apply_setting "Password"             "${PZ_SERVER_PASSWORD:-}"      "$INI_FILE"
-apply_setting "AdminPassword"        "${PZ_ADMIN_PASSWORD:-admin}"  "$INI_FILE"
+# Passwords — .config_state takes priority over env var defaults
+STATE_VAL=$(read_config_state "Password")
+apply_setting "Password"             "${STATE_VAL:-${PZ_SERVER_PASSWORD:-}}"      "$INI_FILE"
+STATE_VAL=$(read_config_state "AdminPassword")
+apply_setting "AdminPassword"        "${STATE_VAL:-${PZ_ADMIN_PASSWORD:-admin}}"  "$INI_FILE"
+
+if [ -r "$CONFIG_STATE_FILE" ]; then
+    echo "[configure-server] Applied web UI overrides from .config_state"
+fi
 
 # RCON — critical for Laravel API
 # PZ_RCON_PASSWORD is used by the ARM64 image; RCON_PASSWORD by the AMD64 renegademaster image.
@@ -182,9 +210,10 @@ fi
 chmod 666 "$INI_FILE" 2>/dev/null || true
 [ -f "$SANDBOX_FILE" ] && chmod 666 "$SANDBOX_FILE" 2>/dev/null || true
 
+# Log effective values from the INI file (not env vars, which may have been overridden)
 echo "[configure-server] Configuration applied:"
-echo "  Port: ${PZ_GAME_PORT:-16261}/udp"
-echo "  RCON: ${PZ_RCON_PORT:-27015}/tcp"
-echo "  MaxPlayers: ${PZ_MAX_PLAYERS:-16}"
-echo "  Public: ${PZ_PUBLIC_SERVER:-true}"
+echo "  Port: $(grep '^DefaultPort=' "$INI_FILE" | sed 's/^DefaultPort=//')/udp"
+echo "  RCON: $(grep '^RCONPort=' "$INI_FILE" | sed 's/^RCONPort=//')/tcp"
+echo "  MaxPlayers: $(grep '^MaxPlayers=' "$INI_FILE" | sed 's/^MaxPlayers=//')"
+echo "  Public: $(grep '^Public=' "$INI_FILE" | sed 's/^Public=//')"
 echo "[configure-server] Done."
