@@ -49,40 +49,58 @@ class ConfigStateManager
 
         $stateFile = $this->stateFilePath($iniPath);
         $stateDir = dirname($stateFile);
+        $lockFile = $stateFile.'.lock';
 
-        // Merge with existing state so partial updates accumulate
-        $existing = $this->readStateFile($stateFile);
-        $merged = array_merge($existing, $persistable);
+        // Use flock() to prevent concurrent read-modify-write races
+        $lockHandle = fopen($lockFile, 'c');
 
-        $lines = [];
-        foreach ($merged as $key => $value) {
-            $safeValue = str_replace(["\n", "\r"], '', (string) $value);
-            $lines[] = "$key=$safeValue";
-        }
-
-        $contents = implode("\n", $lines)."\n";
-
-        // Atomic write: tempfile → rename
-        $tempFile = tempnam($stateDir, '.config_state.');
-
-        if ($tempFile === false) {
-            throw new RuntimeException("Unable to create temporary config state file in $stateDir.");
+        if ($lockHandle === false) {
+            throw new RuntimeException("Unable to open lock file $lockFile.");
         }
 
         try {
-            if (file_put_contents($tempFile, $contents) === false) {
-                throw new RuntimeException("Unable to write temporary config state file $tempFile.");
+            if (! flock($lockHandle, LOCK_EX)) {
+                throw new RuntimeException("Unable to acquire lock on $lockFile.");
             }
 
-            if (! rename($tempFile, $stateFile)) {
-                throw new RuntimeException("Unable to atomically replace config state file $stateFile.");
+            // Merge with existing state so partial updates accumulate.
+            // Filter existing keys by allowlist to discard any polluted entries.
+            $existing = array_intersect_key($this->readStateFile($stateFile), array_flip(self::PERSISTABLE_KEYS));
+            $merged = array_merge($existing, $persistable);
+
+            $lines = [];
+            foreach ($merged as $key => $value) {
+                $safeValue = str_replace(["\n", "\r"], '', (string) $value);
+                $lines[] = "$key=$safeValue";
             }
 
-            chmod($stateFile, 0644);
+            $contents = implode("\n", $lines)."\n";
+
+            // Atomic write: tempfile → rename
+            $tempFile = tempnam($stateDir, '.config_state.');
+
+            if ($tempFile === false) {
+                throw new RuntimeException("Unable to create temporary config state file in $stateDir.");
+            }
+
+            try {
+                if (file_put_contents($tempFile, $contents) === false) {
+                    throw new RuntimeException("Unable to write temporary config state file $tempFile.");
+                }
+
+                if (! rename($tempFile, $stateFile)) {
+                    throw new RuntimeException("Unable to atomically replace config state file $stateFile.");
+                }
+
+                chmod($stateFile, 0644);
+            } finally {
+                if (is_file($tempFile)) {
+                    @unlink($tempFile);
+                }
+            }
         } finally {
-            if (is_file($tempFile)) {
-                @unlink($tempFile);
-            }
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
         }
     }
 

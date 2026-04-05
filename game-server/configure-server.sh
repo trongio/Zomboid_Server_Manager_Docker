@@ -210,9 +210,10 @@ fi
 chmod 666 "$INI_FILE" 2>/dev/null || true
 [ -f "$SANDBOX_FILE" ] && chmod 666 "$SANDBOX_FILE" 2>/dev/null || true
 
+# Log effective values from the INI file (not env vars, which may have been overridden)
 echo "[configure-server] Configuration applied:"
-echo "  Port: ${PZ_GAME_PORT:-16261}/udp"
-echo "  RCON: ${PZ_RCON_PORT:-27015}/tcp"
-echo "  MaxPlayers: ${PZ_MAX_PLAYERS:-16}"
-echo "  Public: ${PZ_PUBLIC_SERVER:-true}"
+echo "  Port: $(grep '^DefaultPort=' "$INI_FILE" | sed 's/^DefaultPort=//')/udp"
+echo "  RCON: $(grep '^RCONPort=' "$INI_FILE" | sed 's/^RCONPort=//')/tcp"
+echo "  MaxPlayers: $(grep '^MaxPlayers=' "$INI_FILE" | sed 's/^MaxPlayers=//')"
+echo "  Public: $(grep '^Public=' "$INI_FILE" | sed 's/^Public=//')"
 echo "[configure-server] Done."

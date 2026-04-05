@@ -14,6 +14,7 @@ beforeEach(function () {
 afterEach(function () {
     @unlink($this->iniPath);
     @unlink($this->stateFile);
+    @unlink($this->stateFile.'.lock');
     // Clean up temp files left by atomic writes
     foreach (glob($this->tempDir.'/.config_state.*') as $f) {
         @unlink($f);
@@ -95,6 +96,20 @@ it('strips newlines from values', function () {
     $contents = file_get_contents($this->stateFile);
     expect($contents)->toContain('MaxPlayers=32')
         ->and($contents)->not->toContain("\r");
+});
+
+it('discards non-allowlisted keys from polluted state file on merge', function () {
+    // Simulate a polluted .config_state with a non-allowlisted key
+    file_put_contents($this->stateFile, "MaxPlayers=32\nRCONPassword=leaked\n");
+
+    $this->manager->persistSettings([
+        'Public' => 'false',
+    ], $this->iniPath);
+
+    $contents = file_get_contents($this->stateFile);
+    expect($contents)->toContain('MaxPlayers=32')
+        ->and($contents)->toContain('Public=false')
+        ->and($contents)->not->toContain('RCONPassword');
 });
 
 it('persists all allowlisted keys', function () {
