@@ -1,6 +1,6 @@
 import { router } from '@inertiajs/react';
 import { FileUp, Loader2, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -60,7 +60,7 @@ export function ImportConfigDialog({
         onOpenChange(open);
     }
 
-    function handleFileLoad(e: React.ChangeEvent<HTMLInputElement>) {
+    function handleFileLoad(e: ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
 

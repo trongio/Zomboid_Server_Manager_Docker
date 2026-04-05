@@ -434,11 +434,17 @@ class BackupManager
 
         // Remove any symlinks extracted from the zip (prevents symlink attacks)
         $targetDir = $layout === 'flat_save' ? "{$dataPath}/Saves/Multiplayer/{$serverName}" : $dataPath;
-        $symlinkResult = Process::timeout(30)->run(['find', $targetDir, '-type', 'l', '-delete']);
+        $symlinkResult = Process::timeout(30)->run(['find', $targetDir, '-type', 'l', '-print', '-delete']);
 
-        if ($symlinkResult->successful() && trim($symlinkResult->output()) !== '') {
+        if (! $symlinkResult->successful()) {
+            Log::warning('Import: failed to scan for symlinks', [
+                'target' => $targetDir,
+                'error' => $symlinkResult->errorOutput(),
+            ]);
+        } elseif (trim($symlinkResult->output()) !== '') {
             Log::warning('Import: removed symlinks from extracted zip', [
                 'target' => $targetDir,
+                'removed' => trim($symlinkResult->output()),
             ]);
         }
 

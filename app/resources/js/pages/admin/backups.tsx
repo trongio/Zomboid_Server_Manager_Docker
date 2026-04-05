@@ -210,7 +210,7 @@ export default function Backups({ backups, current_version, current_branch, filt
         const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
         const formData = new FormData();
         formData.append('file', importFile);
-        formData.append('confirm', '1');
+        formData.append('confirm', importConfirm ? '1' : '0');
 
         try {
             const res = await fetch('/admin/backups/import', {
