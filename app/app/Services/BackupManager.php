@@ -324,8 +324,10 @@ class BackupManager
             }
         }
 
-        if ($hasServer || $hasSaves || $hasDb) {
-            $layout = ($hasServer && $hasSaves) ? 'full' : 'save_only';
+        if ($hasSaves) {
+            $layout = $hasServer ? 'full' : 'save_only';
+        } elseif ($hasServer || $hasDb) {
+            throw new \RuntimeException('Zip contains config/db files but no save data (Saves/ directory). Use config import for server settings.');
         } else {
             // Check for flat save layout (map files, players.db at root)
             $hasSaveFiles = false;
@@ -371,13 +373,16 @@ class BackupManager
 
         // 2. Stop the game server
         $this->stopServer();
-        sleep(3);
 
-        // 3. Extract zip based on detected layout
-        $this->extractImportZip($zipPath, $metadata, $dataPath, $serverName);
+        try {
+            sleep(3);
 
-        // 4. Start the game server
-        $this->docker->startContainer();
+            // 3. Extract zip based on detected layout
+            $this->extractImportZip($zipPath, $metadata, $dataPath, $serverName);
+        } finally {
+            // 4. Start the game server even if extraction fails
+            $this->docker->startContainer();
+        }
 
         return [
             'pre_import_backup' => $preImport['backup'],

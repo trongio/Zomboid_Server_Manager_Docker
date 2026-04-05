@@ -87,6 +87,7 @@ class ConfigImporter
     public function apply(string $type, array $settings): array
     {
         if ($type === 'server') {
+            $settings = array_diff_key($settings, self::SKIPPED_SERVER_KEYS);
             $path = config('zomboid.paths.server_ini');
             $this->iniParser->write($path, $settings);
         } else {
