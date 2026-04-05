@@ -1,5 +1,5 @@
 import { Head, router } from '@inertiajs/react';
-import { ImageIcon, Palette, Trash2, Type, Upload } from 'lucide-react';
+import { ImageIcon, Palette, RotateCcw, Save, Trash2, Type, Upload } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { fetchAction } from '@/lib/fetch-action';
@@ -51,6 +51,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Site Settings', href: '/admin/site-settings' },
 ];
 
+const COLOR_FIELDS = [
+    { key: 'primary', label: 'Primary', description: 'Buttons, links, active states' },
+    { key: 'accent', label: 'Accent', description: 'Hover states, highlights' },
+    { key: 'destructive', label: 'Destructive', description: 'Delete buttons, error states' },
+    { key: 'sidebar_primary', label: 'Sidebar', description: 'Sidebar active item' },
+] as const;
+
 export default function SiteSettings({ settings, available_icons, available_sections }: Props) {
     const [siteName, setSiteName] = useState(settings.site_name);
     const [footerText, setFooterText] = useState(settings.footer_text);
@@ -61,6 +68,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
     const [heroButtonText, setHeroButtonText] = useState(settings.hero_button_text);
     const [features, setFeatures] = useState<Feature[]>(settings.features);
     const [landingSections, setLandingSections] = useState<LandingSection[]>(settings.landing_sections);
+    const [themeColors, setThemeColors] = useState<Record<string, string>>(settings.theme_colors ?? {});
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [faviconFile, setFaviconFile] = useState<File | null>(null);
@@ -68,6 +76,21 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     const logoInputRef = useRef<HTMLInputElement>(null);
     const faviconInputRef = useRef<HTMLInputElement>(null);
+
+    // Track dirty state for floating save button
+    const isDirty =
+        siteName !== settings.site_name ||
+        footerText !== settings.footer_text ||
+        heroBadge !== settings.hero_badge ||
+        heroTitle !== settings.hero_title ||
+        heroSubtitle !== settings.hero_subtitle ||
+        heroDescription !== settings.hero_description ||
+        heroButtonText !== settings.hero_button_text ||
+        JSON.stringify(features) !== JSON.stringify(settings.features) ||
+        JSON.stringify(landingSections) !== JSON.stringify(settings.landing_sections) ||
+        JSON.stringify(themeColors) !== JSON.stringify(settings.theme_colors ?? {}) ||
+        logoFile !== null ||
+        faviconFile !== null;
 
     async function save() {
         setSaving(true);
@@ -85,19 +108,25 @@ export default function SiteSettings({ settings, available_icons, available_sect
         if (logoFile) formData.append('logo', logoFile);
         if (faviconFile) formData.append('favicon', faviconFile);
 
-        // Append features as JSON-encoded fields
         features.forEach((feature, i) => {
             formData.append(`features[${i}][icon]`, feature.icon);
             formData.append(`features[${i}][title]`, feature.title);
             formData.append(`features[${i}][description]`, feature.description);
         });
 
-        // Append landing sections
         landingSections.forEach((section, i) => {
             formData.append(`landing_sections[${i}][id]`, section.id);
             formData.append(`landing_sections[${i}][enabled]`, section.enabled ? '1' : '0');
             formData.append(`landing_sections[${i}][order]`, String(section.order));
         });
+
+        // Theme colors
+        const activeColors = Object.entries(themeColors).filter(([, v]) => v);
+        if (activeColors.length > 0) {
+            activeColors.forEach(([key, value]) => {
+                formData.append(`theme_colors[${key}]`, value);
+            });
+        }
 
         try {
             const res = await fetch('/admin/site-settings', {
@@ -171,6 +200,14 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     function getSectionLabel(id: string) {
         return available_sections.find((s) => s.id === id)?.label ?? id;
+    }
+
+    function updateColor(key: string, value: string) {
+        setThemeColors((prev) => ({ ...prev, [key]: value }));
+    }
+
+    function resetColors() {
+        setThemeColors({});
     }
 
     return (
@@ -314,6 +351,63 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">ICO, PNG, or SVG. Max 512 KB.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Theme Colors Card */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Palette className="size-5" />
+                                    Theme Colors
+                                </CardTitle>
+                                <CardDescription>
+                                    Customize the color scheme. Leave empty to use defaults.
+                                </CardDescription>
+                            </div>
+                            {Object.values(themeColors).some(Boolean) && (
+                                <Button variant="outline" size="sm" onClick={resetColors}>
+                                    <RotateCcw className="mr-1.5 size-3.5" />
+                                    Reset to Defaults
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            {COLOR_FIELDS.map(({ key, label, description }) => (
+                                <div key={key} className="space-y-2">
+                                    <Label>{label}</Label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="color"
+                                            value={themeColors[key] || '#000000'}
+                                            onChange={(e) => updateColor(key, e.target.value)}
+                                            className="size-9 cursor-pointer rounded-md border border-input"
+                                        />
+                                        <Input
+                                            value={themeColors[key] || ''}
+                                            onChange={(e) => updateColor(key, e.target.value)}
+                                            placeholder="#000000"
+                                            className="flex-1 font-mono text-sm"
+                                            maxLength={7}
+                                        />
+                                        {themeColors[key] && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => updateColor(key, '')}
+                                            >
+                                                Clear
+                                            </Button>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">{description}</p>
+                                </div>
+                            ))}
                         </div>
                     </CardContent>
                 </Card>
@@ -505,13 +599,25 @@ export default function SiteSettings({ settings, available_icons, available_sect
                             ))}
                     </CardContent>
                 </Card>
+            </div>
 
-                {/* Save button */}
-                <div className="flex items-center gap-2">
-                    <Button onClick={save} disabled={saving}>
-                        {saving ? 'Saving...' : 'Save All Settings'}
-                    </Button>
-                </div>
+            {/* Floating save button */}
+            <div
+                className={`fixed bottom-6 right-6 z-50 transition-all duration-200 ${
+                    isDirty
+                        ? 'translate-y-0 opacity-100'
+                        : 'pointer-events-none translate-y-4 opacity-0'
+                }`}
+            >
+                <Button
+                    size="lg"
+                    onClick={save}
+                    disabled={saving}
+                    className="shadow-lg"
+                >
+                    <Save className="mr-2 size-4" />
+                    {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
             </div>
         </AppLayout>
     );
