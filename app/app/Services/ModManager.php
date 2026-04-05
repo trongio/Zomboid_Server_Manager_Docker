@@ -140,8 +140,8 @@ class ModManager
     {
         $config = $this->iniParser->read($iniPath);
 
-        $mods = $config['Mods'] ?? '';
-        $workshopItems = $config['WorkshopItems'] ?? '';
+        $mods = str_replace(["\n", "\r"], '', $config['Mods'] ?? '');
+        $workshopItems = str_replace(["\n", "\r"], '', $config['WorkshopItems'] ?? '');
 
         $stateFile = dirname($iniPath, 2).'/.mod_state';
         $stateDir = dirname($stateFile);
@@ -160,6 +160,8 @@ class ModManager
             if (! rename($tempFile, $stateFile)) {
                 throw new \RuntimeException("Unable to atomically replace mod state file {$stateFile}.");
             }
+
+            chmod($stateFile, 0644);
         } finally {
             if (is_file($tempFile)) {
                 @unlink($tempFile);

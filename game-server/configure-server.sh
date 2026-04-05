@@ -92,7 +92,7 @@ if [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
     apply_setting "Mods"          "${PZ_MOD_IDS:-}"        "$INI_FILE"
     apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
     echo "[configure-server] Applied mods from environment variables"
-elif [ -f "$MOD_STATE_FILE" ]; then
+elif [ -r "$MOD_STATE_FILE" ]; then
     # No env vars — restore from web UI's last-known mod state
     STATE_MODS=$(grep "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//')
     STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//')
@@ -103,7 +103,7 @@ elif [ -f "$MOD_STATE_FILE" ]; then
     else
         echo "[configure-server] .mod_state exists but is empty — no mods to restore"
     fi
-elif [ -f "$MOD_STATE_BACKUP" ]; then
+elif [ -r "$MOD_STATE_BACKUP" ]; then
     # Fallback — restore from INI snapshot taken before image config ran
     STATE_MODS=$(grep "^Mods=" "$MOD_STATE_BACKUP" | sed 's/^Mods=//')
     STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_BACKUP" | sed 's/^WorkshopItems=//')
