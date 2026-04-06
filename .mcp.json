@@ -16,16 +16,6 @@
         "https://www.shadcn.io/api/mcp"
       ],
       "env": {}
-    },
-    "playwright": {
-      "command": "/home/trongio/.nvm/versions/node/v24.14.0/bin/node",
-      "args": [
-        "/home/trongio/.nvm/versions/node/v24.14.0/bin/npx",
-        "@playwright/mcp@latest"
-      ],
-      "env": {
-        "PATH": "/home/trongio/.nvm/versions/node/v24.14.0/bin:/usr/local/bin:/usr/bin:/bin"
-      }
     }
   }
 }

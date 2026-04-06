@@ -97,6 +97,12 @@ class SiteSettingController extends Controller
             }
         }
 
+        // If no features were sent in a full form save, clear them
+        if (! array_key_exists('features', $validated) && $request->has('site_name')) {
+            $settings->features = [];
+            $changes[] = 'features';
+        }
+
         $settings->save();
         SiteSetting::bustCache();
 
@@ -158,10 +164,10 @@ class SiteSettingController extends Controller
     public static function availableIcons(): array
     {
         return [
-            'Archive', 'Bell', 'Clock', 'Globe', 'Heart', 'LayoutGrid',
-            'MapPin', 'Package', 'Shield', 'ShieldAlert', 'Star',
-            'Sword', 'Terminal', 'Trophy', 'Users', 'Wallet', 'Wrench',
-            'Zap', 'Crosshair', 'Gamepad2',
+            'Archive', 'Bell', 'Clock', 'Crosshair', 'Gamepad2', 'Globe',
+            'Heart', 'LayoutGrid', 'MapPin', 'Package', 'Shield', 'ShieldAlert',
+            'Skull', 'Star', 'Sword', 'Terminal', 'Trophy', 'Users', 'Wallet',
+            'Wrench', 'Zap',
         ];
     }
 }

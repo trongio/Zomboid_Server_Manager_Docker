@@ -10,12 +10,14 @@ import {
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { useTranslation } from '@/hooks/use-translation';
 import { login, register } from '@/routes';
 
 const adminRoles = ['super_admin', 'admin', 'moderator'];
 
 function NavLinks({ className, onClick }: { className?: string; onClick?: () => void }) {
     const { auth } = usePage().props;
+    const { t } = useTranslation();
     const isAdmin = auth.user && adminRoles.includes((auth.user as { role: string }).role);
 
     return (
@@ -25,21 +27,21 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
                 className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                 onClick={onClick}
             >
-                Server Status
+                {t('nav.server_status')}
             </Link>
             <Link
                 href="/rankings"
                 className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                 onClick={onClick}
             >
-                Rankings
+                {t('nav.rankings')}
             </Link>
             <Link
                 href="/shop"
                 className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                 onClick={onClick}
             >
-                Shop
+                {t('nav.shop')}
             </Link>
             {auth.user ? (
                 <Link
@@ -47,7 +49,7 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
                     className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     onClick={onClick}
                 >
-                    {isAdmin ? 'Dashboard' : 'My Account'}
+                    {isAdmin ? t('nav.dashboard') : t('nav.my_account')}
                 </Link>
             ) : (
                 <>
@@ -56,14 +58,14 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
                         className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                         onClick={onClick}
                     >
-                        Log in
+                        {t('nav.login')}
                     </Link>
                     <Link
                         href={register()}
                         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         onClick={onClick}
                     >
-                        Register
+                        {t('nav.register')}
                     </Link>
                 </>
             )}

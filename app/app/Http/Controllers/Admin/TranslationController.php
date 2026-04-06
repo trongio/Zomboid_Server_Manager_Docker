@@ -16,6 +16,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TranslationController extends Controller
 {
+    private const LOCALE_REGEX = '/\A[a-zA-Z0-9_-]+\z/';
+
     public function __construct(
         private readonly AuditLogger $auditLogger,
     ) {}
@@ -27,7 +29,7 @@ class TranslationController extends Controller
 
         // Get all DB overrides grouped by locale
         $overrides = Translation::query()
-            ->whereNull('group')
+            ->where('group', '')
             ->get()
             ->groupBy('locale')
             ->map(fn ($items) => $items->pluck('value', 'key')->all())
@@ -54,7 +56,7 @@ class TranslationController extends Controller
     public function updateTranslation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10'],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
             'key' => ['required', 'string', 'max:255'],
             'value' => ['required', 'string', 'max:5000'],
         ]);
@@ -62,7 +64,7 @@ class TranslationController extends Controller
         Translation::query()->updateOrCreate(
             [
                 'locale' => $validated['locale'],
-                'group' => null,
+                'group' => '',
                 'key' => $validated['key'],
             ],
             ['value' => $validated['value']],
@@ -86,13 +88,13 @@ class TranslationController extends Controller
     public function deleteTranslation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10'],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
             'key' => ['required', 'string', 'max:255'],
         ]);
 
         Translation::query()
             ->where('locale', $validated['locale'])
-            ->whereNull('group')
+            ->where('group', '')
             ->where('key', $validated['key'])
             ->delete();
 
@@ -104,7 +106,7 @@ class TranslationController extends Controller
     public function storeLanguage(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:10', 'unique:languages,code'],
+            'code' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX, 'unique:languages,code'],
             'name' => ['required', 'string', 'max:100'],
             'native_name' => ['required', 'string', 'max:100'],
         ]);
@@ -129,6 +131,11 @@ class TranslationController extends Controller
             'is_active' => ['sometimes', 'boolean'],
             'is_default' => ['sometimes', 'boolean'],
         ]);
+
+        // Prevent deactivating the default language
+        if ($language->is_default && array_key_exists('is_active', $validated) && ! $validated['is_active']) {
+            return response()->json(['message' => 'Cannot deactivate the default language'], 422);
+        }
 
         // If setting as default, unset other defaults and sync SiteSetting
         if (($validated['is_default'] ?? false) && ! $language->is_default) {
@@ -181,7 +188,7 @@ class TranslationController extends Controller
      */
     public function exportLocale(string $locale): StreamedResponse
     {
-        if (strlen($locale) > 10 || ! preg_match('/\A[a-zA-Z0-9_-]+\z/', $locale)) {
+        if (strlen($locale) > 10 || ! preg_match(self::LOCALE_REGEX, $locale)) {
             abort(404);
         }
 
@@ -191,7 +198,6 @@ class TranslationController extends Controller
 
         $translations = TranslationService::getForLocale($locale);
 
-        // Sort keys alphabetically for readability
         ksort($translations);
 
         return response()->streamDownload(function () use ($translations) {
@@ -207,7 +213,7 @@ class TranslationController extends Controller
     public function importLocale(Request $request): JsonResponse
     {
         $request->validate([
-            'locale' => ['required', 'string', 'max:10'],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
             'file' => ['required', 'file', 'max:1024', 'mimes:json,txt'],
         ]);
 
@@ -219,18 +225,25 @@ class TranslationController extends Controller
             return response()->json(['message' => 'Invalid JSON file'], 422);
         }
 
-        // Validate all values are strings
+        $count = 0;
+        $skipped = 0;
+
         foreach ($data as $key => $value) {
             if (! is_string($key) || ! is_string($value)) {
-                return response()->json(['message' => 'JSON must be a flat key-value object with string values'], 422);
+                $skipped++;
+
+                continue;
             }
-        }
 
-        $count = 0;
+            // Enforce DB column limits
+            if (strlen($key) > 255 || strlen($value) > 5000) {
+                $skipped++;
 
-        foreach ($data as $key => $value) {
+                continue;
+            }
+
             Translation::query()->updateOrCreate(
-                ['locale' => $locale, 'group' => null, 'key' => $key],
+                ['locale' => $locale, 'group' => '', 'key' => $key],
                 ['value' => $value],
             );
             $count++;
@@ -241,13 +254,19 @@ class TranslationController extends Controller
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
             action: 'translation.import',
-            details: ['locale' => $locale, 'keys_imported' => $count],
+            details: ['locale' => $locale, 'keys_imported' => $count, 'keys_skipped' => $skipped],
             ip: $request->ip(),
         );
 
+        $message = "{$count} translations imported for '{$locale}'";
+        if ($skipped > 0) {
+            $message .= " ({$skipped} skipped due to invalid format or length)";
+        }
+
         return response()->json([
-            'message' => "{$count} translations imported for '{$locale}'",
+            'message' => $message,
             'count' => $count,
+            'skipped' => $skipped,
         ]);
     }
 }

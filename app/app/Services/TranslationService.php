@@ -29,7 +29,7 @@ class TranslationService
             // Overlay DB overrides for this locale
             $overrides = Translation::query()
                 ->where('locale', $locale)
-                ->whereNull('group')
+                ->where('group', '')
                 ->pluck('value', 'key')
                 ->all();
 

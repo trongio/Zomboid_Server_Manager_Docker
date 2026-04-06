@@ -111,15 +111,11 @@ export default function SiteSettings({ settings, available_icons, available_sect
         if (logoFile) formData.append('logo', logoFile);
         if (faviconFile) formData.append('favicon', faviconFile);
 
-        if (features.length === 0) {
-            formData.append('features', '[]');
-        } else {
-            features.forEach((feature, i) => {
-                formData.append(`features[${i}][icon]`, feature.icon);
-                formData.append(`features[${i}][title]`, feature.title);
-                formData.append(`features[${i}][description]`, feature.description);
-            });
-        }
+        features.forEach((feature, i) => {
+            formData.append(`features[${i}][icon]`, feature.icon);
+            formData.append(`features[${i}][title]`, feature.title);
+            formData.append(`features[${i}][description]`, feature.description);
+        });
 
         landingSections.forEach((section, i) => {
             formData.append(`landing_sections[${i}][id]`, section.id);

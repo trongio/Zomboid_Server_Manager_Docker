@@ -39,7 +39,7 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $siteSettings = SiteSetting::cached();
+        $siteSettings = $request->attributes->get('site_settings') ?? SiteSetting::cached();
 
         view()->share('siteFavicon', $siteSettings->faviconUrl());
 

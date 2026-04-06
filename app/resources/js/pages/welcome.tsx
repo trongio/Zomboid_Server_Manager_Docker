@@ -1,6 +1,7 @@
 import { Deferred, Head, Link } from '@inertiajs/react';
 import {
     Archive,
+    Bell,
     Check,
     ChevronRight,
     Clock,
@@ -43,11 +44,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useClipboard } from '@/hooks/use-clipboard';
 import { usePing } from '@/hooks/use-ping';
+import { useTranslation } from '@/hooks/use-translation';
 import PublicLayout from '@/layouts/public-layout';
 import type { WelcomePageData } from '@/types';
 
 const iconMap: Record<string, LucideIcon> = {
     Archive,
+    Bell,
     Clock,
     Crosshair,
     Gamepad2,
@@ -104,6 +107,8 @@ function HeroSection({
     ping,
     connection,
 }: Pick<WelcomePageData, 'hero' | 'server' | 'connection'> & { ping: number | null }) {
+    const { t } = useTranslation();
+
     return (
         <section className="relative overflow-hidden py-20 lg:py-28">
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/5 via-transparent to-transparent" />
@@ -146,10 +151,10 @@ function HeroSection({
                     />
                     <span className="font-medium">
                         {server.status === 'online'
-                            ? `Online — ${server.player_count} player${server.player_count !== 1 ? 's' : ''}`
+                            ? `${t('status.online')} — ${server.player_count} ${server.player_count !== 1 ? t('common.players') : t('common.player')}`
                             : server.status === 'starting'
-                              ? 'Starting up...'
-                              : 'Offline'}
+                              ? t('status.starting')
+                              : t('status.offline')}
                     </span>
                     {ping !== null && server.status === 'online' && (
                         <span className="text-muted-foreground">— {ping}ms</span>
@@ -225,6 +230,8 @@ function HeroSection({
 }
 
 function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_stats' | 'server'>) {
+    const { t } = useTranslation();
+
     return (
         <Deferred data="server_stats" fallback={
             <section className="border-y border-border/40 bg-muted/20 py-8">
@@ -249,7 +256,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
                             <span className="text-2xl font-bold tabular-nums">
                                 <AnimatedCounter value={server_stats.total_players} />
                             </span>
-                            <span className="text-xs text-muted-foreground">Total Players</span>
+                            <span className="text-xs text-muted-foreground">{t('status.total_players')}</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <div className="flex size-10 items-center justify-center rounded-lg bg-red-500/10">
@@ -258,7 +265,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
                             <span className="text-2xl font-bold tabular-nums">
                                 <AnimatedCounter value={server_stats.total_zombie_kills} />
                             </span>
-                            <span className="text-xs text-muted-foreground">Zombie Kills</span>
+                            <span className="text-xs text-muted-foreground">{t('status.zombie_kills')}</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <div className="flex size-10 items-center justify-center rounded-lg bg-green-500/10">
@@ -267,7 +274,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
                             <span className="text-2xl font-bold tabular-nums">
                                 <AnimatedCounter value={server_stats.total_hours_survived} decimals={1} suffix="h" />
                             </span>
-                            <span className="text-xs text-muted-foreground">Hours Survived</span>
+                            <span className="text-xs text-muted-foreground">{t('status.hours_survived')}</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
                             <div className="flex size-10 items-center justify-center rounded-lg bg-orange-500/10">
@@ -276,7 +283,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
                             <span className="text-2xl font-bold tabular-nums">
                                 <AnimatedCounter value={server_stats.total_deaths} />
                             </span>
-                            <span className="text-xs text-muted-foreground">Deaths</span>
+                            <span className="text-xs text-muted-foreground">{t('status.deaths')}</span>
                         </div>
                         <div className="hidden flex-col items-center gap-1 lg:flex">
                             <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
@@ -285,7 +292,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
                             <span className="text-2xl font-bold tabular-nums">
                                 {server.player_count}
                             </span>
-                            <span className="text-xs text-muted-foreground">Players Online</span>
+                            <span className="text-xs text-muted-foreground">{t('status.players_online')}</span>
                         </div>
                     </div>
                 </section>
@@ -295,6 +302,7 @@ function StatsSection({ server_stats, server }: Pick<WelcomePageData, 'server_st
 }
 
 function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>) {
+    const { t } = useTranslation();
     return (
         <Deferred data="top_players" fallback={
             <section className="py-16">
@@ -313,9 +321,9 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
                     <div className="mx-auto max-w-7xl px-4">
                         <div className="mb-10 text-center">
                             <h2 className="mb-2 text-2xl font-bold tracking-tight sm:text-3xl">
-                                Top Survivors
+                                {t('landing.top_survivors')}
                             </h2>
-                            <p className="text-muted-foreground">Leading zombie slayers on the server</p>
+                            <p className="text-muted-foreground">{t('landing.top_survivors_desc')}</p>
                         </div>
                         <div className="flex items-end justify-center gap-2 sm:gap-4">
                             {/* 2nd place */}
@@ -412,7 +420,7 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
                                 className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
                             >
                                 <Trophy className="size-4" />
-                                View Full Rankings
+                                {t('landing.view_full_rankings')}
                             </Link>
                         </div>
                     </div>
@@ -423,15 +431,17 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
 }
 
 function FeaturesSection({ features }: { features: WelcomePageData['features'] }) {
+    const { t } = useTranslation();
+
     return (
         <section className="border-t border-border/40 bg-muted/30 py-16 lg:py-20">
             <div className="mx-auto max-w-7xl px-4">
                 <div className="mb-12 text-center">
                     <h2 className="mb-3 text-2xl font-bold tracking-tight sm:text-3xl">
-                        Server Management Features
+                        {t('landing.features_title')}
                     </h2>
                     <p className="text-muted-foreground">
-                        Everything you need to run a PZ server, without SSH access.
+                        {t('landing.features_desc')}
                     </p>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

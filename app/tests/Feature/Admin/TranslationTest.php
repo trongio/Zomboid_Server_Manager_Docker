@@ -140,7 +140,7 @@ describe('Language management', function () {
     });
 
     it('updates a language', function () {
-        $lang = Language::factory()->create();
+        $lang = Language::factory()->create(['code' => 'ka', 'name' => 'Georgian', 'native_name' => 'ქართული', 'is_default' => false]);
 
         $this->actingAs($this->admin)
             ->patchJson(route('admin.languages.update', $lang), [
@@ -149,6 +149,17 @@ describe('Language management', function () {
             ->assertOk();
 
         expect($lang->fresh()->is_active)->toBeFalse();
+    });
+
+    it('prevents deactivating the default language', function () {
+        $lang = Language::factory()->create(['is_default' => true]);
+
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.languages.update', $lang), [
+                'is_active' => false,
+            ])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Cannot deactivate the default language']);
     });
 
     it('sets a language as default and unsets previous', function () {

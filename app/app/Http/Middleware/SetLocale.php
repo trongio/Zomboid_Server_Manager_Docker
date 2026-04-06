@@ -13,21 +13,24 @@ class SetLocale
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $siteSettings = SiteSetting::cached();
+
+        // Share with other middleware (HandleInertiaRequests) to avoid duplicate lookups
+        $request->attributes->set('site_settings', $siteSettings);
+
         $preferred = $request->query('lang')
             ?? $request->cookie('locale')
             ?? session('locale');
 
-        $default = SiteSetting::cached()->default_locale ?? 'en';
+        $default = $siteSettings->default_locale ?? 'en';
 
-        // Sanitize and validate the preferred locale
-        $locale = $this->resolveLocale($preferred, $default);
+        $locale = $this->resolveLocale($preferred, $this->validateDefault($default));
 
         App::setLocale($locale);
         session(['locale' => $locale]);
 
         $response = $next($request);
 
-        // Persist locale choice in cookie (30 days)
         if ($request->query('lang')) {
             $response->headers->setCookie(cookie('locale', $locale, 43200));
         }
@@ -41,23 +44,40 @@ class SetLocale
             return $default;
         }
 
-        // Sanitize: only allow alphanumeric, dash, underscore; max 10 chars
         $sanitized = preg_replace('/[^a-zA-Z0-9_-]/', '', $preferred);
 
         if ($sanitized === '' || strlen($sanitized) > 10) {
             return $default;
         }
 
-        // English is always valid even without a Language row
         if ($sanitized === 'en') {
             return 'en';
         }
 
-        // Validate against active languages in the database
         if (Language::query()->where('code', $sanitized)->where('is_active', true)->exists()) {
             return $sanitized;
         }
 
         return $default;
+    }
+
+    /**
+     * Validate the configured default locale. Falls back to 'en' if invalid/inactive.
+     */
+    private function validateDefault(string $default): string
+    {
+        if ($default === 'en') {
+            return 'en';
+        }
+
+        if (strlen($default) > 10 || ! preg_match('/\A[a-zA-Z0-9_-]+\z/', $default)) {
+            return 'en';
+        }
+
+        if (Language::query()->where('code', $default)->where('is_active', true)->exists()) {
+            return $default;
+        }
+
+        return 'en';
     }
 }
