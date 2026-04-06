@@ -228,5 +228,17 @@
     "admin.site_settings.title": "საიტის პარამეტრები",
     "admin.site_settings.description": "საიტის ბრენდინგის, სადესანტო გვერდის შინაარსისა და განლაგების მორგება.",
     "admin.translations.title": "თარგმანები",
-    "admin.translations.description": "ენებისა და თარგმანის სტრიქონების მართვა."
+    "admin.translations.description": "ენებისა და თარგმანის სტრიქონების მართვა.",
+    "game_state.unavailable": "თამაშის მდგომარეობა მიუწვდომელია",
+    "game_state.day": "დღე :day",
+    "game_state.spring": "გაზაფხული",
+    "game_state.summer": "ზაფხული",
+    "game_state.autumn": "შემოდგომა",
+    "game_state.winter": "ზამთარი",
+    "game_state.clear": "მოწმენდილი",
+    "game_state.rain": "წვიმა",
+    "game_state.heavy_rain": "ძლიერი წვიმა",
+    "game_state.fog": "ნისლი",
+    "game_state.snow": "თოვლი",
+    "game_state.night": "ღამე"
 }

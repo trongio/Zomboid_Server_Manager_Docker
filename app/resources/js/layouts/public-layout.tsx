@@ -1,6 +1,6 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, Skull } from 'lucide-react';
-import { useState, type PropsWithChildren } from 'react';
+import { useMemo, useState, type PropsWithChildren } from 'react';
 import { Button } from '@/components/ui/button';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -15,6 +15,24 @@ import { login, register } from '@/routes';
 
 const adminRoles = ['super_admin', 'admin', 'moderator'];
 
+function NavLink({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) {
+    const { url } = usePage();
+    const isActive = useMemo(() => url.startsWith(href), [url, href]);
+    return (
+        <Link
+            href={href}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                isActive
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={onClick}
+        >
+            {children}
+        </Link>
+    );
+}
+
 function NavLinks({ className, onClick }: { className?: string; onClick?: () => void }) {
     const { auth } = usePage().props;
     const { t } = useTranslation();
@@ -22,27 +40,15 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
 
     return (
         <nav className={className}>
-            <Link
-                href="/status"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
+            <NavLink href="/status" onClick={onClick}>
                 {t('nav.server_status')}
-            </Link>
-            <Link
-                href="/rankings"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
+            </NavLink>
+            <NavLink href="/rankings" onClick={onClick}>
                 {t('nav.rankings')}
-            </Link>
-            <Link
-                href="/shop"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
+            </NavLink>
+            <NavLink href="/shop" onClick={onClick}>
                 {t('nav.shop')}
-            </Link>
+            </NavLink>
             {auth.user ? (
                 <Link
                     href={isAdmin ? '/dashboard' : '/portal'}

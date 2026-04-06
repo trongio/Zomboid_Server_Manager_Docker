@@ -228,5 +228,17 @@
     "admin.site_settings.title": "Site Settings",
     "admin.site_settings.description": "Customize your site's branding, landing page content, and layout.",
     "admin.translations.title": "Translations",
-    "admin.translations.description": "Manage languages and translation overrides."
+    "admin.translations.description": "Manage languages and translation overrides.",
+    "game_state.unavailable": "Game state unavailable",
+    "game_state.day": "Day :day",
+    "game_state.spring": "Spring",
+    "game_state.summer": "Summer",
+    "game_state.autumn": "Autumn",
+    "game_state.winter": "Winter",
+    "game_state.clear": "Clear",
+    "game_state.rain": "Rain",
+    "game_state.heavy_rain": "Heavy rain",
+    "game_state.fog": "Fog",
+    "game_state.snow": "Snow",
+    "game_state.night": "Night"
 }
