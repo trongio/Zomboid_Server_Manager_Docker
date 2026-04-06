@@ -103,6 +103,12 @@ class SiteSettingController extends Controller
             $changes[] = 'features';
         }
 
+        // Explicit signal that theme colors were cleared
+        if (! array_key_exists('theme_colors', $validated) && $request->has('theme_colors_cleared')) {
+            $settings->theme_colors = null;
+            $changes[] = 'theme_colors';
+        }
+
         $settings->save();
         SiteSetting::bustCache();
 

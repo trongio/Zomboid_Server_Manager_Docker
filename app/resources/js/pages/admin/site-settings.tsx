@@ -148,14 +148,14 @@ export default function SiteSettings({ settings, available_icons, available_sect
             formData.append(`landing_sections[${i}][order]`, String(section.order));
         });
 
-        // Theme colors — send explicit null when cleared so backend removes them
+        // Theme colors — send entries when set, or signal cleared via flag
         const activeColors = Object.entries(themeColors).filter(([, v]) => v);
         if (activeColors.length > 0) {
             activeColors.forEach(([key, value]) => {
                 formData.append(`theme_colors[${key}]`, value);
             });
         } else {
-            formData.append('theme_colors', '');
+            formData.append('theme_colors_cleared', '1');
         }
 
         try {

@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property int $id
  * @property string $locale
- * @property string|null $group
+ * @property string $group
  * @property string $key
  * @property string $value
  * @property \Illuminate\Support\Carbon $created_at

@@ -148,8 +148,12 @@ class TranslationController extends Controller
             return response()->json(['message' => 'Cannot deactivate the default language'], 422);
         }
 
-        // If setting as default, unset other defaults and sync SiteSetting
+        // If setting as default, ensure language is active, unset other defaults, and sync SiteSetting
         if (($validated['is_default'] ?? false) && ! $language->is_default) {
+            if (! $language->is_active && ! ($validated['is_active'] ?? false)) {
+                return response()->json(['message' => 'Cannot set an inactive language as default'], 422);
+            }
+
             Language::query()->where('is_default', true)->update(['is_default' => false]);
 
             $siteSettings = SiteSetting::instance();

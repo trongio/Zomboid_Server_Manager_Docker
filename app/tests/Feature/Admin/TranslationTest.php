@@ -193,6 +193,17 @@ describe('Language management', function () {
         expect($en->fresh()->is_default)->toBeFalse();
     });
 
+    it('prevents setting an inactive language as default', function () {
+        $lang = Language::factory()->create(['code' => 'ka', 'is_default' => false, 'is_active' => false]);
+
+        $this->actingAs($this->admin)
+            ->patchJson(route('admin.languages.update', $lang), [
+                'is_default' => true,
+            ])
+            ->assertUnprocessable()
+            ->assertJson(['message' => 'Cannot set an inactive language as default']);
+    });
+
     it('prevents deleting the default language', function () {
         $lang = Language::factory()->create(['is_default' => true]);
 
