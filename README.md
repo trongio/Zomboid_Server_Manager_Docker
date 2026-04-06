@@ -423,7 +423,7 @@ Volumes: pz-data, pz-server-files, pz-backups, pz-lua-bridge, pz-map-tiles,
 
 **Linux:** Docker Engine, Docker Compose v2, Git, Make — see [full Linux guide](docs/installation-linux.md)
 
-**Windows Server (alpha):** Docker Desktop, Git for Windows — see [full Windows guide](docs/installation-windows.md)
+**Windows (alpha):** PowerShell wrappers are included, but they require Docker CLI + Compose with a Linux container backend. On Windows Server, use a Linux VM or other Linux container host. See [full Windows guide](docs/installation-windows.md)
 
 ### Start
 
@@ -437,6 +437,12 @@ make init
 # Windows (PowerShell)
 git clone <repo-url>; cd Zomboid_Server
 .\make.ps1 init
+```
+
+Or use the wrapper:
+
+```powershell
+.\easy-init.ps1
 ```
 
 The interactive setup wizard will:
@@ -477,7 +483,7 @@ Navigate to the URL shown at the end of setup and log in with the displayed cred
 | Guide | Description |
 |-------|-------------|
 | [Linux Installation](docs/installation-linux.md) | Requirements, setup, and step-by-step instructions for Linux |
-| [Windows Installation](docs/installation-windows.md) | PowerShell native (Option A) and WSL2 (Option B) for Windows Server **(alpha)** |
+| [Windows Installation](docs/installation-windows.md) | Windows desktop and Windows Server guidance for PowerShell wrappers and Linux backends **(alpha)** |
 | [Command Reference](docs/commands.md) | All `make` / `.\make.ps1` commands with Linux and Windows equivalents |
 | [Troubleshooting](docs/troubleshooting.md) | Common issues, cloud provider notes, hardware requirements |
 | [Firewall — UFW](docs/firewall-ufw.md) | Ubuntu/Debian firewall details |
@@ -528,6 +534,12 @@ After editing `.env`, restart to apply:
 
 ```bash
 make down && make up
+```
+
+On Windows PowerShell, the equivalent is:
+
+```powershell
+.\easy-deploy.ps1
 ```
 
 ## Firewall & Network Access

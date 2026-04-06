@@ -8,11 +8,14 @@ All commands are available via `make` (Linux) or `.\make.ps1` (Windows PowerShel
 |-------|---------|-------------|
 | `make init` | `.\make.ps1 init` | Interactive first-run setup wizard |
 | `make setup` | `.\make.ps1 setup` | Alias for `init` |
+| `-` | `.\easy-init.ps1` | Convenience wrapper for `.\make.ps1 init` |
+| `-` | `.\easy-deploy.ps1` | Convenience wrapper for `.\make.ps1 deploy` |
 
 ## Services
 
 | Linux | Windows | Description |
 |-------|---------|-------------|
+| `-` | `.\make.ps1 deploy` | Start services, or run setup first if env is missing |
 | `make up` | `.\make.ps1 up` | Start all services |
 | `make down` | `.\make.ps1 down` | Stop all services |
 | `make build` | `.\make.ps1 build` | Build Docker images |

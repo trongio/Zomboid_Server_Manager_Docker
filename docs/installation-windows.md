@@ -1,14 +1,18 @@
-# Windows Server Installation (2022 / 2025)
+# Windows Installation
 
 > **Alpha:** Windows support is in alpha. The PowerShell scripts (`make.ps1`, `scripts/setup.ps1`) mirror the Linux Makefile but have not been extensively tested in production. Please report any issues you encounter.
 
-Two options for running on Windows. Pick whichever suits you.
+The PowerShell wrappers work on Windows, but this project still requires Linux containers.
+
+- Windows 10/11: Docker Desktop is the simplest option.
+- Windows Server 2022/2025: Windows-container mode is not supported for this stack. Use a Linux VM or another Linux Docker host.
+- WSL2 remains optional where it is available, but it is not the only path.
 
 ---
 
-## Option A — Native PowerShell (recommended)
+## Option A — Windows 10/11 with Native PowerShell
 
-PowerShell scripts (`make.ps1`, `scripts/setup.ps1`) are included as drop-in replacements for the Linux Makefile. All you need is Docker Desktop.
+PowerShell scripts (`make.ps1`, `scripts/setup.ps1`) are included as drop-in replacements for the Linux Makefile. On desktop Windows, the simplest backend is Docker Desktop with Linux containers enabled.
 
 ### Requirements
 
@@ -37,6 +41,18 @@ cd zomboid-manager
 
 Same interactive wizard as Linux — configures everything, generates secrets, creates certs, and starts all Docker containers.
 
+If you want a simpler entrypoint, use:
+
+```powershell
+.\easy-init.ps1
+```
+
+For later restarts or a first-run-or-start command, use:
+
+```powershell
+.\easy-deploy.ps1
+```
+
 **3. Open game ports**
 
 ```powershell
@@ -55,6 +71,7 @@ This creates Windows Firewall rules automatically.
 | Command | Description |
 |---------|-------------|
 | `.\make.ps1 up` | Start all services |
+| `.\make.ps1 deploy` | Start services, or run setup if env is missing |
 | `.\make.ps1 down` | Stop all services |
 | `.\make.ps1 restart` | Restart all services |
 | `.\make.ps1 logs` | Follow live logs |
@@ -71,9 +88,32 @@ This creates Windows Firewall rules automatically.
 | `.\make.ps1 nuke` | Destroy ALL data (danger) |
 | `.\make.ps1 help` | Show all commands |
 
+Convenience wrappers:
+
+| Script | Description |
+|--------|-------------|
+| `.\easy-init.ps1` | Shortcut for `.\make.ps1 init` |
+| `.\easy-deploy.ps1` | Shortcut for `.\make.ps1 deploy` |
+
 ---
 
-## Option B — WSL2 (use Linux commands on Windows)
+## Option B — Windows Server with a Linux VM or Linux Docker host
+
+Windows Server cannot run this stack in Windows-container mode. If you want to stay off WSL, run Docker Engine inside a Linux VM on the server.
+
+Typical layout:
+
+1. Create an Ubuntu VM on the Windows Server host (for example with Hyper-V).
+2. Install Docker Engine and Docker Compose inside that VM.
+3. Clone this repo inside the VM.
+4. Follow the Linux guide there: [installation-linux.md](installation-linux.md)
+5. Open Windows Firewall and router/NAT rules on the Windows Server host as needed.
+
+Use this option when you specifically want Windows Server hosting without relying on WSL.
+
+---
+
+## Option C — WSL2 (use Linux commands on Windows)
 
 If you prefer the Linux Makefile and bash scripts directly, install WSL2 and run everything inside Ubuntu.
 

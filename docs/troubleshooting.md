@@ -60,4 +60,4 @@ The host firewall commands (`make expose` / `make admin-expose`) only affect the
 | Disk | 20 GB free | 30 GB+ |
 | OS | Ubuntu 22.04+, Debian 12+, Fedora 38+ | Any modern Linux with Docker |
 
-The PZ game server alone needs 2-4 GB of RAM. Windows Server 2022/2025 is supported via Docker Desktop or WSL2.
+The PZ game server alone needs 2-4 GB of RAM. On Windows, this stack requires a Linux container backend. Windows Server 2022/2025 is not supported in Windows-container mode.

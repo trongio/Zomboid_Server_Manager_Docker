@@ -7,7 +7,7 @@
     Interactive wizard: configures env, creates DB volume, starts services,
     and provisions the admin account. Safe to re-run (prompts before overwrite).
 .NOTES
-    Requires Docker Desktop for Windows with Linux containers enabled.
+    Requires Docker CLI + Compose with a Linux container backend.
     Run from the project root: .\scripts\setup.ps1
     Or via: .\make.ps1 init
 #>
@@ -80,6 +80,70 @@ function Write-FileUtf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
 }
 
+function Get-DetectedIPv4Addresses {
+    $addresses = @()
+
+    try {
+        $addresses = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object {
+                $_.IPAddress -ne "127.0.0.1" -and
+                $_.IPAddress -notmatch "^172\." -and
+                $_.IPAddress -notmatch "^169\.254\."
+            } |
+            Select-Object -ExpandProperty IPAddress
+    } catch {
+        $ipconfigOutput = ipconfig 2>$null
+        if ($ipconfigOutput) {
+            $addresses = $ipconfigOutput |
+                Select-String -Pattern 'IPv4[^:]*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)' |
+                ForEach-Object { $_.Matches[0].Groups[1].Value } |
+                Where-Object {
+                    $_ -ne "127.0.0.1" -and
+                    $_ -notmatch "^172\." -and
+                    $_ -notmatch "^169\.254\."
+                }
+        }
+    }
+
+    return @($addresses | Sort-Object -Unique)
+}
+
+function Test-AddressBelongsToServer {
+    param(
+        [string]$Address,
+        [string]$PublicIp,
+        [string[]]$LocalIps
+    )
+
+    if ($PublicIp -and $Address -eq $PublicIp) { return $true }
+    return $LocalIps -contains $Address
+}
+
+function Assert-DockerEnvironment {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Host "ERROR: Docker CLI was not found in PATH." -ForegroundColor Red
+        exit 1
+    }
+
+    docker compose version 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Docker Compose v2 is required." -ForegroundColor Red
+        exit 1
+    }
+
+    $serverOs = (docker version --format "{{.Server.Os}}" 2>$null | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($serverOs)) {
+        Write-Host "ERROR: Docker is not reachable. Start your Docker backend and try again." -ForegroundColor Red
+        exit 1
+    }
+
+    if ($serverOs -ne "linux") {
+        Write-Host "ERROR: This stack requires Linux containers. Current Docker server OS: $serverOs." -ForegroundColor Red
+        Write-Host "       Windows container mode is not supported." -ForegroundColor Yellow
+        exit 1
+    }
+}
+
 $GENERATE_SELF_SIGNED = $false
 
 # ── Architecture detection ──────────────────────────────────────────
@@ -93,6 +157,8 @@ if ($procArch -eq [System.Runtime.InteropServices.Architecture]::Arm64) {
 }
 $ARCH_FILE = if ($ARCH -eq "aarch64") { "docker-compose.arm64.yml" } else { "docker-compose.amd64.yml" }
 $ComposeArgs = @("compose", "-f", "docker-compose.yml", "-f", $ARCH_FILE)
+
+Assert-DockerEnvironment
 
 # ── Guard: existing .env ────────────────────────────────────────────
 if ((Test-Path ".env") -or (Test-Path "app\.env")) {
@@ -197,7 +263,7 @@ if ([string]::IsNullOrEmpty($enablePublic)) { $enablePublic = "n" }
 if ($enablePublic.ToLower() -ne "y") {
     # Local-only mode
     $SITE_HOST = "localhost"
-    $APP_URL = "https://localhost"
+    $APP_URL = "http://localhost:$APP_PORT"
     $CADDY_SITE = "localhost"
     $CADDY_TLS = "`ttls internal"
     Write-Host "  Panel will be available locally at http://localhost:$APP_PORT" -ForegroundColor Green
@@ -257,12 +323,10 @@ if ($enablePublic.ToLower() -ne "y") {
                     $IP_OPTIONS += $SERVER_IP
                     $IP_LABELS += "$SERVER_IP  (public)"
                 }
-                # Get local IPs (skip loopback, Docker)
-                $localAddrs = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue |
-                    Where-Object { $_.IPAddress -ne "127.0.0.1" -and $_.IPAddress -notmatch "^172\." -and $_.IPAddress -ne $SERVER_IP }
-                foreach ($addr in $localAddrs) {
-                    $IP_OPTIONS += $addr.IPAddress
-                    $IP_LABELS += "$($addr.IPAddress)  (LAN)"
+                $localIps = @(Get-DetectedIPv4Addresses | Where-Object { $_ -ne $SERVER_IP })
+                foreach ($ip in $localIps) {
+                    $IP_OPTIONS += $ip
+                    $IP_LABELS += "$ip  (LAN)"
                 }
 
                 if ($IP_OPTIONS.Count -gt 0) {
@@ -278,19 +342,62 @@ if ($enablePublic.ToLower() -ne "y") {
                     if ($ipPick -match "^\d+$" -and [int]$ipPick -ge 1 -and [int]$ipPick -le $IP_OPTIONS.Count) {
                         $SITE_HOST = $IP_OPTIONS[[int]$ipPick - 1]
                     } else {
-                        # Manual entry
+                        # Manual entry with server ownership validation
                         while ($true) {
                             $SITE_HOST = Read-Prompt "IP address" ""
-                            if ($SITE_HOST -match "^\d+\.\d+\.\d+\.\d+$") { break }
-                            Write-Host "  Invalid IP address. Try again." -ForegroundColor Red
+                            if ($SITE_HOST -notmatch "^\d+\.\d+\.\d+\.\d+$") {
+                                Write-Host "  Invalid IP address. Try again." -ForegroundColor Red
+                                continue
+                            }
+
+                            if (Test-AddressBelongsToServer -Address $SITE_HOST -PublicIp $SERVER_IP -LocalIps $localIps) {
+                                if ($SERVER_IP -and $SITE_HOST -eq $SERVER_IP) {
+                                    Write-Host "  Matches server public IP" -ForegroundColor Green
+                                } else {
+                                    Write-Host "  Matches local network interface" -ForegroundColor Green
+                                }
+                                break
+                            }
+
+                            Write-Host "  $SITE_HOST is not assigned to this server." -ForegroundColor Yellow
+                            if ($SERVER_IP) {
+                                Write-Host "  Public IP: $SERVER_IP | Local IPs: $($localIps -join ', ')" -ForegroundColor Yellow
+                            } elseif ($localIps.Count -gt 0) {
+                                Write-Host "  Local IPs: $($localIps -join ', ')" -ForegroundColor Yellow
+                            }
+
+                            $forceIp = Read-Host "  Use anyway? [y/N]"
+                            if ($forceIp.ToLower() -eq "y") { break }
                         }
                     }
                 } else {
-                    # No IPs detected — manual entry
+                    # No IPs detected — manual entry with server ownership validation
+                    $localIps = @(Get-DetectedIPv4Addresses)
                     while ($true) {
                         $SITE_HOST = Read-Prompt "Server IP address" ""
-                        if ($SITE_HOST -match "^\d+\.\d+\.\d+\.\d+$") { break }
-                        Write-Host "  Invalid IP address. Try again." -ForegroundColor Red
+                        if ($SITE_HOST -notmatch "^\d+\.\d+\.\d+\.\d+$") {
+                            Write-Host "  Invalid IP address. Try again." -ForegroundColor Red
+                            continue
+                        }
+
+                        if (Test-AddressBelongsToServer -Address $SITE_HOST -PublicIp $SERVER_IP -LocalIps $localIps) {
+                            if ($SERVER_IP -and $SITE_HOST -eq $SERVER_IP) {
+                                Write-Host "  Matches server public IP" -ForegroundColor Green
+                            } else {
+                                Write-Host "  Matches local network interface" -ForegroundColor Green
+                            }
+                            break
+                        }
+
+                        Write-Host "  $SITE_HOST is not assigned to this server." -ForegroundColor Yellow
+                        if ($SERVER_IP) {
+                            Write-Host "  Public IP: $SERVER_IP | Local IPs: $($localIps -join ', ')" -ForegroundColor Yellow
+                        } elseif ($localIps.Count -gt 0) {
+                            Write-Host "  Local IPs: $($localIps -join ', ')" -ForegroundColor Yellow
+                        }
+
+                        $forceIp = Read-Host "  Use anyway? [y/N]"
+                        if ($forceIp.ToLower() -eq "y") { break }
                     }
                 }
 
@@ -347,6 +454,11 @@ if ($enablePublic.ToLower() -ne "y") {
         if ($CADDY_HTTP_PORT -eq $CADDY_HTTPS_PORT) {
             Write-Host "  HTTP and HTTPS ports must be different." -ForegroundColor Red; continue
         }
+        if ([int]$CADDY_HTTP_PORT -lt 1024 -and [int]$CADDY_HTTP_PORT -ne 80) {
+            Write-Host "  Warning: Port $CADDY_HTTP_PORT is a privileged port (< 1024)." -ForegroundColor Yellow
+            $privOk = Read-Host "  Continue? [Y/n]"
+            if ($privOk.ToLower() -eq "n") { continue }
+        }
         break
     }
 
@@ -355,6 +467,8 @@ if ($enablePublic.ToLower() -ne "y") {
         Write-Host ""
         Write-Host "  Warning: Some routers use ports 80/443 for their WAN remote management UI." -ForegroundColor Yellow
         Write-Host "  If enabled, your router will intercept traffic before it reaches your server." -ForegroundColor Yellow
+        Write-Host "  Fix: disable Remote Management / WAN Admin, move the router admin UI to another port," -ForegroundColor DarkGray
+        Write-Host "       or choose custom Caddy ports here (for example 8080/8443)." -ForegroundColor DarkGray
     }
 
     Write-Host "  Caddy will listen on ports $CADDY_HTTP_PORT (HTTP) and $CADDY_HTTPS_PORT (HTTPS)" -ForegroundColor Green
@@ -369,6 +483,7 @@ if ($enablePublic.ToLower() -ne "y") {
         Write-Host ""
         Write-Host "  Warning: Let's Encrypt HTTP challenge requires ports 80 and 443." -ForegroundColor Yellow
         Write-Host "  Non-standard ports may prevent automatic certificate issuance." -ForegroundColor Yellow
+        Write-Host "  Consider using standard ports with a domain, or switch to IP mode." -ForegroundColor Yellow
     }
 }
 
@@ -514,7 +629,8 @@ Write-FileUtf8NoBom "caddy\Caddyfile" $caddyfile
 # Update .firewall.conf with CADDY_ENABLED=true
 if (Test-Path ".firewall.conf") {
     $fwContent = Get-Content ".firewall.conf" -Raw
-    $fwContent = $fwContent -replace "CADDY_ENABLED=.*", "CADDY_ENABLED=true"
+    $fwValue = if ($ADMIN_PUBLIC_ENABLED) { "true" } else { "false" }
+    $fwContent = $fwContent -replace "CADDY_ENABLED=.*", "CADDY_ENABLED=$fwValue"
     Write-FileUtf8NoBom ".firewall.conf" $fwContent
 }
 

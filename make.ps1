@@ -8,7 +8,7 @@
              .\make.ps1 exec "php artisan migrate"
              .\make.ps1 init
 .NOTES
-    Requires Docker Desktop for Windows (with Linux containers enabled).
+    Requires Docker CLI + Compose with a Linux container backend.
 #>
 
 param(
@@ -46,10 +46,31 @@ $Volumes = @(
 # ── Helpers ─────────────────────────────────────────────────────────
 function Invoke-Compose {
     param([string[]]$Arguments)
+    Assert-DockerEnvironment
     $allArgs = $script:ComposeArgs + $Arguments
     Write-Host "  > docker $($allArgs -join ' ')" -ForegroundColor DarkGray
     & docker @allArgs
     if ($LASTEXITCODE -ne 0) { throw "Command failed with exit code $LASTEXITCODE" }
+}
+
+function Assert-DockerEnvironment {
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        throw "Docker CLI was not found in PATH. Install Docker and try again."
+    }
+
+    docker compose version 2>$null | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker Compose v2 is required. Install Docker Compose and try again."
+    }
+
+    $serverOs = (docker version --format "{{.Server.Os}}" 2>$null | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($serverOs)) {
+        throw "Docker is not reachable. Start your Docker backend and try again."
+    }
+
+    if ($serverOs -ne "linux") {
+        throw "This stack requires Linux containers. Current Docker server OS: $serverOs. Windows container mode is not supported."
+    }
 }
 
 function Test-VolumeExists {
@@ -79,7 +100,22 @@ function Ensure-DbVolume {
 function Do-Init {
     Write-Host ""
     Write-Host "Starting setup wizard..." -ForegroundColor Cyan
-    & powershell -ExecutionPolicy Bypass -File "scripts\setup.ps1"
+    Assert-DockerEnvironment
+    & (Join-Path $PSScriptRoot "scripts\setup.ps1")
+    if ($LASTEXITCODE -ne 0) { throw "Setup wizard failed with exit code $LASTEXITCODE" }
+}
+
+function Do-Deploy {
+    if (-not (Test-Path ".env") -or -not (Test-Path "app\.env")) {
+        Write-Host "Environment files not found. Running first-time setup..." -ForegroundColor Yellow
+        Do-Init
+        return
+    }
+
+    Write-Host "Starting services..." -ForegroundColor Cyan
+    Do-Up
+    Write-Host ""
+    Do-Info
 }
 
 function Do-Up {
@@ -124,6 +160,7 @@ function Do-Migrate {
 }
 
 function Do-Test {
+    Assert-DockerEnvironment
     # Create test DB if missing
     $check = docker exec -T pz-db psql -U zomboid -tc "SELECT 1 FROM pg_database WHERE datname='zomboid_test'" 2>$null
     if ($check -notmatch "1") {
@@ -138,9 +175,7 @@ function Do-Exec {
         Write-Host "Usage: .\make.ps1 exec `"php artisan ...`"" -ForegroundColor Yellow
         return
     }
-    # Split the command string into tokens for proper argument passing
-    $tokens = $cmd -split '\s+'
-    Invoke-Compose (@("exec", "app") + $tokens)
+    Invoke-Compose @("exec", "app", "sh", "-lc", $cmd)
 }
 
 function Do-Arch {
@@ -195,10 +230,12 @@ function Do-Info {
 }
 
 function Do-DbCheck {
+    Assert-DockerEnvironment
     Ensure-DbVolume
 }
 
 function Do-DbInit {
+    Assert-DockerEnvironment
     if (Test-VolumeExists "pz-postgres") {
         Write-Host "Volume pz-postgres already exists - keeping existing data."
     } else {
@@ -209,6 +246,7 @@ function Do-DbInit {
 }
 
 function Do-DbReset {
+    Assert-DockerEnvironment
     Write-Host "WARNING: This will PERMANENTLY delete Postgres data volume pz-postgres." -ForegroundColor Red
     $confirm = Read-Host "Type RESET_DB and press Enter to continue"
     if ($confirm -ne "RESET_DB") {
@@ -222,6 +260,7 @@ function Do-DbReset {
 }
 
 function Do-DbBackup {
+    Assert-DockerEnvironment
     if (-not (Test-Path "db-backups")) { New-Item -ItemType Directory -Path "db-backups" | Out-Null }
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $backupFile = "db-backups\backup-$timestamp.sql"
@@ -236,6 +275,7 @@ function Do-DbBackup {
 }
 
 function Do-DbRestore {
+    Assert-DockerEnvironment
     if (-not (Test-Path "db-backups") -or -not (Get-ChildItem "db-backups\*.sql" -ErrorAction SilentlyContinue)) {
         Write-Host "No backups found in db-backups\"
         return
@@ -250,6 +290,7 @@ function Do-DbRestore {
 }
 
 function Do-Nuke {
+    Assert-DockerEnvironment
     Write-Host "WARNING: This will destroy ALL data (database, game saves, backups, config)." -ForegroundColor Red
     $confirm = Read-Host "Type NUKE_ALL and press Enter to continue"
     if ($confirm -ne "NUKE_ALL") {
@@ -380,6 +421,7 @@ function Do-Help {
     Write-Host "  Setup:" -ForegroundColor White
     Write-Host "    .\make.ps1 init             Interactive first-run setup wizard"
     Write-Host "    .\make.ps1 setup            Alias for init"
+    Write-Host "    .\make.ps1 deploy           Start services, or run init if env is missing"
     Write-Host ""
     Write-Host "  Services:" -ForegroundColor White
     Write-Host "    .\make.ps1 up               Start services"
@@ -421,6 +463,7 @@ function Do-Help {
 switch ($Command) {
     "init"           { Do-Init }
     "setup"          { Do-Init }
+    "deploy"         { Do-Deploy }
     "up"             { Do-Up }
     "down"           { Do-Down }
     "build"          { Do-Build }
