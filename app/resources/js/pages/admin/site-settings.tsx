@@ -82,7 +82,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     useEffect(() => {
         if (logoFile) {
-            const url = logoPreview!;
+            const url = URL.createObjectURL(logoFile);
             setLogoPreview(url);
             return () => URL.revokeObjectURL(url);
         }
@@ -91,7 +91,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     useEffect(() => {
         if (faviconFile) {
-            const url = faviconPreview!;
+            const url = URL.createObjectURL(faviconFile);
             setFaviconPreview(url);
             return () => URL.revokeObjectURL(url);
         }
