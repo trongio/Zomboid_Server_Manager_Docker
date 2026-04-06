@@ -20,6 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem } from '@/types';
 
 type LanguageEntry = {
@@ -40,12 +41,14 @@ type Props = {
     search: string;
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Translations', href: '/admin/translations' },
-];
-
 export default function Translations({ languages, keys, defaults, locale_defaults, overrides, search }: Props) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.translations.title'), href: '/admin/translations' },
+    ];
+
     const [searchValue, setSearchValue] = useState(search);
     const [editingCell, setEditingCell] = useState<{ key: string; locale: string } | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -80,7 +83,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                 key: editingCell.key,
                 value: editValue,
             },
-            successMessage: 'Translation saved',
+            successMessage: t('admin.translations.translation_saved'),
         });
 
         setEditingCell(null);
@@ -91,7 +94,7 @@ export default function Translations({ languages, keys, defaults, locale_default
         await fetchAction('/admin/translations', {
             method: 'DELETE',
             data: { locale, key },
-            successMessage: 'Override removed',
+            successMessage: t('admin.translations.override_removed'),
         });
         router.reload({ only: ['overrides'] });
     }
@@ -99,7 +102,7 @@ export default function Translations({ languages, keys, defaults, locale_default
     async function addLanguage() {
         const result = await fetchAction('/admin/languages', {
             data: { code: newLangCode, name: newLangName, native_name: newLangNative },
-            successMessage: 'Language added',
+            successMessage: t('admin.translations.language_added'),
         });
         if (result) {
             setNewLangCode('');
@@ -113,7 +116,9 @@ export default function Translations({ languages, keys, defaults, locale_default
         await fetchAction(`/admin/languages/${language.id}`, {
             method: 'PATCH',
             data: { is_active: !language.is_active },
-            successMessage: `${language.name} ${language.is_active ? 'disabled' : 'enabled'}`,
+            successMessage: language.is_active
+                ? t('admin.translations.language_disabled', { name: language.name })
+                : t('admin.translations.language_enabled', { name: language.name }),
         });
         router.reload();
     }
@@ -122,7 +127,7 @@ export default function Translations({ languages, keys, defaults, locale_default
         await fetchAction(`/admin/languages/${language.id}`, {
             method: 'PATCH',
             data: { is_default: true },
-            successMessage: `${language.name} set as default`,
+            successMessage: t('admin.translations.language_set_default', { name: language.name }),
         });
         router.reload();
     }
@@ -130,7 +135,7 @@ export default function Translations({ languages, keys, defaults, locale_default
     async function deleteLanguage(language: LanguageEntry) {
         await fetchAction(`/admin/languages/${language.id}`, {
             method: 'DELETE',
-            successMessage: `${language.name} deleted`,
+            successMessage: t('admin.translations.language_deleted', { name: language.name }),
         });
         router.reload();
     }
@@ -161,13 +166,13 @@ export default function Translations({ languages, keys, defaults, locale_default
             });
             const json = await res.json().catch(() => ({}));
             if (res.ok) {
-                toast.success(json.message || 'Translations imported');
+                toast.success(json.message || t('admin.translations.translations_imported'));
                 router.reload();
             } else {
-                toast.error(json.message || `Import failed (${res.status})`);
+                toast.error(json.message || t('admin.translations.import_failed', { status: String(res.status) }));
             }
         } catch {
-            toast.error('Network error — could not reach the server');
+            toast.error(t('common.network_error'));
         }
 
         // Reset the input so the same file can be re-selected
@@ -189,12 +194,12 @@ export default function Translations({ languages, keys, defaults, locale_default
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Translations" />
+            <Head title={t('admin.translations.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Translations</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('admin.translations.title')}</h1>
                     <p className="text-muted-foreground">
-                        Manage languages and override translation strings.
+                        {t('admin.translations.description')}
                     </p>
                 </div>
 
@@ -205,29 +210,29 @@ export default function Translations({ languages, keys, defaults, locale_default
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Globe className="size-5" />
-                                    Languages
+                                    {t('admin.translations.languages')}
                                 </CardTitle>
                                 <CardDescription>
-                                    Active languages appear in the language switcher on public pages.
+                                    {t('admin.translations.languages_description')}
                                 </CardDescription>
                             </div>
                             <Dialog>
                                 <DialogTrigger asChild>
                                     <Button variant="outline" size="sm">
                                         <Plus className="mr-1.5 size-3.5" />
-                                        Add Language
+                                        {t('admin.translations.add_language')}
                                     </Button>
                                 </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>Add Language</DialogTitle>
+                                        <DialogTitle>{t('admin.translations.add_language')}</DialogTitle>
                                         <DialogDescription>
-                                            Add a new language for translation. Use ISO 639-1 codes (e.g. ka, ru, de).
+                                            {t('admin.translations.add_language_description')}
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-3 py-2">
                                         <div className="space-y-1">
-                                            <Label>Language Code</Label>
+                                            <Label>{t('admin.translations.language_code')}</Label>
                                             <Input
                                                 value={newLangCode}
                                                 onChange={(e) => setNewLangCode(e.target.value)}
@@ -236,7 +241,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label>Name (English)</Label>
+                                            <Label>{t('admin.translations.name_english')}</Label>
                                             <Input
                                                 value={newLangName}
                                                 onChange={(e) => setNewLangName(e.target.value)}
@@ -245,7 +250,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label>Native Name</Label>
+                                            <Label>{t('admin.translations.native_name')}</Label>
                                             <Input
                                                 value={newLangNative}
                                                 onChange={(e) => setNewLangNative(e.target.value)}
@@ -256,10 +261,10 @@ export default function Translations({ languages, keys, defaults, locale_default
                                     </div>
                                     <DialogFooter>
                                         <DialogClose asChild>
-                                            <Button variant="outline">Cancel</Button>
+                                            <Button variant="outline">{t('common.cancel')}</Button>
                                         </DialogClose>
                                         <Button onClick={addLanguage} disabled={!newLangCode || !newLangName || !newLangNative}>
-                                            Add
+                                            {t('common.add')}
                                         </Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -279,7 +284,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                     <span className="text-sm font-medium">{lang.native_name}</span>
                                     <span className="text-sm text-muted-foreground">({lang.name})</span>
                                     {lang.is_default && (
-                                        <Badge variant="secondary">Default</Badge>
+                                        <Badge variant="secondary">{t('admin.translations.default_badge')}</Badge>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -287,7 +292,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => downloadLocale(lang.code)}
-                                        title="Download translations as JSON"
+                                        title={t('admin.translations.download_tooltip')}
                                     >
                                         <Download className="size-4" />
                                     </Button>
@@ -295,7 +300,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => triggerImport(lang.code)}
-                                        title="Upload translated JSON"
+                                        title={t('admin.translations.upload_tooltip')}
                                     >
                                         <Upload className="size-4" />
                                     </Button>
@@ -306,12 +311,12 @@ export default function Translations({ languages, keys, defaults, locale_default
                                             onClick={() => setDefault(lang)}
                                             className="text-xs"
                                         >
-                                            Set Default
+                                            {t('admin.translations.set_default')}
                                         </Button>
                                     )}
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs text-muted-foreground">
-                                            {lang.is_active ? 'Active' : 'Inactive'}
+                                            {lang.is_active ? t('common.active') : t('common.inactive')}
                                         </span>
                                         <Switch
                                             checked={lang.is_active}
@@ -332,7 +337,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                         ))}
                         {languages.length === 0 && (
                             <p className="py-4 text-center text-sm text-muted-foreground">
-                                No languages configured. Add English as the default to get started.
+                                {t('admin.translations.no_languages')}
                             </p>
                         )}
                     </CardContent>
@@ -343,10 +348,10 @@ export default function Translations({ languages, keys, defaults, locale_default
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Languages className="size-5" />
-                            Translation Strings
+                            {t('admin.translations.translation_strings')}
                         </CardTitle>
                         <CardDescription>
-                            Click a cell to override. Overrides are highlighted. Clear an override to revert to the default.
+                            {t('admin.translations.translation_strings_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -363,7 +368,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                 />
                             </div>
                             <Button variant="outline" onClick={handleSearch}>
-                                Search
+                                {t('common.search')}
                             </Button>
                             {search && (
                                 <Button
@@ -385,7 +390,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                 <thead>
                                     <tr className="border-b bg-muted/50">
                                         <th className="px-3 py-2 text-left font-medium text-muted-foreground w-[250px]">
-                                            Key
+                                            {t('admin.translations.table_key')}
                                         </th>
                                         {activeLocales.map((lang) => (
                                             <th key={lang.code} className="px-3 py-2 text-left font-medium text-muted-foreground min-w-[200px]">
@@ -424,7 +429,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                                                     autoFocus
                                                                 />
                                                                 <Button size="sm" onClick={saveEdit}>
-                                                                    Save
+                                                                    {t('common.save')}
                                                                 </Button>
                                                                 <Button
                                                                     size="sm"
@@ -442,7 +447,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                                                 <span className="flex-1 text-sm break-words">
                                                                     {getCellValue(key, lang.code) || (
                                                                         <span className="italic text-muted-foreground/50">
-                                                                            empty
+                                                                            {t('admin.translations.empty_cell')}
                                                                         </span>
                                                                     )}
                                                                 </span>
@@ -453,7 +458,7 @@ export default function Translations({ languages, keys, defaults, locale_default
                                                                             e.stopPropagation();
                                                                             removeOverride(key, lang.code);
                                                                         }}
-                                                                        title="Remove override"
+                                                                        title={t('admin.translations.remove_override_tooltip')}
                                                                     >
                                                                         <X className="size-3 text-muted-foreground hover:text-destructive" />
                                                                     </button>
@@ -469,13 +474,13 @@ export default function Translations({ languages, keys, defaults, locale_default
                             </table>
                             {keys.length === 0 && (
                                 <p className="py-8 text-center text-sm text-muted-foreground">
-                                    {search ? 'No keys match your search.' : 'No translation keys found. Check that lang/en.json exists.'}
+                                    {search ? t('admin.translations.no_keys_search') : t('admin.translations.no_keys_empty')}
                                 </p>
                             )}
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Showing {keys.length} key{keys.length !== 1 ? 's' : ''}.
-                            Overrides are saved per-language in the database and take priority over JSON file defaults.
+                            {t('admin.translations.showing_keys', { count: String(keys.length) })}{' '}
+                            {t('admin.translations.overrides_note')}
                         </p>
                     </CardContent>
                 </Card>

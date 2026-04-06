@@ -167,6 +167,15 @@ Detailed plan with acceptance criteria in `IMPLEMENTATION_PLAN.md`. Status track
 ### Code Formatting
 - Run `make exec CMD="vendor/bin/pint --dirty --format agent"` after modifying PHP files
 
+### Internationalization (i18n)
+- **Never hardcode user-facing strings** in React components — always use the `t()` function from `useTranslation()` hook (`resources/js/hooks/use-translation.ts`)
+- This applies to ALL pages: public, admin, auth, and shared components (sidebar, layouts, widgets)
+- Translation keys use dot-notation namespaces: `admin.page_name.key`, `nav.label`, `common.action`
+- English defaults live in `lang/en.json`, Georgian in `lang/ka.json`
+- DB overrides (via Translations admin page) take priority over JSON file defaults
+- When adding a new page or component, add all its translation keys to both `en.json` and `ka.json`
+- Use `:placeholder` syntax for dynamic values: `t('admin.players.count', { count: players.length })`
+
 ### Inertia.js v2
 - Components live in `resources/js/pages`
 - Use `Inertia::render()` for server-side routing

@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useServerSort } from '@/hooks/use-server-sort';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { GameEventEntry, MapConfig } from '@/types/server';
@@ -43,11 +44,11 @@ type Props = {
 };
 
 const EVENT_TYPES = [
-    { value: 'pvp_kill', label: 'PvP Kill', color: '#f97316' },
-    { value: 'pvp_hit', label: 'PvP Hit', color: '#ef4444' },
-    { value: 'death', label: 'Death', color: '#9ca3af' },
-    { value: 'connect', label: 'Connect', color: '#22c55e' },
-    { value: 'disconnect', label: 'Disconnect', color: '#f59e0b' },
+    { value: 'pvp_kill', labelKey: 'admin.moderation.event_type.pvp_kill', color: '#f97316' },
+    { value: 'pvp_hit', labelKey: 'admin.moderation.event_type.pvp_hit', color: '#ef4444' },
+    { value: 'death', labelKey: 'admin.moderation.event_type.death', color: '#9ca3af' },
+    { value: 'connect', labelKey: 'admin.moderation.event_type.connect', color: '#22c55e' },
+    { value: 'disconnect', labelKey: 'admin.moderation.event_type.disconnect', color: '#f59e0b' },
 ] as const;
 
 const typeBadgeVariant: Record<string, 'destructive' | 'secondary' | 'outline'> = {
@@ -58,14 +59,15 @@ const typeBadgeVariant: Record<string, 'destructive' | 'secondary' | 'outline'> 
     disconnect: 'outline',
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Moderation', href: '/admin/moderation' },
-];
-
 type SortKey = 'created_at' | 'event_type' | 'player';
 
 export default function Moderation({ mapConfig, hasTiles, filters, events }: Props) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.moderation.title'), href: '/admin/moderation' },
+    ];
     const [localFilters, setLocalFilters] = useState({
         event_types: filters.event_types || '',
         player: filters.player || '',
@@ -144,20 +146,20 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Moderation" />
+            <Head title={t('admin.moderation.title')} />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4 lg:p-6">
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Filter className="size-4" />
-                            Filters
+                            {t('admin.moderation.filters')}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
                             <div>
-                                <Label className="mb-2 block text-xs">Event Types</Label>
+                                <Label className="mb-2 block text-xs">{t('admin.moderation.event_types')}</Label>
                                 <div className="flex flex-wrap gap-2">
                                     {EVENT_TYPES.map((et) => (
                                         <Button
@@ -170,22 +172,22 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                                 className="mr-1.5 inline-block size-2.5 rounded-full"
                                                 style={{ backgroundColor: et.color }}
                                             />
-                                            {et.label}
+                                            {t(et.labelKey)}
                                         </Button>
                                     ))}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">Player</Label>
+                                    <Label className="text-xs">{t('admin.moderation.player_label')}</Label>
                                     <Input
                                         value={localFilters.player}
                                         onChange={(e) => setLocalFilters((f) => ({ ...f, player: e.target.value }))}
-                                        placeholder="Search player name..."
+                                        placeholder={t('admin.moderation.search_player_placeholder')}
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">From</Label>
+                                    <Label className="text-xs">{t('admin.moderation.from_label')}</Label>
                                     <Input
                                         type="date"
                                         value={localFilters.from}
@@ -193,7 +195,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">To</Label>
+                                    <Label className="text-xs">{t('admin.moderation.to_label')}</Label>
                                     <Input
                                         type="date"
                                         value={localFilters.to}
@@ -201,8 +203,8 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                     />
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button size="sm" onClick={applyFilters}>Apply</Button>
-                                    <Button size="sm" variant="outline" onClick={clearFilters}>Clear</Button>
+                                    <Button size="sm" onClick={applyFilters}>{t('common.apply')}</Button>
+                                    <Button size="sm" variant="outline" onClick={clearFilters}>{t('common.clear')}</Button>
                                 </div>
                             </div>
                         </div>
@@ -216,10 +218,10 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <MapPin className="size-5" />
-                                    Event Map
+                                    {t('admin.moderation.event_map')}
                                 </CardTitle>
                                 <CardDescription>
-                                    Click a marker to highlight the event below, or click a table row to pan the map
+                                    {t('admin.moderation.event_map_description')}
                                 </CardDescription>
                             </div>
                             <div className="flex flex-wrap gap-3">
@@ -229,7 +231,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                             className="inline-block size-2.5 rounded-full"
                                             style={{ backgroundColor: et.color }}
                                         />
-                                        {et.label}
+                                        {t(et.labelKey)}
                                     </div>
                                 ))}
                             </div>
@@ -253,10 +255,10 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Crosshair className="size-5" />
-                            Events
+                            {t('admin.moderation.events')}
                         </CardTitle>
                         <CardDescription>
-                            {events ? `${events.total} event${events.total !== 1 ? 's' : ''} found` : 'Loading...'}
+                            {events?.total != null ? t('admin.moderation.events_found', { count: String(events.total) }) : t('common.loading')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
@@ -264,12 +266,12 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Time</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead>Player</TableHead>
-                                        <TableHead>Target</TableHead>
-                                        <TableHead>Location</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead>{t('admin.moderation.table_time')}</TableHead>
+                                        <TableHead>{t('admin.moderation.table_type')}</TableHead>
+                                        <TableHead>{t('admin.moderation.table_player')}</TableHead>
+                                        <TableHead>{t('admin.moderation.table_target')}</TableHead>
+                                        <TableHead>{t('admin.moderation.table_location')}</TableHead>
+                                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -291,17 +293,17 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>
-                                                <SortableHeader column="created_at" label="Time" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="created_at" label={t('admin.moderation.table_time')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="event_type" label="Type" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="event_type" label={t('admin.moderation.table_type')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="player" label="Player" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="player" label={t('admin.moderation.table_player')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
-                                            <TableHead>Target</TableHead>
-                                            <TableHead>Location</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead>{t('admin.moderation.table_target')}</TableHead>
+                                            <TableHead>{t('admin.moderation.table_location')}</TableHead>
+                                            <TableHead className="text-right">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -319,7 +321,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                                 </TableCell>
                                                 <TableCell>
                                                     <Badge variant={typeBadgeVariant[event.event_type] ?? 'outline'}>
-                                                        {event.event_type.replace('_', ' ')}
+                                                        {t(`admin.moderation.event_type.${event.event_type}`)}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="font-medium">{event.player}</TableCell>
@@ -344,7 +346,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                                             onClick={() => setKickTarget(event.player)}
                                                         >
                                                             <UserX className="mr-1 size-3" />
-                                                            Kick
+                                                            {t('common.kick')}
                                                         </Button>
                                                         <Button
                                                             variant="destructive"
@@ -352,7 +354,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                                             onClick={() => setBanTarget(event.player)}
                                                         >
                                                             <Ban className="mr-1 size-3" />
-                                                            Ban
+                                                            {t('common.ban')}
                                                         </Button>
                                                     </div>
                                                 </TableCell>
@@ -362,7 +364,7 @@ export default function Moderation({ mapConfig, hasTiles, filters, events }: Pro
                                 </Table>
                             ) : (
                                 <p className="py-8 text-center text-muted-foreground">
-                                    No events found matching filters
+                                    {t('admin.moderation.no_events')}
                                 </p>
                             )}
 

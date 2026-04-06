@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import {
     groupSettings,
@@ -41,11 +42,6 @@ type ConfigProps = {
     sandbox_config: Record<string, unknown>;
     respawn_delay: RespawnDelayConfig;
 };
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Config', href: '/admin/config' },
-];
 
 const COUNTDOWN_OPTIONS = [
     { value: '0', label: 'Immediately' },
@@ -109,6 +105,7 @@ function SettingInput({
     isDirty: boolean;
     onChange: (value: string) => void;
 }) {
+    const { t } = useTranslation();
     const inputId = `cfg-${settingKey}`;
     const dirtyClass = isDirty ? 'border-blue-500' : '';
 
@@ -134,10 +131,10 @@ function SettingInput({
                         </Badge>
                     ))
                 ) : (
-                    <span className="text-xs text-muted-foreground">None</span>
+                    <span className="text-xs text-muted-foreground">{t('common.none')}</span>
                 )}
                 <Link href="/admin/mods" className="ml-1 text-xs text-blue-500 hover:underline">
-                    Manage on Mods page
+                    {t('admin.config.manage_mods_link')}
                 </Link>
             </div>
         );
@@ -156,7 +153,7 @@ function SettingInput({
                     onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
                 />
                 <Label htmlFor={inputId} className="cursor-pointer text-sm font-normal">
-                    {value === 'true' ? 'Enabled' : 'Disabled'}
+                    {value === 'true' ? t('common.enabled') : t('common.disabled')}
                 </Label>
             </div>
         );
@@ -225,6 +222,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
     { title, description, config, meta, groupOrder, search, onSave, onDirtyChange },
     ref,
 ) {
+    const { t } = useTranslation();
     const [values, setValues] = useState<Record<string, string>>(config);
     const [dirty, setDirty] = useState<Set<string>>(new Set());
     const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(groupOrder));
@@ -293,7 +291,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
     if (Object.keys(config).length === 0) {
         return (
             <div className="rounded-lg border p-8 text-center text-muted-foreground">
-                <p className="text-sm">{title} — Config file not available. The server may not have been started yet.</p>
+                <p className="text-sm">{t('admin.config.config_not_available', { title })}</p>
             </div>
         );
     }
@@ -353,7 +351,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
 
             {filteredGroups.length === 0 && search && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
-                    No settings match &quot;{search}&quot; in {title.toLowerCase()}.
+                    {t('admin.config.no_settings_match', { search, section: title.toLowerCase() })}
                 </p>
             )}
         </div>
@@ -363,6 +361,11 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
 // ── Main config page ────────────────────────────────────────────────
 
 export default function Config({ server_config, sandbox_config, respawn_delay }: ConfigProps) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.config.title'), href: '/admin/config' },
+    ];
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
     const [serverDirty, setServerDirty] = useState(0);
@@ -392,7 +395,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
         const result = await fetchAction(url, {
             method: 'PATCH',
             data: { settings },
-            successMessage: 'Configuration saved',
+            successMessage: t('admin.config.toast_config_saved'),
         });
         setSaving(false);
         return result !== null;
@@ -434,7 +437,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
         await fetchAction('/admin/respawn-delay', {
             method: 'PATCH',
             data: { enabled: respawnEnabled, delay_minutes: respawnMinutes },
-            successMessage: 'Respawn delay settings saved',
+            successMessage: t('admin.config.toast_respawn_saved'),
         });
         setRespawnSaving(false);
     }
@@ -455,13 +458,13 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Server Config" />
+            <Head title={t('admin.config.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Server Configuration</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.config.title')}</h1>
                         <p className="text-muted-foreground">
-                            Edit server.ini and SandboxVars.lua settings
+                            {t('admin.config.description')}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -479,12 +482,12 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                         </Button>
                         <Button variant="outline" onClick={() => setShowImportDialog(true)}>
                             <Upload className="mr-2 size-4" />
-                            Import
+                            {t('common.import')}
                         </Button>
                         <div className="relative w-full sm:w-72">
                             <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
-                                placeholder="Search settings..."
+                                placeholder={t('admin.config.search_placeholder')}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-9"
@@ -497,20 +500,20 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Timer className="size-5" />
-                            Custom Rules
+                            {t('admin.config.custom_rules_title')}
                         </CardTitle>
                         <CardDescription>
-                            Server-side rules enforced by the ZomboidManager Lua mod
+                            {t('admin.config.custom_rules_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between rounded-lg border p-4">
                             <div className="space-y-0.5">
                                 <Label htmlFor="respawn-enabled" className="text-sm font-medium">
-                                    Respawn Delay
+                                    {t('admin.config.respawn_delay_label')}
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Prevent players from immediately creating a new character after death
+                                    {t('admin.config.respawn_delay_description')}
                                 </p>
                             </div>
                             <Switch
@@ -521,7 +524,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                         </div>
                         {respawnEnabled && (
                             <div className="grid gap-2">
-                                <Label htmlFor="respawn-minutes">Cooldown (minutes)</Label>
+                                <Label htmlFor="respawn-minutes">{t('admin.config.cooldown_label')}</Label>
                                 <Input
                                     id="respawn-minutes"
                                     type="number"
@@ -532,7 +535,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                                     className="w-32"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    No server restart required — changes apply within 60 seconds
+                                    {t('admin.config.cooldown_description')}
                                 </p>
                             </div>
                         )}
@@ -544,10 +547,10 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                             {respawnSaving ? (
                                 <>
                                     <Loader2 className="mr-2 size-4 animate-spin" />
-                                    Saving...
+                                    {t('common.saving')}
                                 </>
                             ) : (
-                                'Save'
+                                t('common.save')
                             )}
                         </Button>
                     </CardContent>
@@ -555,8 +558,8 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
 
                 <ConfigSection
                     ref={serverRef}
-                    title="Server Settings"
-                    description="server.ini — General server configuration"
+                    title={t('admin.config.server_settings_title')}
+                    description={t('admin.config.server_settings_description')}
                     config={server_config}
                     meta={SERVER_INI_META}
                     groupOrder={SERVER_INI_GROUP_ORDER}
@@ -567,8 +570,8 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
 
                 <ConfigSection
                     ref={sandboxRef}
-                    title="Sandbox Settings"
-                    description="SandboxVars.lua — Gameplay and world settings"
+                    title={t('admin.config.sandbox_settings_title')}
+                    description={t('admin.config.sandbox_settings_description')}
                     config={flatSandbox}
                     meta={SANDBOX_META}
                     groupOrder={SANDBOX_GROUP_ORDER}
@@ -593,7 +596,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                     className="shadow-lg"
                 >
                     <Save className="mr-2 size-4" />
-                    {saving ? 'Saving...' : `Save ${totalDirty} change${totalDirty !== 1 ? 's' : ''}`}
+                    {saving ? t('common.saving') : t('admin.config.save_changes', { count: String(totalDirty) })}
                 </Button>
             </div>
 
@@ -608,14 +611,14 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
             <Dialog open={showRestartDialog} onOpenChange={setShowRestartDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Restart Server</DialogTitle>
+                        <DialogTitle>{t('admin.config.restart_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Config saved. Restart the server for changes to take effect, or skip if you want to restart later.
+                            {t('admin.config.restart_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="restart-countdown">Countdown</Label>
+                            <Label htmlFor="restart-countdown">{t('admin.config.restart_countdown_label')}</Label>
                             <Select value={restartCountdown} onValueChange={setRestartCountdown}>
                                 <SelectTrigger id="restart-countdown">
                                     <SelectValue />
@@ -631,10 +634,10 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                         </div>
                         {restartCountdown !== '0' && (
                             <div className="grid gap-2">
-                                <Label htmlFor="restart-message">Warning message (optional)</Label>
+                                <Label htmlFor="restart-message">{t('admin.config.restart_warning_label')}</Label>
                                 <Input
                                     id="restart-message"
-                                    placeholder="Server restarting for config changes..."
+                                    placeholder={t('admin.config.restart_warning_placeholder')}
                                     value={restartMessage}
                                     onChange={(e) => setRestartMessage(e.target.value)}
                                     maxLength={500}
@@ -648,7 +651,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                             onClick={() => setShowRestartDialog(false)}
                             disabled={restartLoading}
                         >
-                            Skip
+                            {t('admin.config.restart_skip')}
                         </Button>
                         <Button
                             variant={restartCountdown === '0' ? 'destructive' : 'default'}
@@ -656,10 +659,10 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                             disabled={restartLoading}
                         >
                             {restartLoading
-                                ? 'Restarting...'
+                                ? t('admin.config.restarting')
                                 : restartCountdown === '0'
-                                  ? 'Restart Now'
-                                  : 'Schedule Restart'}
+                                  ? t('admin.config.restart_now')
+                                  : t('admin.config.schedule_restart')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

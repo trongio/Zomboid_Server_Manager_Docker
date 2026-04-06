@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { SortableHeader } from '@/components/sortable-header';
 import { useTableSort } from '@/hooks/use-table-sort';
+import { useTranslation } from '@/hooks/use-translation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -40,16 +41,11 @@ type Props = {
     shopItems: ShopItem[];
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Shop', href: '/admin/shop' },
-    { title: 'Bundles', href: '/admin/shop/bundles' },
-];
-
 type BundleItemEntry = { shop_item_id: string; quantity: number };
 type SortKey = 'name' | 'discount_percent' | 'price' | 'is_active';
 
 export default function ShopBundles({ bundles, shopItems }: Props) {
+    const { t } = useTranslation();
     const [dialogOpen, setDialogOpen] = useState(false);
     const { sortKey, sortDir, toggleSort } = useTableSort<SortKey>('name', 'asc');
     const [editBundle, setEditBundle] = useState<ShopBundle | null>(null);
@@ -130,12 +126,12 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
             await fetchAction(`/admin/shop/bundles/${editBundle.id}`, {
                 method: 'PATCH',
                 data,
-                successMessage: 'Bundle updated',
+                successMessage: t('admin.shop_bundles.bundle_updated'),
             });
         } else {
             await fetchAction('/admin/shop/bundles', {
                 data,
-                successMessage: 'Bundle created',
+                successMessage: t('admin.shop_bundles.bundle_created'),
             });
         }
         setLoading(false);
@@ -146,7 +142,7 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
     async function handleDelete(bundle: ShopBundle) {
         await fetchAction(`/admin/shop/bundles/${bundle.id}`, {
             method: 'DELETE',
-            successMessage: 'Bundle deleted',
+            successMessage: t('admin.shop_bundles.bundle_deleted'),
         });
         router.reload();
     }
@@ -155,27 +151,33 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
         return bundle.items.reduce((sum, item) => sum + coin(item.price) * item.pivot.quantity, 0);
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.shop.breadcrumb'), href: '/admin/shop' },
+        { title: t('admin.shop_bundles.breadcrumb'), href: '/admin/shop/bundles' },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Shop Bundles" />
+            <Head title={t('admin.shop_bundles.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Bundles</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.shop_bundles.title')}</h1>
                         <p className="text-muted-foreground text-sm">
-                            Manage item bundles for the shop
+                            {t('admin.shop_bundles.description')}
                         </p>
                     </div>
                     <Button onClick={openCreate}>
                         <Plus className="mr-1.5 size-4" />
-                        Create Bundle
+                        {t('admin.shop_bundles.create_bundle')}
                     </Button>
                 </div>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>All Bundles</CardTitle>
-                        <CardDescription>{bundles.length} bundles</CardDescription>
+                        <CardTitle>{t('admin.shop_bundles.all_bundles')}</CardTitle>
+                        <CardDescription>{t('admin.shop_bundles.bundles_count', { count: String(bundles.length) })}</CardDescription>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
                         {bundles.length > 0 ? (
@@ -183,19 +185,19 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>
-                                            <SortableHeader column="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                            <SortableHeader column="name" label={t('common.name')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                         </TableHead>
-                                        <TableHead>Items</TableHead>
+                                        <TableHead>{t('common.items')}</TableHead>
                                         <TableHead className="text-center">
-                                            <SortableHeader column="discount_percent" label="Discount %" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                            <SortableHeader column="discount_percent" label={t('admin.shop_bundles.discount_percent')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                         </TableHead>
                                         <TableHead className="text-right">
-                                            <SortableHeader column="price" label="Price" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                            <SortableHeader column="price" label={t('common.price')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                         </TableHead>
                                         <TableHead>
-                                            <SortableHeader column="is_active" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                            <SortableHeader column="is_active" label={t('common.status')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                         </TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -215,7 +217,7 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                                     <div>
                                                         <span className="font-medium">{bundle.name}</span>
                                                         {bundle.is_featured && (
-                                                            <Badge className="ml-2 bg-amber-500 text-xs">Featured</Badge>
+                                                            <Badge className="ml-2 bg-amber-500 text-xs">{t('common.featured')}</Badge>
                                                         )}
                                                         {bundle.description && (
                                                             <p className="text-muted-foreground max-w-[250px] truncate text-xs">
@@ -264,13 +266,13 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                                         variant={bundle.is_active ? 'default' : 'destructive'}
                                                         className="text-xs"
                                                     >
-                                                        {bundle.is_active ? 'Active' : 'Inactive'}
+                                                        {bundle.is_active ? t('common.active') : t('common.inactive')}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <div className="flex justify-end gap-1">
                                                         <Button variant="ghost" size="sm" onClick={() => openEdit(bundle)}>
-                                                            Edit
+                                                            {t('common.edit')}
                                                         </Button>
                                                         <Button variant="ghost" size="sm" onClick={() => handleDelete(bundle)}>
                                                             <Trash2 className="size-4 text-destructive" />
@@ -284,7 +286,7 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                             </Table>
                         ) : (
                             <p className="text-muted-foreground py-8 text-center">
-                                No bundles yet. Create one to get started.
+                                {t('admin.shop_bundles.no_bundles')}
                             </p>
                         )}
                     </CardContent>
@@ -294,23 +296,23 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogContent className="sm:max-w-lg">
                     <DialogHeader>
-                        <DialogTitle>{editBundle ? 'Edit Bundle' : 'Create Bundle'}</DialogTitle>
+                        <DialogTitle>{editBundle ? t('admin.shop_bundles.edit_title') : t('admin.shop_bundles.create_title')}</DialogTitle>
                         <DialogDescription>
-                            {editBundle ? 'Update bundle details.' : 'Create a new item bundle.'}
+                            {editBundle ? t('admin.shop_bundles.edit_desc') : t('admin.shop_bundles.create_desc')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
                         <div className="space-y-2">
-                            <Label>Name</Label>
+                            <Label>{t('common.name')}</Label>
                             <Input value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Description</Label>
+                            <Label>{t('common.description')}</Label>
                             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Discount %</Label>
+                                <Label>{t('admin.shop_bundles.discount_percent')}</Label>
                                 <Input
                                     type="number"
                                     step="1"
@@ -321,11 +323,11 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Max Per Player</Label>
+                                <Label>{t('admin.shop_bundles.max_per_player')}</Label>
                                 <Input
                                     type="number"
                                     min={1}
-                                    placeholder="Unlimited"
+                                    placeholder={t('common.unlimited')}
                                     value={maxPerPlayer}
                                     onChange={(e) => setMaxPerPlayer(e.target.value)}
                                 />
@@ -334,25 +336,25 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                         {itemsTotal > 0 && (
                             <div className="rounded-md bg-muted p-3 text-sm">
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Items total:</span>
+                                    <span className="text-muted-foreground">{t('admin.shop_bundles.items_total')}</span>
                                     <span className="tabular-nums">{Math.round(itemsTotal)}</span>
                                 </div>
                                 <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Discount ({discountPercent || '0'}%):</span>
+                                    <span className="text-muted-foreground">{t('admin.shop_bundles.discount_label', { percent: discountPercent || '0' })}</span>
                                     <span className="tabular-nums text-green-600">-{Math.round(itemsTotal) - calculatedPrice}</span>
                                 </div>
                                 <div className="mt-1 flex justify-between border-t pt-1 font-medium">
-                                    <span>Bundle price:</span>
+                                    <span>{t('admin.shop_bundles.bundle_price')}</span>
                                     <span className="tabular-nums">{calculatedPrice}</span>
                                 </div>
                             </div>
                         )}
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <Label>Bundle Items</Label>
+                                <Label>{t('admin.shop_bundles.bundle_items')}</Label>
                                 <Button variant="outline" size="sm" onClick={addBundleItem}>
                                     <Plus className="mr-1 size-3" />
-                                    Add
+                                    {t('common.add')}
                                 </Button>
                             </div>
                             {bundleItems.map((entry, idx) => (
@@ -362,7 +364,7 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                         onValueChange={(v) => updateBundleItem(idx, 'shop_item_id', v)}
                                     >
                                         <SelectTrigger className="flex-1">
-                                            <SelectValue placeholder="Select item..." />
+                                            <SelectValue placeholder={t('admin.shop_bundles.select_item')} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {shopItems.map((si) => (
@@ -393,18 +395,18 @@ export default function ShopBundles({ bundles, shopItems }: Props) {
                                 checked={featured}
                                 onCheckedChange={(checked) => setFeatured(checked === true)}
                             />
-                            <Label htmlFor="bundle-featured">Featured bundle</Label>
+                            <Label htmlFor="bundle-featured">{t('admin.shop_bundles.featured_bundle')}</Label>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             disabled={!name || bundleItems.filter((i) => i.shop_item_id).length === 0 || loading}
                             onClick={handleSave}
                         >
-                            {editBundle ? 'Update' : 'Create'}
+                            {editBundle ? t('common.update') : t('common.create')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

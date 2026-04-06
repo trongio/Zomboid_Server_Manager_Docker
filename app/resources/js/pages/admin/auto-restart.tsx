@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem } from '@/types';
 
 type ScheduleEntry = {
@@ -38,11 +39,6 @@ type Props = {
     schedule: ScheduleEntry[];
     next_restart_at: string | null;
 };
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Auto Restart', href: '/admin/auto-restart' },
-];
 
 const WARNING_OPTIONS = [
     { value: '2', label: '2 minutes' },
@@ -75,6 +71,11 @@ const TIMEZONE_OPTIONS = [
 ] as const;
 
 export default function AutoRestart({ settings, schedule, next_restart_at }: Props) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.auto_restart.title'), href: '/admin/auto-restart' },
+    ];
     const [enabled, setEnabled] = useState(settings.enabled);
     const [warningMinutes, setWarningMinutes] = useState(String(settings.warning_minutes));
     const [warningMessage, setWarningMessage] = useState(settings.warning_message ?? '');
@@ -95,7 +96,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                 timezone,
                 discord_reminder_minutes: parseInt(discordReminderMinutes, 10),
             },
-            successMessage: 'Auto-restart settings saved',
+            successMessage: t('admin.auto_restart.toast_settings_saved'),
         });
         setSaving(false);
         router.reload();
@@ -107,7 +108,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
         const result = await fetchAction('/admin/auto-restart/times', {
             method: 'POST',
             data: { time: newTime },
-            successMessage: 'Restart time added',
+            successMessage: t('admin.auto_restart.toast_time_added'),
         });
         setAddingTime(false);
         if (result) {
@@ -119,7 +120,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
     async function deleteTime(id: number) {
         await fetchAction(`/admin/auto-restart/times/${id}`, {
             method: 'DELETE',
-            successMessage: 'Restart time removed',
+            successMessage: t('admin.auto_restart.toast_time_removed'),
         });
         router.reload();
     }
@@ -127,19 +128,19 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
     async function toggleTime(id: number) {
         await fetchAction(`/admin/auto-restart/times/${id}/toggle`, {
             method: 'POST',
-            successMessage: 'Restart time toggled',
+            successMessage: t('admin.auto_restart.toast_time_toggled'),
         });
         router.reload();
     }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Auto Restart" />
+            <Head title={t('admin.auto_restart.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Auto Restart</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('admin.auto_restart.title')}</h1>
                     <p className="text-muted-foreground">
-                        Schedule daily restart times so the community can plan around predictable restart windows.
+                        {t('admin.auto_restart.description')}
                     </p>
                 </div>
 
@@ -148,19 +149,19 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Timer className="size-5" />
-                            Restart Settings
+                            {t('admin.auto_restart.settings_title')}
                         </CardTitle>
                         <CardDescription>
-                            Configure automatic server restarts with in-game countdown warnings and Discord reminders.
+                            {t('admin.auto_restart.settings_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Enable/Disable */}
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label htmlFor="auto-restart-enabled">Enable Auto Restart</Label>
+                                <Label htmlFor="auto-restart-enabled">{t('admin.auto_restart.enable_label')}</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    When enabled, the server will restart at the scheduled daily times.
+                                    {t('admin.auto_restart.enable_description')}
                                 </p>
                             </div>
                             <Switch
@@ -174,9 +175,9 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
 
                         {/* Timezone */}
                         <div className="grid gap-2">
-                            <Label htmlFor="timezone">Timezone</Label>
+                            <Label htmlFor="timezone">{t('admin.auto_restart.timezone_label')}</Label>
                             <p className="text-sm text-muted-foreground">
-                                Scheduled times are interpreted in this timezone.
+                                {t('admin.auto_restart.timezone_description')}
                             </p>
                             <Select value={timezone} onValueChange={setTimezone}>
                                 <SelectTrigger id="timezone">
@@ -194,9 +195,9 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
 
                         {/* Warning Minutes */}
                         <div className="grid gap-2">
-                            <Label htmlFor="warning">In-Game Warning Time</Label>
+                            <Label htmlFor="warning">{t('admin.auto_restart.warning_time_label')}</Label>
                             <p className="text-sm text-muted-foreground">
-                                How long before the restart to start sending in-game countdown warnings.
+                                {t('admin.auto_restart.warning_time_description')}
                             </p>
                             <Select value={warningMinutes} onValueChange={setWarningMinutes}>
                                 <SelectTrigger id="warning">
@@ -214,9 +215,9 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
 
                         {/* Discord Reminder Minutes */}
                         <div className="grid gap-2">
-                            <Label htmlFor="discord-reminder">Discord Reminder</Label>
+                            <Label htmlFor="discord-reminder">{t('admin.auto_restart.discord_reminder_label')}</Label>
                             <p className="text-sm text-muted-foreground">
-                                How far ahead Discord gets an early &quot;heads up&quot; notification.
+                                {t('admin.auto_restart.discord_reminder_description')}
                             </p>
                             <Select value={discordReminderMinutes} onValueChange={setDiscordReminderMinutes}>
                                 <SelectTrigger id="discord-reminder">
@@ -234,23 +235,23 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
 
                         {/* Warning Message */}
                         <div className="grid gap-2">
-                            <Label htmlFor="warning-message">Warning Message (optional)</Label>
+                            <Label htmlFor="warning-message">{t('admin.auto_restart.warning_message_label')}</Label>
                             <Input
                                 id="warning-message"
                                 value={warningMessage}
                                 onChange={(e) => setWarningMessage(e.target.value)}
-                                placeholder="restart (automatic)"
+                                placeholder={t('admin.auto_restart.warning_message_placeholder')}
                                 maxLength={500}
                             />
                             <p className="text-sm text-muted-foreground">
-                                Custom label for countdown warnings. Default: &quot;restart (automatic)&quot;
+                                {t('admin.auto_restart.warning_message_description')}
                             </p>
                         </div>
 
                         <Separator />
 
                         <Button onClick={save} disabled={saving}>
-                            {saving ? 'Saving...' : 'Save Settings'}
+                            {saving ? t('common.saving') : t('admin.auto_restart.save_settings')}
                         </Button>
                     </CardContent>
                 </Card>
@@ -260,10 +261,10 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Clock className="size-5" />
-                            Daily Schedule
+                            {t('admin.auto_restart.schedule_title')}
                         </CardTitle>
                         <CardDescription>
-                            Add up to 5 daily restart times. Times are in {settings.timezone}.
+                            {t('admin.auto_restart.schedule_description', { timezone: settings.timezone })}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -280,7 +281,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                                                 {entry.time}
                                             </span>
                                             {!entry.enabled && (
-                                                <Badge variant="secondary">Disabled</Badge>
+                                                <Badge variant="secondary">{t('common.disabled')}</Badge>
                                             )}
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -301,7 +302,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground">
-                                No restart times configured. Add one below.
+                                {t('admin.auto_restart.no_times')}
                             </p>
                         )}
 
@@ -310,7 +311,7 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                         {/* Add new time */}
                         <div className="flex items-end gap-3">
                             <div className="grid gap-2">
-                                <Label htmlFor="new-time">Add Time</Label>
+                                <Label htmlFor="new-time">{t('admin.auto_restart.add_time_label')}</Label>
                                 <Input
                                     id="new-time"
                                     type="time"
@@ -324,18 +325,18 @@ export default function AutoRestart({ settings, schedule, next_restart_at }: Pro
                                 disabled={!newTime || addingTime || schedule.length >= 5}
                             >
                                 <Plus className="mr-1.5 size-4" />
-                                {addingTime ? 'Adding...' : 'Add'}
+                                {addingTime ? t('admin.auto_restart.adding') : t('common.add')}
                             </Button>
                         </div>
 
                         <p className="text-sm text-muted-foreground">
-                            {schedule.length}/5 slots used
+                            {t('admin.auto_restart.slots_used', { count: String(schedule.length) })}
                         </p>
 
                         {/* Next Restart Info */}
                         {next_restart_at && (
                             <div className="rounded-md border border-border bg-muted/50 p-3 text-sm">
-                                Next restart:{' '}
+                                {t('admin.auto_restart.next_restart')}{' '}
                                 <span className="font-semibold">
                                     {new Date(next_restart_at).toLocaleString()}
                                 </span>

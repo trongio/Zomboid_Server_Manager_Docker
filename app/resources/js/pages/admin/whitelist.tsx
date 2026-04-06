@@ -29,6 +29,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem } from '@/types';
 
 type PlayerEntry = {
@@ -48,11 +49,6 @@ type WhitelistSettings = {
 type SortKey = 'username' | 'role' | 'status';
 type StatusFilter = 'all' | 'whitelisted' | 'not_whitelisted';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Whitelist', href: '/admin/whitelist' },
-];
-
 const roleBadgeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
     super_admin: 'default',
     admin: 'default',
@@ -68,6 +64,13 @@ const roleOrder: Record<string, number> = {
 };
 
 export default function Whitelist({ players, whitelist_settings }: { players: PlayerEntry[]; whitelist_settings: WhitelistSettings }) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.whitelist.title'), href: '/admin/whitelist' },
+    ];
+
     const [showAdd, setShowAdd] = useState(false);
     const [passwordTarget, setPasswordTarget] = useState<string | null>(null);
     const [removeTarget, setRemoveTarget] = useState<string | null>(null);
@@ -124,7 +127,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
         setLoading(true);
         await fetchAction('/admin/whitelist', {
             data: { username, password },
-            successMessage: `Added ${username} to whitelist`,
+            successMessage: t('admin.whitelist.toast_added', { username }),
         });
         setLoading(false);
         setShowAdd(false);
@@ -148,7 +151,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
         setLoading(true);
         await fetchAction(`/admin/whitelist/${target}/toggle`, {
             data: {},
-            successMessage: `Whitelisted ${target}`,
+            successMessage: t('admin.whitelist.toast_whitelisted', { username: target }),
         });
         setLoading(false);
         router.reload({ only: ['players'] });
@@ -159,7 +162,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
         setLoading(true);
         await fetchAction(`/admin/whitelist/${passwordTarget}/toggle`, {
             data: { password },
-            successMessage: `Whitelisted ${passwordTarget}`,
+            successMessage: t('admin.whitelist.toast_whitelisted', { username: passwordTarget }),
         });
         setLoading(false);
         setPasswordTarget(null);
@@ -172,7 +175,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
         setLoading(true);
         await fetchAction(`/admin/whitelist/${removeTarget}/toggle`, {
             data: {},
-            successMessage: `Removed ${removeTarget} from whitelist`,
+            successMessage: t('admin.whitelist.toast_removed', { username: removeTarget }),
         });
         setLoading(false);
         setRemoveTarget(null);
@@ -182,7 +185,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
     async function syncWhitelist() {
         setSyncing(true);
         await fetchAction('/admin/whitelist/sync', {
-            successMessage: 'Whitelist synced',
+            successMessage: t('admin.whitelist.toast_synced'),
         });
         setSyncing(false);
         router.reload({ only: ['players'] });
@@ -196,7 +199,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                 open: !enforceWhitelist,
                 auto_create_user_in_whitelist: autoRegister,
             },
-            successMessage: 'Whitelist settings updated',
+            successMessage: t('admin.whitelist.toast_settings_updated'),
         });
         setSavingSettings(false);
         if (result?.restart_required) {
@@ -207,23 +210,23 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Whitelist" />
+            <Head title={t('admin.whitelist.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Whitelist Management</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.whitelist.title')}</h1>
                         <p className="text-muted-foreground">
-                            {whitelistedCount} of {players.length} player{players.length !== 1 ? 's' : ''} whitelisted
+                            {t('admin.whitelist.subtitle', { whitelisted: String(whitelistedCount), total: String(players.length) })}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
                         <Button variant="outline" onClick={syncWhitelist} disabled={syncing}>
                             <RefreshCw className={`mr-1.5 size-4 ${syncing ? 'animate-spin' : ''}`} />
-                            Sync
+                            {t('common.sync')}
                         </Button>
                         <Button onClick={() => setShowAdd(true)}>
                             <Plus className="mr-1.5 size-4" />
-                            Add User
+                            {t('admin.whitelist.add_dialog_title')}
                         </Button>
                     </div>
                 </div>
@@ -232,10 +235,10 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Settings className="size-5" />
-                            Whitelist Settings
+                            {t('admin.whitelist.settings_title')}
                         </CardTitle>
                         <CardDescription>
-                            Control how the server handles player access and credential storage.
+                            {t('admin.whitelist.settings_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -243,15 +246,15 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                             <Alert variant="destructive">
                                 <AlertTriangle className="size-4" />
                                 <AlertDescription>
-                                    Settings saved. A server restart is required for changes to take effect.
+                                    {t('admin.whitelist.restart_required')}
                                 </AlertDescription>
                             </Alert>
                         )}
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label htmlFor="enforce-whitelist">Whitelist Enforcement</Label>
+                                <Label htmlFor="enforce-whitelist">{t('admin.whitelist.enforce_label')}</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    When enabled, only whitelisted players can join (Open=false).
+                                    {t('admin.whitelist.enforce_description')}
                                 </p>
                             </div>
                             <Switch
@@ -263,9 +266,9 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                         <Separator />
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label htmlFor="auto-register">Auto-register Players</Label>
+                                <Label htmlFor="auto-register">{t('admin.whitelist.auto_register_label')}</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    Store player credentials when they join. Required for web login sync.
+                                    {t('admin.whitelist.auto_register_description')}
                                 </p>
                             </div>
                             <Switch
@@ -277,7 +280,7 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                         {settingsDirty && (
                             <div className="flex justify-end pt-2">
                                 <Button onClick={saveSettings} disabled={savingSettings}>
-                                    {savingSettings ? 'Saving...' : 'Save Settings'}
+                                    {savingSettings ? t('common.saving') : t('admin.whitelist.save_settings')}
                                 </Button>
                             </div>
                         )}
@@ -290,17 +293,17 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Shield className="size-5" />
-                                    All Players
+                                    {t('admin.whitelist.all_players_title')}
                                 </CardTitle>
                                 <CardDescription>
-                                    {filteredPlayers.length} of {players.length} players
+                                    {t('admin.whitelist.all_players_description', { filtered: String(filteredPlayers.length), total: String(players.length) })}
                                 </CardDescription>
                             </div>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <div className="relative">
                                     <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search players..."
+                                        placeholder={t('admin.whitelist.search_placeholder')}
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="pl-9 sm:w-[200px]"
@@ -311,9 +314,9 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="whitelisted">Whitelisted</SelectItem>
-                                        <SelectItem value="not_whitelisted">Not Whitelisted</SelectItem>
+                                        <SelectItem value="all">{t('common.all')}</SelectItem>
+                                        <SelectItem value="whitelisted">{t('admin.whitelist.status_whitelisted')}</SelectItem>
+                                        <SelectItem value="not_whitelisted">{t('admin.whitelist.status_not_whitelisted')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -326,24 +329,24 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                                     <TableRow>
                                         <TableHead>
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('username')}>
-                                                Username
+                                                {t('admin.whitelist.table_username')}
                                                 <SortIcon column="username" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
-                                        <TableHead className="hidden sm:table-cell">Character</TableHead>
+                                        <TableHead className="hidden sm:table-cell">{t('admin.whitelist.table_character')}</TableHead>
                                         <TableHead className="hidden sm:table-cell">
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('role')}>
-                                                Role
+                                                {t('admin.whitelist.table_role')}
                                                 <SortIcon column="role" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
                                         <TableHead>
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('status')}>
-                                                Status
+                                                {t('admin.whitelist.table_status')}
                                                 <SortIcon column="status" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -363,10 +366,10 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                                             <TableCell>
                                                 {player.whitelisted ? (
                                                     <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                                                        Whitelisted
+                                                        {t('admin.whitelist.status_whitelisted')}
                                                     </Badge>
                                                 ) : (
-                                                    <Badge variant="outline">Not Whitelisted</Badge>
+                                                    <Badge variant="outline">{t('admin.whitelist.status_not_whitelisted')}</Badge>
                                                 )}
                                             </TableCell>
                                             <TableCell className="text-right">
@@ -378,12 +381,12 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                                                     {player.whitelisted ? (
                                                         <>
                                                             <ShieldOff className="mr-1.5 size-4" />
-                                                            Remove
+                                                            {t('common.remove')}
                                                         </>
                                                     ) : (
                                                         <>
                                                             <Shield className="mr-1.5 size-4" />
-                                                            Whitelist
+                                                            {t('admin.whitelist.action_whitelist')}
                                                         </>
                                                     )}
                                                 </Button>
@@ -395,8 +398,8 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
                         ) : (
                             <p className="py-8 text-center text-muted-foreground">
                                 {search || statusFilter !== 'all'
-                                    ? 'No players match your filters'
-                                    : 'No players found. Run account sync to discover players.'}
+                                    ? t('admin.whitelist.no_players_filtered')
+                                    : t('admin.whitelist.no_players')}
                             </p>
                         )}
                     </CardContent>
@@ -407,36 +410,36 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
             <Dialog open={showAdd} onOpenChange={setShowAdd}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Add User to Whitelist</DialogTitle>
+                        <DialogTitle>{t('admin.whitelist.add_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Create PZ credentials for a new user. They will use these to join the server.
+                            {t('admin.whitelist.add_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="wl-username">Username</Label>
+                            <Label htmlFor="wl-username">{t('admin.whitelist.add_username_label')}</Label>
                             <Input
                                 id="wl-username"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                placeholder="PZ username"
+                                placeholder={t('admin.whitelist.add_username_placeholder')}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="wl-password">Password</Label>
+                            <Label htmlFor="wl-password">{t('admin.whitelist.add_password_label')}</Label>
                             <Input
                                 id="wl-password"
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                placeholder="PZ password"
+                                placeholder={t('admin.whitelist.add_password_placeholder')}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
                         <Button disabled={loading || !username || !password} onClick={addUser}>
-                            Add User
+                            {t('admin.whitelist.add_dialog_title')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -446,25 +449,25 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
             <Dialog open={passwordTarget !== null} onOpenChange={() => { setPasswordTarget(null); setPassword(''); }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Set PZ Password</DialogTitle>
+                        <DialogTitle>{t('admin.whitelist.password_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Set a password for <strong>{passwordTarget}</strong> to add them to the PZ whitelist.
+                            {t('admin.whitelist.password_dialog_description', { username: passwordTarget ?? '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-2">
-                        <Label htmlFor="toggle-password">Password</Label>
+                        <Label htmlFor="toggle-password">{t('admin.whitelist.password_dialog_label')}</Label>
                         <Input
                             id="toggle-password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="PZ password"
+                            placeholder={t('admin.whitelist.password_dialog_placeholder')}
                         />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => { setPasswordTarget(null); setPassword(''); }}>Cancel</Button>
+                        <Button variant="outline" onClick={() => { setPasswordTarget(null); setPassword(''); }}>{t('common.cancel')}</Button>
                         <Button disabled={loading || !password} onClick={confirmAddToWhitelist}>
-                            Add to Whitelist
+                            {t('admin.whitelist.password_dialog_confirm')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -474,20 +477,19 @@ export default function Whitelist({ players, whitelist_settings }: { players: Pl
             <Dialog open={removeTarget !== null} onOpenChange={() => setRemoveTarget(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Remove from Whitelist</DialogTitle>
+                        <DialogTitle>{t('admin.whitelist.remove_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Remove <strong>{removeTarget}</strong> from the whitelist?
-                            They will no longer be able to join if the server requires whitelist.
+                            {t('admin.whitelist.remove_dialog_description', { username: removeTarget ?? '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRemoveTarget(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setRemoveTarget(null)}>{t('common.cancel')}</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={confirmRemoveFromWhitelist}
                         >
-                            Remove
+                            {t('common.remove')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

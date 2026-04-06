@@ -59,7 +59,7 @@ class SiteSettingController extends Controller
             if ($settings->logo_path) {
                 Storage::disk('public')->delete($settings->logo_path);
             }
-            $ext = $request->file('logo')->getClientOriginalExtension();
+            $ext = $request->file('logo')->extension();
             $settings->logo_path = $request->file('logo')->storeAs('site', 'logo.' . $ext, 'public');
             $changes[] = 'logo';
         }
@@ -69,7 +69,7 @@ class SiteSettingController extends Controller
             if ($settings->favicon_path) {
                 Storage::disk('public')->delete($settings->favicon_path);
             }
-            $ext = $request->file('favicon')->getClientOriginalExtension();
+            $ext = $request->file('favicon')->extension();
             $settings->favicon_path = $request->file('favicon')->storeAs('site', 'favicon.' . $ext, 'public');
             $changes[] = 'favicon';
         }

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem } from '@/types';
 
 type Settings = {
@@ -47,19 +48,18 @@ type Props = {
     available_sections: { id: string; label: string }[];
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Site Settings', href: '/admin/site-settings' },
-];
+const COLOR_KEYS = ['primary', 'accent', 'destructive', 'sidebar_primary'] as const;
 
-const COLOR_FIELDS = [
-    { key: 'primary', label: 'Primary', description: 'Buttons, links, active states' },
-    { key: 'accent', label: 'Accent', description: 'Hover states, highlights' },
-    { key: 'destructive', label: 'Destructive', description: 'Delete buttons, error states' },
-    { key: 'sidebar_primary', label: 'Sidebar', description: 'Sidebar active item' },
-] as const;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 export default function SiteSettings({ settings, available_icons, available_sections }: Props) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.site_settings.title'), href: '/admin/site-settings' },
+    ];
+
     const [siteName, setSiteName] = useState(settings.site_name);
     const [footerText, setFooterText] = useState(settings.footer_text);
     const [heroBadge, setHeroBadge] = useState(settings.hero_badge);
@@ -166,15 +166,15 @@ export default function SiteSettings({ settings, available_icons, available_sect
             });
             const json = await res.json().catch(() => ({}));
             if (res.ok) {
-                toast.success(json.message || 'Settings saved');
+                toast.success(json.message || t('admin.site_settings.settings_saved'));
                 setLogoFile(null);
                 setFaviconFile(null);
                 router.reload();
             } else {
-                toast.error(json.message || `Save failed (${res.status})`);
+                toast.error(json.message || t('admin.site_settings.save_failed', { status: String(res.status) }));
             }
         } catch {
-            toast.error('Network error — could not reach the server');
+            toast.error(t('common.network_error'));
         }
         setSaving(false);
     }
@@ -182,7 +182,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
     async function removeLogo() {
         await fetchAction('/admin/site-settings/logo', {
             method: 'DELETE',
-            successMessage: 'Logo removed',
+            successMessage: t('admin.site_settings.logo_removed'),
         });
         router.reload();
     }
@@ -190,7 +190,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
     async function removeFavicon() {
         await fetchAction('/admin/site-settings/favicon', {
             method: 'DELETE',
-            successMessage: 'Favicon removed',
+            successMessage: t('admin.site_settings.favicon_removed'),
         });
         router.reload();
     }
@@ -242,12 +242,12 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Site Settings" />
+            <Head title={t('admin.site_settings.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Site Settings</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('admin.site_settings.title')}</h1>
                     <p className="text-muted-foreground">
-                        Customize your site's branding, landing page content, and layout.
+                        {t('admin.site_settings.description')}
                     </p>
                 </div>
 
@@ -256,15 +256,15 @@ export default function SiteSettings({ settings, available_icons, available_sect
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Palette className="size-5" />
-                            Branding
+                            {t('admin.site_settings.branding')}
                         </CardTitle>
                         <CardDescription>
-                            Site name, logo, and favicon shown across all pages.
+                            {t('admin.site_settings.branding_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="site-name">Site Name</Label>
+                            <Label htmlFor="site-name">{t('admin.site_settings.site_name')}</Label>
                             <Input
                                 id="site-name"
                                 value={siteName}
@@ -274,7 +274,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="footer-text">Footer Text</Label>
+                            <Label htmlFor="footer-text">{t('admin.site_settings.footer_text')}</Label>
                             <Input
                                 id="footer-text"
                                 value={footerText}
@@ -287,36 +287,36 @@ export default function SiteSettings({ settings, available_icons, available_sect
 
                         {/* Logo upload */}
                         <div className="space-y-2">
-                            <Label>Logo</Label>
+                            <Label>{t('admin.site_settings.logo')}</Label>
                             <div className="flex items-center gap-4">
                                 {settings.logo_url && !logoFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
                                             src={settings.logo_url}
-                                            alt="Current logo"
+                                            alt={t('admin.site_settings.current_logo_alt')}
                                             className="size-10 rounded-md border object-contain"
                                         />
                                         <Button variant="outline" size="sm" onClick={removeLogo}>
                                             <Trash2 className="mr-1.5 size-3.5" />
-                                            Remove
+                                            {t('common.remove')}
                                         </Button>
                                     </div>
                                 ) : logoFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
                                             src={logoPreview!}
-                                            alt="New logo preview"
+                                            alt={t('admin.site_settings.new_logo_alt')}
                                             className="size-10 rounded-md border object-contain"
                                         />
                                         <span className="text-sm text-muted-foreground">{logoFile.name}</span>
                                         <Button variant="outline" size="sm" onClick={() => setLogoFile(null)}>
-                                            Clear
+                                            {t('common.clear')}
                                         </Button>
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ImageIcon className="size-4" />
-                                        No logo uploaded — using default icon
+                                        {t('admin.site_settings.no_logo')}
                                     </div>
                                 )}
                                 <input
@@ -328,44 +328,44 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 />
                                 <Button variant="outline" size="sm" onClick={() => logoInputRef.current?.click()}>
                                     <Upload className="mr-1.5 size-3.5" />
-                                    Upload
+                                    {t('common.upload')}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">PNG, JPG, or WebP. Max 2 MB.</p>
+                            <p className="text-xs text-muted-foreground">{t('admin.site_settings.logo_hint')}</p>
                         </div>
 
                         {/* Favicon upload */}
                         <div className="space-y-2">
-                            <Label>Favicon</Label>
+                            <Label>{t('admin.site_settings.favicon')}</Label>
                             <div className="flex items-center gap-4">
                                 {settings.favicon_url && !faviconFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
                                             src={settings.favicon_url}
-                                            alt="Current favicon"
+                                            alt={t('admin.site_settings.current_favicon_alt')}
                                             className="size-8 rounded border object-contain"
                                         />
                                         <Button variant="outline" size="sm" onClick={removeFavicon}>
                                             <Trash2 className="mr-1.5 size-3.5" />
-                                            Remove
+                                            {t('common.remove')}
                                         </Button>
                                     </div>
                                 ) : faviconFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
                                             src={faviconPreview!}
-                                            alt="New favicon preview"
+                                            alt={t('admin.site_settings.new_favicon_alt')}
                                             className="size-8 rounded border object-contain"
                                         />
                                         <span className="text-sm text-muted-foreground">{faviconFile.name}</span>
                                         <Button variant="outline" size="sm" onClick={() => setFaviconFile(null)}>
-                                            Clear
+                                            {t('common.clear')}
                                         </Button>
                                     </div>
                                 ) : (
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                         <ImageIcon className="size-4" />
-                                        No custom favicon — using default
+                                        {t('admin.site_settings.no_favicon')}
                                     </div>
                                 )}
                                 <input
@@ -377,10 +377,10 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 />
                                 <Button variant="outline" size="sm" onClick={() => faviconInputRef.current?.click()}>
                                     <Upload className="mr-1.5 size-3.5" />
-                                    Upload
+                                    {t('common.upload')}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground">ICO or PNG. Max 512 KB.</p>
+                            <p className="text-xs text-muted-foreground">{t('admin.site_settings.favicon_hint')}</p>
                         </div>
                     </CardContent>
                 </Card>
@@ -392,25 +392,25 @@ export default function SiteSettings({ settings, available_icons, available_sect
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Palette className="size-5" />
-                                    Theme Colors
+                                    {t('admin.site_settings.theme_colors')}
                                 </CardTitle>
                                 <CardDescription>
-                                    Customize the color scheme. Leave empty to use defaults.
+                                    {t('admin.site_settings.theme_colors_description')}
                                 </CardDescription>
                             </div>
                             {Object.values(themeColors).some(Boolean) && (
                                 <Button variant="outline" size="sm" onClick={resetColors}>
                                     <RotateCcw className="mr-1.5 size-3.5" />
-                                    Reset to Defaults
+                                    {t('admin.site_settings.reset_to_defaults')}
                                 </Button>
                             )}
                         </div>
                     </CardHeader>
                     <CardContent>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            {COLOR_FIELDS.map(({ key, label, description }) => (
+                            {COLOR_KEYS.map((key) => (
                                 <div key={key} className="space-y-2">
-                                    <Label>{label}</Label>
+                                    <Label>{t(`admin.site_settings.color_${key}`)}</Label>
                                     <div className="flex items-center gap-3">
                                         <input
                                             type="color"
@@ -422,8 +422,9 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                             value={themeColors[key] || ''}
                                             onChange={(e) => updateColor(key, e.target.value)}
                                             placeholder="#000000"
-                                            className="flex-1 font-mono text-sm"
+                                            className={`flex-1 font-mono text-sm ${themeColors[key] && !HEX_RE.test(themeColors[key]) ? 'border-destructive' : ''}`}
                                             maxLength={7}
+                                            aria-invalid={!!(themeColors[key] && !HEX_RE.test(themeColors[key]))}
                                         />
                                         {themeColors[key] && (
                                             <Button
@@ -431,11 +432,11 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                                 size="sm"
                                                 onClick={() => updateColor(key, '')}
                                             >
-                                                Clear
+                                                {t('common.clear')}
                                             </Button>
                                         )}
                                     </div>
-                                    <p className="text-xs text-muted-foreground">{description}</p>
+                                    <p className="text-xs text-muted-foreground">{t(`admin.site_settings.color_${key}_description`)}</p>
                                 </div>
                             ))}
                         </div>
@@ -447,59 +448,59 @@ export default function SiteSettings({ settings, available_icons, available_sect
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Type className="size-5" />
-                            Hero Section
+                            {t('admin.site_settings.hero_section')}
                         </CardTitle>
                         <CardDescription>
-                            The main hero area at the top of the landing page.
+                            {t('admin.site_settings.hero_section_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="hero-badge">Badge Text</Label>
+                                <Label htmlFor="hero-badge">{t('admin.site_settings.badge_text')}</Label>
                                 <Input
                                     id="hero-badge"
                                     value={heroBadge}
                                     onChange={(e) => setHeroBadge(e.target.value)}
-                                    placeholder="Georgian Gaming Community"
+                                    placeholder={t('admin.site_settings.badge_placeholder')}
                                     maxLength={100}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="hero-button">Button Text</Label>
+                                <Label htmlFor="hero-button">{t('admin.site_settings.button_text')}</Label>
                                 <Input
                                     id="hero-button"
                                     value={heroButtonText}
                                     onChange={(e) => setHeroButtonText(e.target.value)}
-                                    placeholder="Join Server"
+                                    placeholder={t('admin.site_settings.button_placeholder')}
                                     maxLength={50}
                                 />
                             </div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label htmlFor="hero-title">Title</Label>
+                                <Label htmlFor="hero-title">{t('admin.site_settings.hero_title')}</Label>
                                 <Input
                                     id="hero-title"
                                     value={heroTitle}
                                     onChange={(e) => setHeroTitle(e.target.value)}
-                                    placeholder="Project Zomboid"
+                                    placeholder={t('admin.site_settings.hero_title_placeholder')}
                                     maxLength={100}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="hero-subtitle">Subtitle</Label>
+                                <Label htmlFor="hero-subtitle">{t('admin.site_settings.hero_subtitle')}</Label>
                                 <Input
                                     id="hero-subtitle"
                                     value={heroSubtitle}
                                     onChange={(e) => setHeroSubtitle(e.target.value)}
-                                    placeholder="Dedicated Server"
+                                    placeholder={t('admin.site_settings.hero_subtitle_placeholder')}
                                     maxLength={100}
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="hero-description">Description</Label>
+                            <Label htmlFor="hero-description">{t('admin.site_settings.hero_description')}</Label>
                             <Textarea
                                 id="hero-description"
                                 value={heroDescription}
@@ -516,13 +517,13 @@ export default function SiteSettings({ settings, available_icons, available_sect
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle>Feature Cards</CardTitle>
+                                <CardTitle>{t('admin.site_settings.feature_cards')}</CardTitle>
                                 <CardDescription>
-                                    Feature highlights shown on the landing page ({features.length}/8).
+                                    {t('admin.site_settings.feature_cards_description', { count: String(features.length) })}
                                 </CardDescription>
                             </div>
                             <Button variant="outline" size="sm" onClick={addFeature} disabled={features.length >= 8}>
-                                Add Feature
+                                {t('admin.site_settings.add_feature')}
                             </Button>
                         </div>
                     </CardHeader>
@@ -530,14 +531,14 @@ export default function SiteSettings({ settings, available_icons, available_sect
                         {features.map((feature, index) => (
                             <div key={feature._id} className="rounded-lg border border-border/50 p-4 space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium text-muted-foreground">Feature {index + 1}</span>
+                                    <span className="text-sm font-medium text-muted-foreground">{t('admin.site_settings.feature_label', { number: String(index + 1) })}</span>
                                     <Button variant="ghost" size="sm" onClick={() => removeFeature(index)}>
                                         <Trash2 className="size-4 text-destructive" />
                                     </Button>
                                 </div>
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div className="space-y-1">
-                                        <Label>Icon</Label>
+                                        <Label>{t('admin.site_settings.feature_icon')}</Label>
                                         <select
                                             value={feature.icon}
                                             onChange={(e) => updateFeature(index, 'icon', e.target.value)}
@@ -549,17 +550,17 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                         </select>
                                     </div>
                                     <div className="space-y-1">
-                                        <Label>Title</Label>
+                                        <Label>{t('admin.site_settings.feature_title')}</Label>
                                         <Input
                                             value={feature.title}
                                             onChange={(e) => updateFeature(index, 'title', e.target.value)}
-                                            placeholder="Feature title"
+                                            placeholder={t('admin.site_settings.feature_title_placeholder')}
                                             maxLength={100}
                                         />
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label>Description</Label>
+                                    <Label>{t('admin.site_settings.feature_description')}</Label>
                                     <Textarea
                                         value={feature.description}
                                         onChange={(e) => updateFeature(index, 'description', e.target.value)}
@@ -571,7 +572,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                         ))}
                         {features.length === 0 && (
                             <p className="py-4 text-center text-sm text-muted-foreground">
-                                No features configured. Click "Add Feature" to get started.
+                                {t('admin.site_settings.no_features')}
                             </p>
                         )}
                     </CardContent>
@@ -580,9 +581,9 @@ export default function SiteSettings({ settings, available_icons, available_sect
                 {/* Landing Page Sections */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Landing Page Sections</CardTitle>
+                        <CardTitle>{t('admin.site_settings.landing_sections')}</CardTitle>
                         <CardDescription>
-                            Toggle sections on/off and reorder them.
+                            {t('admin.site_settings.landing_sections_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
@@ -599,6 +600,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                             className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
                                             disabled={index === 0}
                                             onClick={() => moveSectionUp(index)}
+                                            aria-label={`Move ${getSectionLabel(section.id)} up`}
                                         >
                                             ▲
                                         </button>
@@ -607,6 +609,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                             className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
                                             disabled={index === landingSections.length - 1}
                                             onClick={() => moveSectionDown(index)}
+                                            aria-label={`Move ${getSectionLabel(section.id)} down`}
                                         >
                                             ▼
                                         </button>
@@ -623,7 +626,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                                 : 'bg-muted text-muted-foreground'
                                         }`}
                                     >
-                                        {section.enabled ? 'Visible' : 'Hidden'}
+                                        {section.enabled ? t('admin.site_settings.section_visible') : t('admin.site_settings.section_hidden')}
                                     </button>
                                 </div>
                             ))}
@@ -646,7 +649,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                     className="shadow-lg"
                 >
                     <Save className="mr-2 size-4" />
-                    {saving ? 'Saving...' : 'Save Changes'}
+                    {saving ? t('common.saving') : t('admin.site_settings.save_changes')}
                 </Button>
             </div>
         </AppLayout>

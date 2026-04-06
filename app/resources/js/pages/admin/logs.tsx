@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { Activity, Pause, Play, RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,12 +15,12 @@ import {
 } from '@/components/ui/select';
 import type { BreadcrumbItem } from '@/types';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Server Logs', href: '/admin/logs' },
-];
-
 export default function Logs({ lines: initialLines }: { lines: string[] }) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.logs.title'), href: '/admin/logs' },
+    ];
     const [lines, setLines] = useState(initialLines);
     const [autoRefresh, setAutoRefresh] = useState(true);
     const [tail, setTail] = useState('100');
@@ -54,13 +55,13 @@ export default function Logs({ lines: initialLines }: { lines: string[] }) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Server Logs" />
+            <Head title={t('admin.logs.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Server Logs</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.logs.title')}</h1>
                         <p className="text-muted-foreground">
-                            Live game server container output
+                            {t('admin.logs.description')}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -69,10 +70,10 @@ export default function Logs({ lines: initialLines }: { lines: string[] }) {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="50">50 lines</SelectItem>
-                                <SelectItem value="100">100 lines</SelectItem>
-                                <SelectItem value="200">200 lines</SelectItem>
-                                <SelectItem value="500">500 lines</SelectItem>
+                                <SelectItem value="50">{t('admin.logs.lines_label', { count: '50' })}</SelectItem>
+                                <SelectItem value="100">{t('admin.logs.lines_label', { count: '100' })}</SelectItem>
+                                <SelectItem value="200">{t('admin.logs.lines_label', { count: '200' })}</SelectItem>
+                                <SelectItem value="500">{t('admin.logs.lines_label', { count: '500' })}</SelectItem>
                             </SelectContent>
                         </Select>
                         <Button
@@ -81,14 +82,14 @@ export default function Logs({ lines: initialLines }: { lines: string[] }) {
                             onClick={() => setAutoRefresh(!autoRefresh)}
                         >
                             {autoRefresh ? (
-                                <><Pause className="mr-1.5 size-3.5" /> Pause</>
+                                <><Pause className="mr-1.5 size-3.5" /> {t('admin.logs.pause')}</>
                             ) : (
-                                <><Play className="mr-1.5 size-3.5" /> Resume</>
+                                <><Play className="mr-1.5 size-3.5" /> {t('admin.logs.resume')}</>
                             )}
                         </Button>
                         <Button variant="outline" size="sm" onClick={fetchLogs} disabled={refreshing}>
                             <RefreshCw className={`mr-1.5 size-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                            Refresh
+                            {t('admin.logs.refresh')}
                         </Button>
                     </div>
                 </div>
@@ -98,14 +99,14 @@ export default function Logs({ lines: initialLines }: { lines: string[] }) {
                         <div>
                             <CardTitle className="flex items-center gap-2">
                                 <Activity className="size-5" />
-                                Container Output
+                                {t('admin.logs.card_title')}
                             </CardTitle>
-                            <CardDescription>{lines.length} lines</CardDescription>
+                            <CardDescription>{t('admin.logs.line_count', { count: String(lines.length) })}</CardDescription>
                         </div>
                         {autoRefresh && (
                             <Badge variant="outline" className="text-xs">
                                 <span className="mr-1.5 size-1.5 rounded-full bg-green-500 inline-block animate-pulse" />
-                                Auto-refresh
+                                {t('admin.logs.auto_refresh_badge')}
                             </Badge>
                         )}
                     </CardHeader>
@@ -122,7 +123,7 @@ export default function Logs({ lines: initialLines }: { lines: string[] }) {
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-zinc-500">No log output available</p>
+                                <p className="text-zinc-500">{t('admin.logs.empty')}</p>
                             )}
                         </div>
                     </CardContent>

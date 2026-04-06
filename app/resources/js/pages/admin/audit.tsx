@@ -18,6 +18,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useServerSort } from '@/hooks/use-server-sort';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import type { AuditEntry, BreadcrumbItem } from '@/types';
 
@@ -37,11 +38,6 @@ type Filters = {
     direction: string;
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Audit Log', href: '/admin/audit' },
-];
-
 type SortKey = 'action' | 'actor' | 'created_at';
 
 export default function Audit({
@@ -53,6 +49,11 @@ export default function Audit({
     filters: Filters;
     available_actions: string[];
 }) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.audit.title'), href: '/admin/audit' },
+    ];
     const [localFilters, setLocalFilters] = useState(filters);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const { sortKey, sortDir, toggleSort } = useServerSort<SortKey>({
@@ -84,12 +85,12 @@ export default function Audit({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Audit Log" />
+            <Head title={t('admin.audit.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('admin.audit.title')}</h1>
                     <p className="text-muted-foreground">
-                        {logs ? `${logs.total} event${logs.total !== 1 ? 's' : ''} recorded` : 'Loading...'}
+                        {logs ? t('admin.audit.event_count', { count: String(logs.total) }) : t('common.loading')}
                     </p>
                 </div>
 
@@ -98,13 +99,13 @@ export default function Audit({
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Filter className="size-4" />
-                            Filters
+                            {t('admin.audit.filters_title')}
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 items-end gap-4 sm:grid-cols-2 lg:grid-cols-5">
                             <div className="space-y-1.5">
-                                <Label className="text-xs">Action</Label>
+                                <Label className="text-xs">{t('admin.audit.filter_action')}</Label>
                                 <Select
                                     value={localFilters.action || '__all__'}
                                     onValueChange={(v) =>
@@ -112,10 +113,10 @@ export default function Audit({
                                     }
                                 >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="All actions" />
+                                        <SelectValue placeholder={t('admin.audit.filter_all_actions')} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="__all__">All actions</SelectItem>
+                                        <SelectItem value="__all__">{t('admin.audit.filter_all_actions')}</SelectItem>
                                         {available_actions.map((a) => (
                                             <SelectItem key={a} value={a}>{a}</SelectItem>
                                         ))}
@@ -123,15 +124,15 @@ export default function Audit({
                                 </Select>
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs">Actor</Label>
+                                <Label className="text-xs">{t('admin.audit.filter_actor')}</Label>
                                 <Input
                                     value={localFilters.actor}
                                     onChange={(e) => setLocalFilters((f) => ({ ...f, actor: e.target.value }))}
-                                    placeholder="All actors"
+                                    placeholder={t('admin.audit.filter_all_actors')}
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs">From</Label>
+                                <Label className="text-xs">{t('admin.audit.filter_from')}</Label>
                                 <Input
                                     type="date"
                                     value={localFilters.from}
@@ -139,7 +140,7 @@ export default function Audit({
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs">To</Label>
+                                <Label className="text-xs">{t('admin.audit.filter_to')}</Label>
                                 <Input
                                     type="date"
                                     value={localFilters.to}
@@ -147,8 +148,8 @@ export default function Audit({
                                 />
                             </div>
                             <div className="flex gap-2">
-                                <Button size="sm" onClick={applyFilters}>Apply</Button>
-                                <Button size="sm" variant="outline" onClick={clearFilters}>Clear</Button>
+                                <Button size="sm" onClick={applyFilters}>{t('common.apply')}</Button>
+                                <Button size="sm" variant="outline" onClick={clearFilters}>{t('common.clear')}</Button>
                             </div>
                         </div>
                     </CardContent>
@@ -159,20 +160,20 @@ export default function Audit({
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <ScrollText className="size-5" />
-                            Events
+                            {t('admin.audit.events_title')}
                         </CardTitle>
-                        <CardDescription>All admin actions logged with details</CardDescription>
+                        <CardDescription>{t('admin.audit.events_description')}</CardDescription>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
                         <Deferred data="logs" fallback={
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Action</TableHead>
-                                        <TableHead>Target</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Actor</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead className="hidden md:table-cell">IP</TableHead>
+                                        <TableHead>{t('admin.audit.table_action')}</TableHead>
+                                        <TableHead>{t('admin.audit.table_target')}</TableHead>
+                                        <TableHead className="hidden sm:table-cell">{t('admin.audit.table_actor')}</TableHead>
+                                        <TableHead>{t('admin.audit.table_date')}</TableHead>
+                                        <TableHead className="hidden md:table-cell">{t('admin.audit.table_ip')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -193,16 +194,16 @@ export default function Audit({
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead>
-                                                <SortableHeader column="action" label="Action" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="action" label={t('admin.audit.table_action')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
-                                            <TableHead>Target</TableHead>
+                                            <TableHead>{t('admin.audit.table_target')}</TableHead>
                                             <TableHead className="hidden sm:table-cell">
-                                                <SortableHeader column="actor" label="Actor" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="actor" label={t('admin.audit.table_actor')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="created_at" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="created_at" label={t('admin.audit.table_date')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
-                                            <TableHead className="hidden md:table-cell">IP</TableHead>
+                                            <TableHead className="hidden md:table-cell">{t('admin.audit.table_ip')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -258,7 +259,7 @@ export default function Audit({
                                     </TableBody>
                                 </Table>
                             ) : (
-                                <p className="py-8 text-center text-muted-foreground">No audit events found</p>
+                                <p className="py-8 text-center text-muted-foreground">{t('admin.audit.empty')}</p>
                             )}
 
                             {/* Pagination */}

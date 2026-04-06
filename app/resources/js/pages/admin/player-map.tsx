@@ -3,6 +3,7 @@ import { AlertTriangle, Circle, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import PlayerActionDialogs from '@/components/player-action-dialogs';
 import PzMap from '@/components/pz-map';
+import { useTranslation } from '@/hooks/use-translation';
 import type { ZoneOverlay } from '@/components/pz-map';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,12 +37,6 @@ type Props = {
     safeZones: SafeZone[];
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Players', href: '/admin/players' },
-    { title: 'Map', href: '/admin/players/map' },
-];
-
 const statusDotColor: Record<PlayerMarker['status'], string> = {
     online: 'fill-green-500 text-green-500',
     offline: 'fill-muted text-muted',
@@ -51,6 +46,7 @@ const statusDotColor: Record<PlayerMarker['status'], string> = {
 const ZONE_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfig, hasTiles, tileProgress, safeZones }: Props) {
+    const { t } = useTranslation();
     usePoll(5000, { only: ['markers', 'onlineCount', 'serverStatus', 'hasTiles', 'tileProgress', 'safeZones'] });
 
     const zoneOverlays: ZoneOverlay[] = useMemo(
@@ -86,30 +82,36 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
         }
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('nav.players'), href: '/admin/players' },
+        { title: t('admin.player_map.breadcrumb'), href: '/admin/players/map' },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Player Map" />
+            <Head title={t('admin.player_map.title')} />
             <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Player Map</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.player_map.title')}</h1>
                         <p className="text-muted-foreground">
-                            {counts.total} players tracked
+                            {t('admin.player_map.players_tracked', { count: String(counts.total) })}
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline" className="text-sm">
                             <Circle className="mr-1.5 size-2 fill-green-500 text-green-500" />
-                            {counts.online} Online
+                            {t('admin.player_map.online_count', { count: String(counts.online) })}
                         </Badge>
                         <Badge variant="outline" className="text-sm">
                             <Circle className="mr-1.5 size-2 fill-muted text-muted" />
-                            {counts.offline} Offline
+                            {t('admin.player_map.offline_count', { count: String(counts.offline) })}
                         </Badge>
                         {counts.dead > 0 && (
                             <Badge variant="outline" className="text-sm">
                                 <Circle className="mr-1.5 size-2 fill-red-500 text-red-500" />
-                                {counts.dead} Dead
+                                {t('admin.player_map.dead_count', { count: String(counts.dead) })}
                             </Badge>
                         )}
                     </div>
@@ -118,13 +120,13 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
                 {serverStatus === 'offline' && (
                     <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                         <AlertTriangle className="size-4 shrink-0" />
-                        Server is offline. Player positions show last known locations.
+                        {t('admin.player_map.server_offline')}
                     </div>
                 )}
                 {serverStatus === 'starting' && (
                     <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
                         <Loader2 className="size-4 shrink-0 animate-spin" />
-                        Server is starting. Live positions will appear once the game server is ready.
+                        {t('admin.player_map.server_starting')}
                     </div>
                 )}
 
@@ -134,7 +136,7 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
                             <div className="absolute top-2 left-1/2 z-[1000] w-64 -translate-x-1/2 rounded-lg border bg-background/90 px-4 py-3 shadow-sm backdrop-blur-sm sm:w-72">
                                 <div className="flex items-center gap-2 text-sm font-medium">
                                     <Loader2 className="size-4 animate-spin text-primary" />
-                                    Generating map tiles...
+                                    {t('admin.player_map.generating_tiles')}
                                 </div>
                                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
                                     {tileProgress.completed > 0 ? (
@@ -148,14 +150,14 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
                                 </div>
                                 <p className="text-muted-foreground mt-1 text-xs">
                                     {tileProgress.completed > 0
-                                        ? `${tileProgress.completed.toLocaleString()} tiles rendered (~${tileProgress.percent}%)`
-                                        : 'Preparing render...'}
+                                        ? t('admin.player_map.tiles_rendered', { count: tileProgress.completed.toLocaleString(), percent: String(tileProgress.percent) })
+                                        : t('admin.player_map.preparing_render')}
                                 </p>
                             </div>
                         )}
                         {!hasTiles && !tileProgress?.generating && (
                             <div className="bg-muted/80 text-muted-foreground absolute top-2 left-1/2 z-[1000] -translate-x-1/2 rounded-md px-3 py-1.5 text-xs backdrop-blur-sm">
-                                No map tiles available. Run <code className="font-mono">php artisan zomboid:generate-map-tiles</code> to generate.
+                                {t('admin.player_map.no_tiles')} <code className="font-mono">{t('admin.player_map.no_tiles_command')}</code> {t('admin.player_map.no_tiles_suffix')}
                             </div>
                         )}
                         <PzMap
@@ -172,7 +174,7 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
                 {markers.length > 0 && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Player Positions</CardTitle>
+                            <CardTitle>{t('admin.player_map.player_positions')}</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">

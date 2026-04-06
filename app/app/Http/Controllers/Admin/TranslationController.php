@@ -3,6 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\DeleteTranslationRequest;
+use App\Http\Requests\Admin\ImportLocaleRequest;
+use App\Http\Requests\Admin\StoreLanguageRequest;
+use App\Http\Requests\Admin\UpdateLanguageRequest;
+use App\Http\Requests\Admin\UpdateTranslationRequest;
 use App\Models\Language;
 use App\Models\SiteSetting;
 use App\Models\Translation;
@@ -64,13 +69,9 @@ class TranslationController extends Controller
         ]);
     }
 
-    public function updateTranslation(Request $request): JsonResponse
+    public function updateTranslation(UpdateTranslationRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
-            'key' => ['required', 'string', 'max:255'],
-            'value' => ['required', 'string', 'max:5000'],
-        ]);
+        $validated = $request->validated();
 
         Translation::query()->updateOrCreate(
             [
@@ -96,12 +97,9 @@ class TranslationController extends Controller
         return response()->json(['message' => 'Translation updated']);
     }
 
-    public function deleteTranslation(Request $request): JsonResponse
+    public function deleteTranslation(DeleteTranslationRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
-            'key' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         Translation::query()
             ->where('locale', $validated['locale'])
@@ -124,13 +122,9 @@ class TranslationController extends Controller
         return response()->json(['message' => 'Translation override removed']);
     }
 
-    public function storeLanguage(Request $request): JsonResponse
+    public function storeLanguage(StoreLanguageRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'code' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX, 'unique:languages,code'],
-            'name' => ['required', 'string', 'max:100'],
-            'native_name' => ['required', 'string', 'max:100'],
-        ]);
+        $validated = $request->validated();
 
         Language::query()->create($validated);
         Cache::forget('active_languages');
@@ -145,14 +139,9 @@ class TranslationController extends Controller
         return response()->json(['message' => 'Language added']);
     }
 
-    public function updateLanguage(Request $request, Language $language): JsonResponse
+    public function updateLanguage(UpdateLanguageRequest $request, Language $language): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:100'],
-            'native_name' => ['sometimes', 'string', 'max:100'],
-            'is_active' => ['sometimes', 'boolean'],
-            'is_default' => ['sometimes', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         // Prevent deactivating the default language
         if ($language->is_default && array_key_exists('is_active', $validated) && ! $validated['is_active']) {
@@ -238,14 +227,10 @@ class TranslationController extends Controller
     /**
      * Import translations from an uploaded JSON file for a locale.
      */
-    public function importLocale(Request $request): JsonResponse
+    public function importLocale(ImportLocaleRequest $request): JsonResponse
     {
-        $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
-            'file' => ['required', 'file', 'max:1024', 'mimes:json,txt'],
-        ]);
-
-        $locale = $request->input('locale');
+        $validated = $request->validated();
+        $locale = $validated['locale'];
 
         // Ensure locale is a configured language (or English)
         if ($locale !== 'en' && ! Language::query()->where('code', $locale)->exists()) {
@@ -254,8 +239,12 @@ class TranslationController extends Controller
         $contents = file_get_contents($request->file('file')->getRealPath());
         $data = json_decode($contents, true);
 
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return response()->json(['message' => 'Invalid JSON: ' . json_last_error_msg()], 422);
+        }
+
         if (! is_array($data)) {
-            return response()->json(['message' => 'Invalid JSON file'], 422);
+            return response()->json(['message' => 'Invalid JSON file — expected an object'], 422);
         }
 
         $count = 0;
