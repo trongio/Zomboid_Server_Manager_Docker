@@ -218,6 +218,11 @@ class TranslationController extends Controller
         ]);
 
         $locale = $request->input('locale');
+
+        // Ensure locale is a configured language (or English)
+        if ($locale !== 'en' && ! Language::query()->where('code', $locale)->exists()) {
+            return response()->json(['message' => "Language '{$locale}' is not configured"], 422);
+        }
         $contents = file_get_contents($request->file('file')->getRealPath());
         $data = json_decode($contents, true);
 

@@ -287,6 +287,7 @@ describe('Translation export', function () {
 
 describe('Translation import', function () {
     it('imports translations from JSON file', function () {
+        Language::factory()->create(['code' => 'ka', 'name' => 'Georgian', 'native_name' => 'ქართული', 'is_default' => false]);
         $json = json_encode(['nav.dashboard' => 'მართვის პანელი', 'nav.players' => 'მოთამაშეები']);
         $file = \Illuminate\Http\UploadedFile::fake()->createWithContent('ka.json', $json);
 

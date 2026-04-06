@@ -97,8 +97,8 @@ class SiteSettingController extends Controller
             }
         }
 
-        // If no features were sent in a full form save, clear them
-        if (! array_key_exists('features', $validated) && $request->has('site_name')) {
+        // Explicit signal that features were submitted but empty
+        if (! array_key_exists('features', $validated) && $request->has('features_cleared')) {
             $settings->features = [];
             $changes[] = 'features';
         }
