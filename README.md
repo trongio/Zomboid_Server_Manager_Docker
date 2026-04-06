@@ -74,6 +74,13 @@ Zomboid Manager wraps a Dockerized Project Zomboid dedicated server with a Larav
 
 Admin-editable site settings at `/admin/site-settings`: site name, logo/favicon upload, footer text, hero section content, feature cards (up to 8 with icon picker), landing page section visibility and ordering, and theme color customization (hex color picker with automatic oklch conversion). Full internationalization system at `/admin/translations`: dynamic language management, JSON file defaults with database overrides, JSON import/export for offline translation workflow, and a language switcher on public pages. Georgian font (Noto Sans Georgian) included.
 
+<details>
+<summary>Screenshots</summary>
+
+![Site Settings](docs/screenshots/site-settings.png)
+![Translations](docs/screenshots/translations.png)
+</details>
+
 ### Welcome Page
 
 Public landing page with live server status, community stats (total players, zombie kills, hours survived, deaths), a top survivors podium, and a feature overview. Sections render in admin-configured order; disabled sections are hidden. All content is editable from the Site Settings admin page. No login required.
