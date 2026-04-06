@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { Bell, Send } from 'lucide-react';
 import { useState } from 'react';
 import { fetchAction } from '@/lib/fetch-action';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,12 +31,12 @@ type Props = {
     available_events: Record<string, EventConfig>;
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Discord Webhook', href: '/admin/discord' },
-];
-
 export default function DiscordWebhook({ settings, available_events }: Props) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.discord.title'), href: '/admin/discord' },
+    ];
     const [webhookUrl, setWebhookUrl] = useState('');
     const [showUrlInput, setShowUrlInput] = useState(!settings.has_webhook_url);
     const [enabled, setEnabled] = useState(settings.enabled);
@@ -86,7 +87,7 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
         await fetchAction('/admin/discord', {
             method: 'PATCH',
             data,
-            successMessage: 'Discord webhook settings saved',
+            successMessage: t('admin.discord.toast_settings_saved'),
         });
         setSaving(false);
         router.reload();
@@ -95,7 +96,7 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
     async function sendTest() {
         setTesting(true);
         const result = await fetchAction('/admin/discord/test', {
-            successMessage: 'Test message sent to Discord!',
+            successMessage: t('admin.discord.toast_test_sent'),
         });
         setTesting(false);
         if (result && !result.success) {
@@ -105,12 +106,12 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Discord Webhook" />
+            <Head title={t('admin.discord.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Discord Webhook</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('admin.discord.title')}</h1>
                     <p className="text-muted-foreground">
-                        Send server event notifications to a Discord channel.
+                        {t('admin.discord.description')}
                     </p>
                 </div>
 
@@ -119,16 +120,16 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Bell className="size-5" />
-                            Webhook Settings
+                            {t('admin.discord.settings_title')}
                         </CardTitle>
                         <CardDescription>
-                            Configure your Discord webhook URL and enable notifications.
+                            {t('admin.discord.settings_description')}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {/* Webhook URL */}
                         <div className="space-y-2">
-                            <Label htmlFor="webhook-url">Webhook URL</Label>
+                            <Label htmlFor="webhook-url">{t('admin.discord.webhook_url_label')}</Label>
                             {settings.has_webhook_url && !showUrlInput ? (
                                 <div className="flex items-center gap-2">
                                     <Input
@@ -141,7 +142,7 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                                         size="sm"
                                         onClick={() => setShowUrlInput(true)}
                                     >
-                                        Change
+                                        {t('admin.discord.change_url')}
                                     </Button>
                                 </div>
                             ) : (
@@ -160,9 +161,9 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                         {/* Enable/Disable */}
                         <div className="flex items-center justify-between">
                             <div className="space-y-0.5">
-                                <Label htmlFor="webhook-enabled">Enable Notifications</Label>
+                                <Label htmlFor="webhook-enabled">{t('admin.discord.enable_label')}</Label>
                                 <p className="text-sm text-muted-foreground">
-                                    When enabled, selected events will be posted to Discord.
+                                    {t('admin.discord.enable_description')}
                                 </p>
                             </div>
                             <Switch
@@ -177,7 +178,7 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                         {/* Actions */}
                         <div className="flex items-center gap-2">
                             <Button onClick={save} disabled={saving}>
-                                {saving ? 'Saving...' : 'Save Settings'}
+                                {saving ? t('common.saving') : t('admin.discord.save_settings')}
                             </Button>
                             {settings.has_webhook_url && (
                                 <Button
@@ -186,7 +187,7 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                                     disabled={testing}
                                 >
                                     <Send className="mr-1.5 size-4" />
-                                    {testing ? 'Sending...' : 'Send Test Message'}
+                                    {testing ? t('admin.discord.sending') : t('admin.discord.send_test')}
                                 </Button>
                             )}
                         </div>
@@ -198,17 +199,17 @@ export default function DiscordWebhook({ settings, available_events }: Props) {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle>Event Selection</CardTitle>
+                                <CardTitle>{t('admin.discord.events_title')}</CardTitle>
                                 <CardDescription>
-                                    Choose which server events trigger Discord notifications.
+                                    {t('admin.discord.events_description')}
                                 </CardDescription>
                             </div>
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" size="sm" onClick={selectAll} disabled={allSelected}>
-                                    Select All
+                                    {t('admin.discord.select_all')}
                                 </Button>
                                 <Button variant="outline" size="sm" onClick={deselectAll} disabled={enabledEvents.length === 0}>
-                                    Deselect All
+                                    {t('admin.discord.deselect_all')}
                                 </Button>
                             </div>
                         </div>

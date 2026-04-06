@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BackupEntry, BreadcrumbItem } from '@/types';
@@ -38,11 +39,6 @@ type PaginatedBackups = {
     per_page: number;
     total: number;
 };
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Backups', href: '/admin/backups' },
-];
 
 const COUNTDOWN_OPTIONS = [
     { value: '0', label: 'Immediately' },
@@ -79,6 +75,11 @@ type BackupsProps = {
 type SortKey = 'filename' | 'type' | 'size_bytes' | 'created_at';
 
 export default function Backups({ backups, current_version, current_branch, filters }: BackupsProps) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.backups.title'), href: '/admin/backups' },
+    ];
     const [showCreate, setShowCreate] = useState(false);
     const { sortKey, sortDir, toggleSort } = useServerSort<SortKey>({
         url: '/admin/backups',
@@ -143,7 +144,7 @@ export default function Backups({ backups, current_version, current_branch, filt
         }
         await fetchAction('/admin/backups', {
             data,
-            successMessage: 'Backup started — it will appear in the list shortly',
+            successMessage: t('admin.backups.toast_backup_started'),
         });
         setLoading(false);
         setShowCreate(false);
@@ -169,8 +170,8 @@ export default function Backups({ backups, current_version, current_branch, filt
         await fetchAction(`/admin/backups/${backup.id}/rollback`, {
             data,
             successMessage: countdown > 0
-                ? `Rollback scheduled in ${countdown} seconds`
-                : `Rollback initiated — ${backup.filename} will be restored`,
+                ? t('admin.backups.toast_rollback_scheduled', { seconds: String(countdown) })
+                : t('admin.backups.toast_rollback_initiated', { filename: backup.filename }),
         });
         setLoading(false);
         setRollbackTarget(null);
@@ -184,7 +185,7 @@ export default function Backups({ backups, current_version, current_branch, filt
         setLoading(true);
         await fetchAction(`/admin/backups/${backup.id}`, {
             method: 'DELETE',
-            successMessage: 'Backup deleted',
+            successMessage: t('admin.backups.toast_backup_deleted'),
         });
         setLoading(false);
         setDeleteTarget(null);
@@ -196,7 +197,7 @@ export default function Backups({ backups, current_version, current_branch, filt
         await fetchAction('/admin/backups', {
             method: 'DELETE',
             data: { ids: Array.from(selectedIds) },
-            successMessage: `Deleted ${selectedIds.size} backup(s)`,
+            successMessage: t('admin.backups.toast_bulk_deleted', { count: String(selectedIds.size) }),
         });
         setLoading(false);
         setShowBulkDelete(false);
@@ -223,18 +224,18 @@ export default function Backups({ backups, current_version, current_branch, filt
 
             if (res.ok) {
                 const { toast } = await import('sonner');
-                toast.success(json.message || 'World import started');
+                toast.success(json.message || t('admin.backups.toast_import_success'));
                 setShowImport(false);
                 setImportFile(null);
                 setImportConfirm(false);
                 router.reload();
             } else {
                 const { toast } = await import('sonner');
-                toast.error(json.error || json.message || `Import failed (${res.status})`);
+                toast.error(json.error || json.message || t('admin.backups.toast_import_failed'));
             }
         } catch {
             const { toast } = await import('sonner');
-            toast.error('Network error — could not reach the server');
+            toast.error(t('admin.backups.toast_network_error'));
         }
 
         setImportLoading(false);
@@ -259,12 +260,12 @@ export default function Backups({ backups, current_version, current_branch, filt
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Backups" />
+            <Head title={t('admin.backups.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Backup Management</h1>
-                        <p className="text-muted-foreground">{backups ? `${backups.total} backup${backups.total !== 1 ? 's' : ''}` : 'Loading...'}</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.backups.title')}</h1>
+                        <p className="text-muted-foreground">{backups ? t('admin.backups.backup_count', { count: String(backups.total) }) : t('common.loading')}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {selectedIds.size > 0 && (
@@ -273,16 +274,16 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 onClick={() => setShowBulkDelete(true)}
                             >
                                 <Trash2 className="mr-1.5 size-4" />
-                                Delete {selectedIds.size} Selected
+                                {t('admin.backups.delete_selected', { count: String(selectedIds.size) })}
                             </Button>
                         )}
                         <Button variant="outline" onClick={() => setShowImport(true)}>
                             <Upload className="mr-1.5 size-4" />
-                            Import World
+                            {t('admin.backups.import_world')}
                         </Button>
                         <Button onClick={() => setShowCreate(true)}>
                             <Plus className="mr-1.5 size-4" />
-                            Create Backup
+                            {t('admin.backups.create_backup')}
                         </Button>
                     </div>
                 </div>
@@ -293,14 +294,14 @@ export default function Backups({ backups, current_version, current_branch, filt
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Archive className="size-5" />
-                                    Backups
+                                    {t('admin.backups.card_title')}
                                 </CardTitle>
-                                <CardDescription>Server world saves with rollback support</CardDescription>
+                                <CardDescription>{t('admin.backups.card_description')}</CardDescription>
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search backups..."
+                                    placeholder={t('admin.backups.search_placeholder')}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="pl-9 sm:w-[200px]"
@@ -314,13 +315,13 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="w-10" />
-                                        <TableHead>Filename</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Type</TableHead>
-                                        <TableHead className="hidden md:table-cell">Version</TableHead>
-                                        <TableHead className="hidden sm:table-cell">Size</TableHead>
-                                        <TableHead className="hidden md:table-cell">Date</TableHead>
-                                        <TableHead className="hidden lg:table-cell">Notes</TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead>{t('admin.backups.table_filename')}</TableHead>
+                                        <TableHead className="hidden sm:table-cell">{t('admin.backups.table_type')}</TableHead>
+                                        <TableHead className="hidden md:table-cell">{t('admin.backups.table_version')}</TableHead>
+                                        <TableHead className="hidden sm:table-cell">{t('admin.backups.table_size')}</TableHead>
+                                        <TableHead className="hidden md:table-cell">{t('admin.backups.table_date')}</TableHead>
+                                        <TableHead className="hidden lg:table-cell">{t('admin.backups.table_notes')}</TableHead>
+                                        <TableHead className="text-right">{t('admin.backups.table_actions')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -356,20 +357,20 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                 />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="filename" label="Filename" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="filename" label={t('admin.backups.table_filename')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
                                             <TableHead className="hidden sm:table-cell">
-                                                <SortableHeader column="type" label="Type" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="type" label={t('admin.backups.table_type')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
-                                            <TableHead className="hidden md:table-cell">Version</TableHead>
+                                            <TableHead className="hidden md:table-cell">{t('admin.backups.table_version')}</TableHead>
                                             <TableHead className="hidden sm:table-cell">
-                                                <SortableHeader column="size_bytes" label="Size" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="size_bytes" label={t('admin.backups.table_size')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
                                             <TableHead className="hidden md:table-cell">
-                                                <SortableHeader column="created_at" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                                                <SortableHeader column="created_at" label={t('admin.backups.table_date')} sortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                                             </TableHead>
-                                            <TableHead className="hidden lg:table-cell">Notes</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead className="hidden lg:table-cell">{t('admin.backups.table_notes')}</TableHead>
+                                            <TableHead className="text-right">{t('admin.backups.table_actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -390,7 +391,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                 </TableCell>
                                                 <TableCell className="hidden md:table-cell">
                                                     <span className="text-sm text-muted-foreground">
-                                                        {backup.game_version ? `v${backup.game_version}` : 'Unknown'}
+                                                        {backup.game_version ? `v${backup.game_version}` : t('admin.backups.version_unknown')}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className="hidden tabular-nums sm:table-cell">
@@ -423,7 +424,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                             onClick={() => setRollbackTarget(backup)}
                                                         >
                                                             <RotateCcw className="mr-1.5 size-3.5" />
-                                                            Rollback
+                                                            {t('admin.backups.rollback_button')}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -441,7 +442,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 </Table>
                             ) : (
                                 <p className="py-8 text-center text-muted-foreground">
-                                    {search ? 'No backups match your search' : 'No backups yet'}
+                                    {search ? t('admin.backups.empty_search') : t('admin.backups.empty')}
                                 </p>
                             )}
 
@@ -449,7 +450,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                             {backups && backups.total > 0 && (
                                 <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
                                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <span>Rows per page</span>
+                                        <span>{t('admin.backups.rows_per_page')}</span>
                                         <Select
                                             value={String(backups.per_page)}
                                             onValueChange={changePerPage}
@@ -464,10 +465,11 @@ export default function Backups({ backups, current_version, current_branch, filt
                                             </SelectContent>
                                         </Select>
                                         <span>
-                                            {(backups.current_page - 1) * backups.per_page + 1}
-                                            &ndash;
-                                            {Math.min(backups.current_page * backups.per_page, backups.total)}
-                                            {' '}of {backups.total}
+                                            {t('admin.backups.pagination_range', {
+                                                from: String((backups.current_page - 1) * backups.per_page + 1),
+                                                to: String(Math.min(backups.current_page * backups.per_page, backups.total)),
+                                                total: String(backups.total),
+                                            })}
                                         </span>
                                     </div>
                                     {backups.last_page > 1 && (
@@ -511,19 +513,19 @@ export default function Backups({ backups, current_version, current_branch, filt
             <Dialog open={showCreate} onOpenChange={setShowCreate}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Create Backup</DialogTitle>
+                        <DialogTitle>{t('admin.backups.create_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Create a manual backup of the current server state.
+                            {t('admin.backups.create_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                            <Label htmlFor="backup-notes">Notes (optional)</Label>
+                            <Label htmlFor="backup-notes">{t('admin.backups.notes_label')}</Label>
                             <Input
                                 id="backup-notes"
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                placeholder="e.g. Before mod update"
+                                placeholder={t('admin.backups.notes_placeholder')}
                             />
                         </div>
                         <div className="flex items-center gap-2">
@@ -533,26 +535,26 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 onCheckedChange={(checked) => setNotifyPlayers(checked === true)}
                             />
                             <Label htmlFor="notify-players" className="cursor-pointer">
-                                Notify players in-game
+                                {t('admin.backups.notify_players')}
                             </Label>
                         </div>
                         {notifyPlayers && (
                             <div className="grid gap-2">
-                                <Label htmlFor="backup-message">Notification message (optional)</Label>
+                                <Label htmlFor="backup-message">{t('admin.backups.notification_message_label')}</Label>
                                 <Input
                                     id="backup-message"
                                     value={backupMessage}
                                     onChange={(e) => setBackupMessage(e.target.value)}
-                                    placeholder="Backup in progress — expect a brief lag"
+                                    placeholder={t('admin.backups.notification_message_placeholder')}
                                     maxLength={500}
                                 />
                             </div>
                         )}
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowCreate(false)}>{t('common.cancel')}</Button>
                         <Button disabled={loading} onClick={createBackup}>
-                            Create Backup
+                            {t('admin.backups.create_backup')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -567,10 +569,9 @@ export default function Backups({ backups, current_version, current_branch, filt
             }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Rollback to Backup</DialogTitle>
+                        <DialogTitle>{t('admin.backups.rollback_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            This will stop the server, restore from <strong>{rollbackTarget?.filename}</strong>,
-                            and restart it. A pre-rollback safety backup will be created automatically.
+                            {t('admin.backups.rollback_dialog_description', { filename: rollbackTarget?.filename ?? '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -579,13 +580,14 @@ export default function Backups({ backups, current_version, current_branch, filt
                             <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
                                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                                 <div>
-                                    <p className="font-medium">Version mismatch</p>
+                                    <p className="font-medium">{t('admin.backups.version_mismatch_title')}</p>
                                     <p>
-                                        This backup was created on <strong>v{rollbackTarget.game_version}</strong>
-                                        {rollbackTarget.steam_branch && <> ({rollbackTarget.steam_branch})</>},
-                                        but the server is currently running <strong>v{current_version}</strong>
-                                        {current_branch && <> ({current_branch})</>}.
-                                        The save may not load correctly on a different game version.
+                                        {t('admin.backups.version_mismatch_description', {
+                                            backup_version: rollbackTarget.game_version ?? '',
+                                            backup_branch: rollbackTarget.steam_branch ?? '',
+                                            current_version: current_version ?? '',
+                                            current_branch: current_branch ?? '',
+                                        })}
                                     </p>
                                     {rollbackTarget.steam_branch && rollbackTarget.steam_branch !== current_branch && (
                                         <div className="mt-2 flex items-center gap-2">
@@ -595,7 +597,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                                                 onCheckedChange={(checked) => setSwitchBranch(checked === true)}
                                             />
                                             <Label htmlFor="switch-branch" className="cursor-pointer text-sm">
-                                                Also switch to <strong>{rollbackTarget.steam_branch}</strong> branch after rollback
+                                                {t('admin.backups.switch_branch_label', { branch: rollbackTarget.steam_branch ?? '' })}
                                             </Label>
                                         </div>
                                     )}
@@ -603,7 +605,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                             </div>
                         )}
                         <div className="grid gap-2">
-                            <Label htmlFor="rollback-countdown">Countdown</Label>
+                            <Label htmlFor="rollback-countdown">{t('admin.backups.countdown_label')}</Label>
                             <Select value={rollbackCountdown} onValueChange={setRollbackCountdown}>
                                 <SelectTrigger id="rollback-countdown">
                                     <SelectValue />
@@ -619,10 +621,10 @@ export default function Backups({ backups, current_version, current_branch, filt
                         </div>
                         {rollbackCountdown !== '0' && (
                             <div className="grid gap-2">
-                                <Label htmlFor="rollback-message">Warning message (optional)</Label>
+                                <Label htmlFor="rollback-message">{t('admin.backups.warning_message_label')}</Label>
                                 <Input
                                     id="rollback-message"
-                                    placeholder="Server rolling back — you will be disconnected..."
+                                    placeholder={t('admin.backups.warning_message_placeholder')}
                                     value={rollbackMessage}
                                     onChange={(e) => setRollbackMessage(e.target.value)}
                                     maxLength={500}
@@ -635,13 +637,13 @@ export default function Backups({ backups, current_version, current_branch, filt
                             setRollbackTarget(null);
                             setRollbackCountdown('0');
                             setRollbackMessage('');
-                        }}>Cancel</Button>
+                        }}>{t('common.cancel')}</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={() => rollbackTarget && rollback(rollbackTarget)}
                         >
-                            {rollbackCountdown === '0' ? 'Rollback Now' : 'Schedule Rollback'}
+                            {rollbackCountdown === '0' ? t('admin.backups.rollback_now') : t('admin.backups.schedule_rollback')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -651,19 +653,19 @@ export default function Backups({ backups, current_version, current_branch, filt
             <Dialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete Backup</DialogTitle>
+                        <DialogTitle>{t('admin.backups.delete_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Permanently delete <strong>{deleteTarget?.filename}</strong>? This cannot be undone.
+                            {t('admin.backups.delete_dialog_description', { filename: deleteTarget?.filename ?? '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={() => deleteTarget && deleteBackup(deleteTarget)}
                         >
-                            Delete
+                            {t('common.delete')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -673,19 +675,19 @@ export default function Backups({ backups, current_version, current_branch, filt
             <Dialog open={showBulkDelete} onOpenChange={setShowBulkDelete}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Delete {selectedIds.size} Backup{selectedIds.size !== 1 ? 's' : ''}</DialogTitle>
+                        <DialogTitle>{t('admin.backups.bulk_delete_dialog_title', { count: String(selectedIds.size) })}</DialogTitle>
                         <DialogDescription>
-                            Permanently delete <strong>{selectedIds.size}</strong> selected backup{selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.
+                            {t('admin.backups.bulk_delete_dialog_description', { count: String(selectedIds.size) })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowBulkDelete(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowBulkDelete(false)}>{t('common.cancel')}</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={deleteBulk}
                         >
-                            Delete {selectedIds.size} Backup{selectedIds.size !== 1 ? 's' : ''}
+                            {t('admin.backups.bulk_delete_confirm', { count: String(selectedIds.size) })}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -701,31 +703,27 @@ export default function Backups({ backups, current_version, current_branch, filt
             }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Import World Save</DialogTitle>
+                        <DialogTitle>{t('admin.backups.import_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Upload a zip file containing PZ world save data. The server will be
-                            stopped automatically, a safety backup created, the save extracted,
-                            and the server restarted.
+                            {t('admin.backups.import_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
                         <div className="flex items-start gap-2 rounded-md border border-yellow-500/50 bg-yellow-500/10 p-3 text-sm text-yellow-700 dark:text-yellow-400">
                             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                             <div className="space-y-1">
-                                <p className="font-medium">This will stop the server and overwrite save data</p>
-                                <p>A pre-import safety backup is created automatically. The server will restart after import completes. Players will be disconnected during this process.</p>
+                                <p className="font-medium">{t('admin.backups.import_warning_title')}</p>
+                                <p>{t('admin.backups.import_warning_description')}</p>
                                 {current_version && (
                                     <p>
-                                        The server is running <strong>v{current_version}</strong>
-                                        {current_branch && <> ({current_branch})</>}.
-                                        Ensure the imported save is compatible with this version.
-                                        Importing a save from a different game version may cause the server to fail to start.
+                                        {t('admin.backups.import_version_warning', { version: current_version })}
+                                        {current_branch && <> ({current_branch})</>}
                                     </p>
                                 )}
                             </div>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="import-file">Zip file</Label>
+                            <Label htmlFor="import-file">{t('admin.backups.import_file_label')}</Label>
                             <Input
                                 id="import-file"
                                 type="file"
@@ -744,7 +742,7 @@ export default function Backups({ backups, current_version, current_branch, filt
                             onClick={() => setShowImportHelp(!showImportHelp)}
                         >
                             <HelpCircle className="size-3.5 shrink-0" />
-                            <span className="flex-1 font-medium">How to create the zip file</span>
+                            <span className="flex-1 font-medium">{t('admin.backups.import_help_toggle')}</span>
                             <ChevronDown className={`size-3.5 transition-transform ${showImportHelp ? 'rotate-180' : ''}`} />
                         </button>
                         {showImportHelp && (
@@ -802,13 +800,13 @@ export default function Backups({ backups, current_version, current_branch, filt
                                 onCheckedChange={(checked) => setImportConfirm(checked === true)}
                             />
                             <Label htmlFor="import-confirm" className="cursor-pointer text-sm">
-                                I understand this will stop the server and overwrite save data
+                                {t('admin.backups.import_confirm_label')}
                             </Label>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowImport(false)} disabled={importLoading}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             variant="destructive"
@@ -818,12 +816,12 @@ export default function Backups({ backups, current_version, current_branch, filt
                             {importLoading ? (
                                 <>
                                     <Loader2 className="mr-2 size-4 animate-spin" />
-                                    Uploading...
+                                    {t('admin.backups.uploading')}
                                 </>
                             ) : (
                                 <>
                                     <Upload className="mr-2 size-4" />
-                                    Import World
+                                    {t('admin.backups.import_world')}
                                 </>
                             )}
                         </Button>

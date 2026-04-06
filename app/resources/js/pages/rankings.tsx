@@ -6,6 +6,7 @@ import { AnimatedCounter } from '@/components/animated-counter';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTranslation } from '@/hooks/use-translation';
 import PublicLayout from '@/layouts/public-layout';
 import type { DeathLeaderboardEntry, LeaderboardEntry, RankingsPageData, RatioLeaderboardEntry, WalletLeaderboardEntry } from '@/types';
 
@@ -41,8 +42,9 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function KillsTable({ data }: { data: LeaderboardEntry[] }) {
+    const { t } = useTranslation();
     if (data.length === 0) {
-        return <p className="py-8 text-center text-sm text-muted-foreground">No player stats recorded yet</p>;
+        return <p className="py-8 text-center text-sm text-muted-foreground">{t('rankings.no_stats')}</p>;
     }
 
     return (
@@ -75,8 +77,9 @@ function KillsTable({ data }: { data: LeaderboardEntry[] }) {
 }
 
 function SurvivalTable({ data }: { data: LeaderboardEntry[] }) {
+    const { t } = useTranslation();
     if (data.length === 0) {
-        return <p className="py-8 text-center text-sm text-muted-foreground">No player stats recorded yet</p>;
+        return <p className="py-8 text-center text-sm text-muted-foreground">{t('rankings.no_stats')}</p>;
     }
 
     return (
@@ -111,8 +114,9 @@ function SurvivalTable({ data }: { data: LeaderboardEntry[] }) {
 }
 
 function DeathsTable({ data }: { data: DeathLeaderboardEntry[] }) {
+    const { t } = useTranslation();
     if (data.length === 0) {
-        return <p className="py-8 text-center text-sm text-muted-foreground">No deaths recorded yet</p>;
+        return <p className="py-8 text-center text-sm text-muted-foreground">{t('rankings.no_deaths')}</p>;
     }
 
     return (
@@ -141,8 +145,9 @@ function DeathsTable({ data }: { data: DeathLeaderboardEntry[] }) {
 }
 
 function RatioTable({ data, unit }: { data: RatioLeaderboardEntry[]; unit?: string }) {
+    const { t } = useTranslation();
     if (data.length === 0) {
-        return <p className="py-8 text-center text-sm text-muted-foreground">No players with at least 1 death yet</p>;
+        return <p className="py-8 text-center text-sm text-muted-foreground">{t('rankings.no_ratio_data')}</p>;
     }
 
     return (
@@ -176,8 +181,9 @@ function RatioTable({ data, unit }: { data: RatioLeaderboardEntry[]; unit?: stri
 }
 
 function WalletTable({ data, field }: { data: WalletLeaderboardEntry[]; field: 'total_spent' | 'balance' }) {
+    const { t } = useTranslation();
     if (data.length === 0) {
-        return <p className="py-8 text-center text-sm text-muted-foreground">No wallet data yet</p>;
+        return <p className="py-8 text-center text-sm text-muted-foreground">{t('rankings.no_wallet_data')}</p>;
     }
 
     return (
@@ -223,15 +229,15 @@ function LeaderboardSkeleton() {
     );
 }
 
-const tabs: { key: TabKey; label: string; icon: typeof Skull }[] = [
-    { key: 'kills', label: 'Zombie Kills', icon: Skull },
-    { key: 'survival', label: 'Hours Survived', icon: Clock },
-    { key: 'deaths', label: 'Deaths', icon: Medal },
-    { key: 'kd', label: 'Kills/Death', icon: Crosshair },
-    { key: 'hd', label: 'Hours/Death', icon: Clock },
-    { key: 'pvpd', label: 'PvP Kills/Death', icon: Swords },
-    { key: 'spent', label: 'Spent', icon: ShoppingCart },
-    { key: 'balance', label: 'Balance', icon: Coins },
+const tabs: { key: TabKey; labelKey: string; icon: typeof Skull }[] = [
+    { key: 'kills', labelKey: 'rankings.tab_kills', icon: Skull },
+    { key: 'survival', labelKey: 'rankings.tab_survival', icon: Clock },
+    { key: 'deaths', labelKey: 'rankings.tab_deaths', icon: Medal },
+    { key: 'kd', labelKey: 'rankings.tab_kd', icon: Crosshair },
+    { key: 'hd', labelKey: 'rankings.tab_hd', icon: Clock },
+    { key: 'pvpd', labelKey: 'rankings.tab_pvpd', icon: Swords },
+    { key: 'spent', labelKey: 'rankings.tab_spent', icon: ShoppingCart },
+    { key: 'balance', labelKey: 'rankings.tab_balance', icon: Coins },
 ];
 
 export default function Rankings({
@@ -246,13 +252,14 @@ export default function Rankings({
     leaderboard_balance,
 }: RankingsPageData) {
     const [activeTab, setActiveTab] = useState<TabKey>('kills');
+    const { t } = useTranslation();
 
     return (
         <>
-            <Head title="Rankings" />
+            <Head title={t('rankings.title')} />
             <PublicLayout>
                 <main className="mx-auto max-w-7xl px-4 py-8">
-                    <h1 className="mb-6 text-3xl font-bold tracking-tight">Rankings</h1>
+                    <h1 className="mb-6 text-3xl font-bold tracking-tight">{t('rankings.title')}</h1>
 
                     {/* Server Stats Hero */}
                     <div className="mb-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -262,7 +269,7 @@ export default function Rankings({
                                     <Users className="size-5 text-blue-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Players</p>
+                                    <p className="text-xs text-muted-foreground">{t('rankings.total_players')}</p>
                                     <p className="text-2xl font-bold tabular-nums">
                                         <AnimatedCounter value={server_stats.total_players} />
                                     </p>
@@ -275,7 +282,7 @@ export default function Rankings({
                                     <Skull className="size-5 text-red-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Zombie Kills</p>
+                                    <p className="text-xs text-muted-foreground">{t('rankings.zombie_kills')}</p>
                                     <p className="text-2xl font-bold tabular-nums">
                                         <AnimatedCounter value={server_stats.total_zombie_kills} />
                                     </p>
@@ -288,7 +295,7 @@ export default function Rankings({
                                     <Clock className="size-5 text-green-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Hours Played</p>
+                                    <p className="text-xs text-muted-foreground">{t('rankings.hours_played')}</p>
                                     <p className="text-2xl font-bold tabular-nums">
                                         <AnimatedCounter value={server_stats.total_hours_survived} decimals={1} suffix="h" />
                                     </p>
@@ -301,7 +308,7 @@ export default function Rankings({
                                     <Skull className="size-5 text-orange-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Deaths</p>
+                                    <p className="text-xs text-muted-foreground">{t('rankings.deaths')}</p>
                                     <p className="text-2xl font-bold tabular-nums">
                                         <AnimatedCounter value={server_stats.total_deaths} />
                                     </p>
@@ -314,7 +321,7 @@ export default function Rankings({
                                     <Swords className="size-5 text-purple-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">PvP Kills</p>
+                                    <p className="text-xs text-muted-foreground">{t('rankings.pvp_kills')}</p>
                                     <p className="text-2xl font-bold tabular-nums">
                                         <AnimatedCounter value={server_stats.total_pvp_kills} />
                                     </p>
@@ -329,7 +336,7 @@ export default function Rankings({
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <Trophy className="size-5" />
-                                    Leaderboards
+                                    {t('rankings.leaderboards')}
                                 </CardTitle>
                             </div>
                             <div className="flex gap-1 overflow-x-auto border-b border-border pt-2">
@@ -344,7 +351,7 @@ export default function Rankings({
                                         }`}
                                     >
                                         <tab.icon className="size-3.5" />
-                                        {tab.label}
+                                        {t(tab.labelKey)}
                                     </button>
                                 ))}
                             </div>

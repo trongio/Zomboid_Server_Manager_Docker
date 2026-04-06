@@ -50,3 +50,4 @@ workshop/ZomboidManager/Contents/mods/ZomboidManager/42/media/
 # Test / Coverage
 /app/.phpunit.result.cache
 /app/coverage/
+.playwright-mcp/

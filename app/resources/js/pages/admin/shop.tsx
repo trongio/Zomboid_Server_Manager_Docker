@@ -3,6 +3,7 @@ import { Package, Plus, Search, Tag, ToggleLeft, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { SortableHeader } from '@/components/sortable-header';
 import { useTableSort } from '@/hooks/use-table-sort';
+import { useTranslation } from '@/hooks/use-translation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,11 +42,6 @@ type Props = {
     catalog: ItemCatalogEntry[];
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Shop', href: '/admin/shop' },
-];
-
 function ItemIcon({ src, name, size = 32 }: { src: string; name: string; size?: number }) {
     return (
         <img
@@ -65,6 +61,7 @@ type ItemSortKey = 'name' | 'item_type' | 'price' | 'quantity' | 'is_active';
 type CatSortKey = 'name' | 'sort_order' | 'is_active';
 
 export default function ShopAdmin({ categories, items, catalog }: Props) {
+    const { t } = useTranslation();
     const [tab, setTab] = useState<'items' | 'categories'>('items');
     const [filter, setFilter] = useState('');
     const [itemDialogOpen, setItemDialogOpen] = useState(false);
@@ -195,12 +192,12 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
             await fetchAction(`/admin/shop/items/${editItem.id}`, {
                 method: 'PATCH',
                 data,
-                successMessage: 'Item updated',
+                successMessage: t('admin.shop.item_updated'),
             });
         } else {
             await fetchAction('/admin/shop/items', {
                 data,
-                successMessage: 'Item created',
+                successMessage: t('admin.shop.item_created'),
             });
         }
         setLoading(false);
@@ -221,12 +218,12 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
             await fetchAction(`/admin/shop/categories/${editCategory.id}`, {
                 method: 'PATCH',
                 data,
-                successMessage: 'Category updated',
+                successMessage: t('admin.shop.category_updated'),
             });
         } else {
             await fetchAction('/admin/shop/categories', {
                 data,
-                successMessage: 'Category created',
+                successMessage: t('admin.shop.category_created'),
             });
         }
         setLoading(false);
@@ -237,14 +234,14 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
     async function handleDeleteItem(item: ShopItem) {
         await fetchAction(`/admin/shop/items/${item.id}`, {
             method: 'DELETE',
-            successMessage: 'Item deleted',
+            successMessage: t('admin.shop.item_deleted'),
         });
         router.reload();
     }
 
     async function handleToggleItem(item: ShopItem) {
         await fetchAction(`/admin/shop/items/${item.id}/toggle`, {
-            successMessage: item.is_active ? 'Item deactivated' : 'Item activated',
+            successMessage: item.is_active ? t('admin.shop.item_deactivated') : t('admin.shop.item_activated'),
         });
         router.reload();
     }
@@ -252,30 +249,35 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
     async function handleDeleteCategory(cat: ShopCategory) {
         await fetchAction(`/admin/shop/categories/${cat.id}`, {
             method: 'DELETE',
-            successMessage: 'Category deleted',
+            successMessage: t('admin.shop.category_deleted'),
         });
         router.reload();
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.shop.breadcrumb'), href: '/admin/shop' },
+    ];
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Shop Management" />
+            <Head title={t('admin.shop.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Shop Management</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.shop.title')}</h1>
                         <p className="text-muted-foreground text-sm">
-                            Manage shop items and categories
+                            {t('admin.shop.description')}
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={openCreateCategory}>
                             <Tag className="mr-1.5 size-4" />
-                            Add Category
+                            {t('admin.shop.add_category')}
                         </Button>
                         <Button onClick={openCreateItem}>
                             <Plus className="mr-1.5 size-4" />
-                            Add Item
+                            {t('admin.shop.add_item')}
                         </Button>
                     </div>
                 </div>
@@ -287,14 +289,14 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                         size="sm"
                         onClick={() => setTab('items')}
                     >
-                        Items ({items.length})
+                        {t('admin.shop.tab_items', { count: String(items.length) })}
                     </Button>
                     <Button
                         variant={tab === 'categories' ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setTab('categories')}
                     >
-                        Categories ({categories.length})
+                        {t('admin.shop.tab_categories', { count: String(categories.length) })}
                     </Button>
                 </div>
 
@@ -303,13 +305,13 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                         <CardHeader>
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
-                                    <CardTitle>Shop Items</CardTitle>
-                                    <CardDescription>{filteredItems.length} items</CardDescription>
+                                    <CardTitle>{t('admin.shop.shop_items')}</CardTitle>
+                                    <CardDescription>{t('admin.shop.items_count', { count: String(filteredItems.length) })}</CardDescription>
                                 </div>
                                 <div className="relative">
                                     <Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
                                     <Input
-                                        placeholder="Filter items..."
+                                        placeholder={t('admin.shop.filter_items')}
                                         value={filter}
                                         onChange={(e) => setFilter(e.target.value)}
                                         className="pl-9 sm:w-[250px]"
@@ -324,23 +326,23 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                         <TableRow>
                                             <TableHead className="w-[40px]" />
                                             <TableHead>
-                                                <SortableHeader column="name" label="Name" sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
+                                                <SortableHeader column="name" label={t('common.name')} sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="item_type" label="Type" sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
+                                                <SortableHeader column="item_type" label={t('admin.shop.type')} sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
                                             </TableHead>
-                                            <TableHead>Category</TableHead>
+                                            <TableHead>{t('common.category')}</TableHead>
                                             <TableHead className="text-right">
-                                                <SortableHeader column="price" label="Price" sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
+                                                <SortableHeader column="price" label={t('common.price')} sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
                                             </TableHead>
                                             <TableHead className="text-center">
-                                                <SortableHeader column="quantity" label="Qty" sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
+                                                <SortableHeader column="quantity" label={t('admin.shop.qty')} sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
                                             </TableHead>
-                                            <TableHead className="text-center">Stock</TableHead>
+                                            <TableHead className="text-center">{t('common.stock')}</TableHead>
                                             <TableHead>
-                                                <SortableHeader column="is_active" label="Status" sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
+                                                <SortableHeader column="is_active" label={t('common.status')} sortKey={itemSortKey} sortDir={itemSortDir} onSort={toggleItemSort} />
                                             </TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead className="text-right">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -355,7 +357,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                                 <TableCell className="font-medium">
                                                     {item.name}
                                                     {item.is_featured && (
-                                                        <Badge className="ml-2 bg-amber-500 text-xs">Featured</Badge>
+                                                        <Badge className="ml-2 bg-amber-500 text-xs">{t('common.featured')}</Badge>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-muted-foreground max-w-[200px] truncate text-xs">
@@ -380,7 +382,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                                         variant={item.is_active ? 'default' : 'destructive'}
                                                         className="text-xs"
                                                     >
-                                                        {item.is_active ? 'Active' : 'Inactive'}
+                                                        {item.is_active ? t('common.active') : t('common.inactive')}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -397,7 +399,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                                             size="sm"
                                                             onClick={() => openEditItem(item)}
                                                         >
-                                                            Edit
+                                                            {t('common.edit')}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -414,7 +416,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 </Table>
                             ) : (
                                 <p className="text-muted-foreground py-8 text-center">
-                                    No shop items yet. Create one to get started.
+                                    {t('admin.shop.no_items')}
                                 </p>
                             )}
                         </CardContent>
@@ -424,8 +426,8 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                 {tab === 'categories' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Categories</CardTitle>
-                            <CardDescription>Organize shop items into categories</CardDescription>
+                            <CardTitle>{t('admin.shop.categories')}</CardTitle>
+                            <CardDescription>{t('admin.shop.categories_desc')}</CardDescription>
                         </CardHeader>
                         <CardContent className="overflow-x-auto">
                             {categories.length > 0 ? (
@@ -434,17 +436,17 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                         <TableRow>
                                             <TableHead className="w-[40px]" />
                                             <TableHead>
-                                                <SortableHeader column="name" label="Name" sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
+                                                <SortableHeader column="name" label={t('common.name')} sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
                                             </TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead className="text-center">Items</TableHead>
+                                            <TableHead>{t('common.description')}</TableHead>
+                                            <TableHead className="text-center">{t('common.items')}</TableHead>
                                             <TableHead className="text-center">
-                                                <SortableHeader column="sort_order" label="Sort Order" sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
+                                                <SortableHeader column="sort_order" label={t('admin.shop.sort_order')} sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
                                             </TableHead>
                                             <TableHead>
-                                                <SortableHeader column="is_active" label="Status" sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
+                                                <SortableHeader column="is_active" label={t('common.status')} sortKey={catSortKey} sortDir={catSortDir} onSort={toggleCatSort} />
                                             </TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead className="text-right">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -474,7 +476,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                                         variant={cat.is_active ? 'default' : 'destructive'}
                                                         className="text-xs"
                                                     >
-                                                        {cat.is_active ? 'Active' : 'Inactive'}
+                                                        {cat.is_active ? t('common.active') : t('common.inactive')}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
@@ -484,7 +486,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                                             size="sm"
                                                             onClick={() => openEditCategory(cat)}
                                                         >
-                                                            Edit
+                                                            {t('common.edit')}
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
@@ -501,7 +503,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 </Table>
                             ) : (
                                 <p className="text-muted-foreground py-8 text-center">
-                                    No categories yet.
+                                    {t('admin.shop.no_categories')}
                                 </p>
                             )}
                         </CardContent>
@@ -513,26 +515,26 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
             <Dialog open={itemDialogOpen} onOpenChange={setItemDialogOpen}>
                 <DialogContent className="sm:max-w-xl">
                     <DialogHeader>
-                        <DialogTitle>{editItem ? 'Edit Item' : 'Create Item'}</DialogTitle>
+                        <DialogTitle>{editItem ? t('admin.shop.edit_item_title') : t('admin.shop.create_item_title')}</DialogTitle>
                         <DialogDescription>
-                            {editItem ? 'Update shop item details.' : 'Add a new item to the shop.'}
+                            {editItem ? t('admin.shop.edit_item_desc') : t('admin.shop.create_item_desc')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3">
                         <div className="space-y-2">
-                            <Label>Name</Label>
+                            <Label>{t('common.name')}</Label>
                             <Input value={itemName} onChange={(e) => setItemName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Description</Label>
+                            <Label>{t('common.description')}</Label>
                             <Textarea value={itemDescription} onChange={(e) => setItemDescription(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <Label>PZ Item Type</Label>
+                            <Label>{t('admin.shop.pz_item_type')}</Label>
                             <div className="relative">
                                 <Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
                                 <Input
-                                    placeholder="Search catalog..."
+                                    placeholder={t('admin.shop.search_catalog')}
                                     value={itemSearch || itemType}
                                     onChange={(e) => {
                                         setItemSearch(e.target.value);
@@ -564,7 +566,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                         </div>
                         <div className="grid grid-cols-3 gap-4">
                             <div className="space-y-2">
-                                <Label>PZ Quantity</Label>
+                                <Label>{t('admin.shop.pz_quantity')}</Label>
                                 <Input
                                     type="number"
                                     min={1}
@@ -573,18 +575,18 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Weight (kg)</Label>
+                                <Label>{t('admin.shop.weight_kg')}</Label>
                                 <Input
                                     type="number"
                                     step="0.01"
                                     min={0}
-                                    placeholder="Optional"
+                                    placeholder={t('admin.shop.optional')}
                                     value={itemWeight}
                                     onChange={(e) => setItemWeight(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Price</Label>
+                                <Label>{t('common.price')}</Label>
                                 <Input
                                     type="number"
                                     step="1"
@@ -596,10 +598,10 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                         </div>
                         <div className="grid grid-cols-3 gap-3">
                             <div className="space-y-2">
-                                <Label>Category</Label>
+                                <Label>{t('common.category')}</Label>
                                 <Select value={itemCategoryId} onValueChange={setItemCategoryId}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="None" />
+                                        <SelectValue placeholder={t('common.none')} />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {categories.filter((c) => c.is_active).map((cat) => (
@@ -611,21 +613,21 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 </Select>
                             </div>
                             <div className="space-y-2">
-                                <Label>Max Per Player</Label>
+                                <Label>{t('admin.shop.max_per_player')}</Label>
                                 <Input
                                     type="number"
                                     min={1}
-                                    placeholder="Unlimited"
+                                    placeholder={t('common.unlimited')}
                                     value={itemMaxPerPlayer}
                                     onChange={(e) => setItemMaxPerPlayer(e.target.value)}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Stock</Label>
+                                <Label>{t('common.stock')}</Label>
                                 <Input
                                     type="number"
                                     min={0}
-                                    placeholder="Unlimited"
+                                    placeholder={t('common.unlimited')}
                                     value={itemStock}
                                     onChange={(e) => setItemStock(e.target.value)}
                                 />
@@ -637,18 +639,18 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 checked={itemFeatured}
                                 onCheckedChange={(checked) => setItemFeatured(checked === true)}
                             />
-                            <Label htmlFor="item-featured">Featured item</Label>
+                            <Label htmlFor="item-featured">{t('admin.shop.featured_item')}</Label>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setItemDialogOpen(false)}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                         <Button
                             disabled={!itemName || !itemType || !itemPrice || loading}
                             onClick={handleSaveItem}
                         >
-                            {editItem ? 'Update' : 'Create'}
+                            {editItem ? t('common.update') : t('common.create')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -658,23 +660,23 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
             <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editCategory ? 'Edit Category' : 'Create Category'}</DialogTitle>
+                        <DialogTitle>{editCategory ? t('admin.shop.edit_category_title') : t('admin.shop.create_category_title')}</DialogTitle>
                         <DialogDescription>
-                            {editCategory ? 'Update category details.' : 'Add a new category.'}
+                            {editCategory ? t('admin.shop.edit_category_desc') : t('admin.shop.create_category_desc')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label>Name</Label>
+                            <Label>{t('common.name')}</Label>
                             <Input value={catName} onChange={(e) => setCatName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
-                            <Label>Description</Label>
+                            <Label>{t('common.description')}</Label>
                             <Textarea value={catDescription} onChange={(e) => setCatDescription(e.target.value)} />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label>Icon (Lucide name)</Label>
+                                <Label>{t('admin.shop.icon_lucide')}</Label>
                                 <Input
                                     placeholder="e.g. Package"
                                     value={catIcon}
@@ -682,7 +684,7 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label>Sort Order</Label>
+                                <Label>{t('admin.shop.sort_order')}</Label>
                                 <Input
                                     type="number"
                                     min={0}
@@ -694,10 +696,10 @@ export default function ShopAdmin({ categories, items, catalog }: Props) {
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
-                            Cancel
+                            {t('common.cancel')}
                         </Button>
                         <Button disabled={!catName || loading} onClick={handleSaveCategory}>
-                            {editCategory ? 'Update' : 'Create'}
+                            {editCategory ? t('common.update') : t('common.create')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

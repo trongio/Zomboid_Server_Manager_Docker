@@ -23,6 +23,7 @@ import {
     Zap,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useTranslation } from '@/hooks/use-translation';
 import { ActivityFeed } from '@/components/activity-feed';
 import { AnimatedCounter } from '@/components/animated-counter';
 import { GameStateWidget } from '@/components/game-state-widget';
@@ -49,13 +50,6 @@ import { fetchAction } from '@/lib/fetch-action';
 import { dashboard } from '@/routes';
 import type { BreadcrumbItem, DashboardData } from '@/types';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard().url,
-    },
-];
-
 export default function Dashboard({
     server,
     auto_restart,
@@ -67,6 +61,8 @@ export default function Dashboard({
     server_totals,
     connection,
 }: DashboardData) {
+    const { t } = useTranslation();
+    const breadcrumbs: BreadcrumbItem[] = [{ title: t('admin.dashboard.title'), href: dashboard().url }];
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [showRestartDialog, setShowRestartDialog] = useState(false);
     const [showStopDialog, setShowStopDialog] = useState(false);
@@ -106,7 +102,7 @@ export default function Dashboard({
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
+            <Head title={t('admin.dashboard.title')} />
             <div className="flex h-full flex-1 flex-col gap-6 overflow-x-auto p-4 lg:p-6">
                 {/* Server Status Banner */}
                 <div className={`flex flex-col gap-3 overflow-hidden rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between ${statusBgClass}`}>
@@ -122,20 +118,20 @@ export default function Dashboard({
                         />
                         <div>
                             <span className="font-semibold">
-                                Server {server.status === 'online'
-                                    ? 'Online'
+                                {server.status === 'online'
+                                    ? t('admin.dashboard.server_online')
                                     : server.status === 'starting'
-                                      ? 'Starting'
-                                      : 'Offline'}
+                                      ? t('admin.dashboard.server_starting')
+                                      : t('admin.dashboard.server_offline')}
                             </span>
                             {server.status !== 'offline' && server.uptime && (
                                 <span className="ml-2 text-sm text-muted-foreground">
-                                    Uptime: {server.uptime}
+                                    {t('admin.dashboard.uptime', { uptime: server.uptime })}
                                 </span>
                             )}
                             {server.status === 'starting' && server.container_status === 'running' && (
                                 <p className="text-sm text-muted-foreground">
-                                    Container running &mdash; waiting for game server to accept connections
+                                    {t('admin.dashboard.container_waiting')}
                                 </p>
                             )}
                         </div>
@@ -176,7 +172,7 @@ export default function Dashboard({
                                     onClick={() => serverAction('save')}
                                 >
                                     <Save className="mr-1.5 size-3.5" />
-                                    Save
+                                    {t('admin.dashboard.save')}
                                 </Button>
                                 <Button
                                     variant="outline"
@@ -185,7 +181,7 @@ export default function Dashboard({
                                     onClick={() => setShowRestartDialog(true)}
                                 >
                                     <RefreshCw className="mr-1.5 size-3.5" />
-                                    Restart
+                                    {t('admin.dashboard.restart')}
                                 </Button>
                                 <Button
                                     variant="destructive"
@@ -194,7 +190,7 @@ export default function Dashboard({
                                     onClick={() => setShowStopDialog(true)}
                                 >
                                     <Square className="mr-1.5 size-3.5" />
-                                    Stop
+                                    {t('admin.dashboard.stop')}
                                 </Button>
                             </>
                         ) : (
@@ -204,7 +200,7 @@ export default function Dashboard({
                                 onClick={() => serverAction('start')}
                             >
                                 <Play className="mr-1.5 size-3.5" />
-                                Start
+                                {t('admin.dashboard.start')}
                             </Button>
                         )}
                         <Button
@@ -214,7 +210,7 @@ export default function Dashboard({
                             onClick={() => setShowUpdateDialog(true)}
                         >
                             <ArrowUpCircle className="mr-1.5 size-3.5" />
-                            Update
+                            {t('admin.dashboard.update')}
                         </Button>
                         <Button
                             variant="destructive"
@@ -223,7 +219,7 @@ export default function Dashboard({
                             onClick={() => setShowWipeDialog(true)}
                         >
                             <Trash2 className="mr-1.5 size-3.5" />
-                            Wipe
+                            {t('admin.dashboard.wipe')}
                         </Button>
                     </div>
                 </div>
@@ -235,7 +231,7 @@ export default function Dashboard({
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Players Online</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.players_online')}</CardTitle>
                             <Users className="size-4 text-blue-500" />
                         </CardHeader>
                         <CardContent>
@@ -260,17 +256,17 @@ export default function Dashboard({
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Map</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.map')}</CardTitle>
                             <Map className="size-4 text-green-500" />
                         </CardHeader>
                         <CardContent>
-                            <div className="truncate text-3xl font-bold">{server.map || 'N/A'}</div>
+                            <div className="truncate text-3xl font-bold">{server.map || t('admin.dashboard.na')}</div>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Connection</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.connection')}</CardTitle>
                             <Dialog open={connOpen} onOpenChange={(open) => {
                                 setConnOpen(open);
                                 if (open) {
@@ -285,14 +281,14 @@ export default function Dashboard({
                                 </DialogTrigger>
                                 <DialogContent className="sm:max-w-md">
                                     <DialogHeader>
-                                        <DialogTitle>Connection Settings</DialogTitle>
+                                        <DialogTitle>{t('admin.dashboard.connection_settings')}</DialogTitle>
                                         <DialogDescription>
-                                            Set the public IP and port shown to players on the welcome page.
+                                            {t('admin.dashboard.connection_description')}
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4 py-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="conn-ip">Server IP</Label>
+                                            <Label htmlFor="conn-ip">{t('admin.dashboard.server_ip')}</Label>
                                             <Input
                                                 id="conn-ip"
                                                 value={connIp}
@@ -301,7 +297,7 @@ export default function Dashboard({
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="conn-port">Port</Label>
+                                            <Label htmlFor="conn-port">{t('admin.dashboard.port')}</Label>
                                             <Input
                                                 id="conn-port"
                                                 value={connPort}
@@ -312,10 +308,10 @@ export default function Dashboard({
                                     </div>
                                     <DialogFooter>
                                         <DialogClose asChild>
-                                            <Button variant="outline">Cancel</Button>
+                                            <Button variant="outline">{t('common.cancel')}</Button>
                                         </DialogClose>
                                         <Button onClick={saveConnection} disabled={connSaving}>
-                                            {connSaving ? 'Saving...' : 'Save'}
+                                            {connSaving ? t('common.saving') : t('common.save')}
                                         </Button>
                                     </DialogFooter>
                                 </DialogContent>
@@ -327,7 +323,7 @@ export default function Dashboard({
                                     {connection.server_ip}:{connection.server_port}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">Not configured</p>
+                                <p className="text-sm text-muted-foreground">{t('admin.dashboard.not_configured')}</p>
                             )}
                         </CardContent>
                     </Card>
@@ -336,7 +332,7 @@ export default function Dashboard({
                         <>
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Backups</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.backups')}</CardTitle>
                                     <Archive className="size-4 text-purple-500" />
                                 </CardHeader>
                                 <CardContent>
@@ -346,7 +342,7 @@ export default function Dashboard({
                             </Card>
                             <Card>
                                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                    <CardTitle className="text-sm font-medium text-muted-foreground">Last Backup</CardTitle>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.last_backup')}</CardTitle>
                                     <HardDrive className="size-4 text-orange-500" />
                                 </CardHeader>
                                 <CardContent>
@@ -357,24 +353,24 @@ export default function Dashboard({
                     }>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Backups</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.backups')}</CardTitle>
                                 <Archive className="size-4 text-purple-500" />
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold">{backup_summary?.total_count}</div>
-                                <p className="text-xs text-muted-foreground">{backup_summary?.total_size_human} total</p>
+                                <p className="text-xs text-muted-foreground">{t('admin.dashboard.total_size', { size: backup_summary?.total_size_human ?? '' })}</p>
                             </CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Last Backup</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('admin.dashboard.last_backup')}</CardTitle>
                                 <HardDrive className="size-4 text-orange-500" />
                             </CardHeader>
                             <CardContent>
                                 <div className="truncate text-3xl font-bold">
                                     {backup_summary?.last_backup
                                         ? formatDate(backup_summary.last_backup.created_at)
-                                        : 'Never'}
+                                        : t('admin.dashboard.never')}
                                 </div>
                                 {backup_summary?.last_backup && (
                                     <p className="text-xs text-muted-foreground">
@@ -407,7 +403,7 @@ export default function Dashboard({
                                     <Users className="size-4 text-blue-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Players</p>
+                                    <p className="text-xs text-muted-foreground">{t('admin.dashboard.total_players')}</p>
                                     <p className="text-lg font-semibold tabular-nums">
                                         <AnimatedCounter value={server_totals.total_players} />
                                     </p>
@@ -418,7 +414,7 @@ export default function Dashboard({
                                     <Skull className="size-4 text-red-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Kills</p>
+                                    <p className="text-xs text-muted-foreground">{t('admin.dashboard.total_kills')}</p>
                                     <p className="text-lg font-semibold tabular-nums">
                                         <AnimatedCounter value={server_totals.total_zombie_kills} />
                                     </p>
@@ -429,7 +425,7 @@ export default function Dashboard({
                                     <Clock className="size-4 text-green-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Hours</p>
+                                    <p className="text-xs text-muted-foreground">{t('admin.dashboard.total_hours')}</p>
                                     <p className="text-lg font-semibold tabular-nums">
                                         <AnimatedCounter value={server_totals.total_hours_survived} decimals={1} suffix="h" />
                                     </p>
@@ -440,7 +436,7 @@ export default function Dashboard({
                                     <Skull className="size-4 text-orange-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">Total Deaths</p>
+                                    <p className="text-xs text-muted-foreground">{t('admin.dashboard.total_deaths')}</p>
                                     <p className="text-lg font-semibold tabular-nums">
                                         <AnimatedCounter value={server_totals.total_deaths} />
                                     </p>
@@ -451,7 +447,7 @@ export default function Dashboard({
                                     <Swords className="size-4 text-purple-500" />
                                 </div>
                                 <div>
-                                    <p className="text-xs text-muted-foreground">PvP Kills</p>
+                                    <p className="text-xs text-muted-foreground">{t('admin.dashboard.pvp_kills')}</p>
                                     <p className="text-lg font-semibold tabular-nums">
                                         <AnimatedCounter value={server_totals.total_pvp_kills} />
                                     </p>
@@ -468,17 +464,17 @@ export default function Dashboard({
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <Users className="size-5" />
-                                    Online Players
+                                    {t('admin.dashboard.online_players')}
                                 </CardTitle>
                                 <Link
                                     href="/rankings"
                                     className="text-xs font-medium text-muted-foreground hover:text-foreground"
                                 >
-                                    View Rankings
+                                    {t('admin.dashboard.view_rankings')}
                                 </Link>
                             </div>
                             <CardDescription>
-                                {server.player_count} connected
+                                {t('admin.dashboard.connected', { count: String(server.player_count) })}
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -501,13 +497,13 @@ export default function Dashboard({
                                             </div>
                                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
                                                 {player.zombie_kills != null && (
-                                                    <span className="flex items-center gap-1" title="Zombie Kills">
+                                                    <span className="flex items-center gap-1" title={t('admin.dashboard.zombie_kills')}>
                                                         <Skull className="size-3" />
                                                         {player.zombie_kills.toLocaleString()}
                                                     </span>
                                                 )}
                                                 {player.hours_survived != null && (
-                                                    <span className="flex items-center gap-1" title="Hours Survived">
+                                                    <span className="flex items-center gap-1" title={t('admin.dashboard.hours_survived')}>
                                                         <Clock className="size-3" />
                                                         {player.hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h
                                                     </span>
@@ -519,10 +515,10 @@ export default function Dashboard({
                             ) : (
                                 <p className="text-sm text-muted-foreground">
                                     {server.status === 'online'
-                                        ? 'No players online'
+                                        ? t('admin.dashboard.no_players')
                                         : server.status === 'starting'
-                                          ? 'Server is starting...'
-                                          : 'Server is offline'}
+                                          ? t('admin.dashboard.server_starting_msg')
+                                          : t('admin.dashboard.server_offline_msg')}
                                 </p>
                             )}
                         </CardContent>
@@ -533,9 +529,9 @@ export default function Dashboard({
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <ScrollText className="size-5" />
-                                Recent Activity
+                                {t('admin.dashboard.recent_activity')}
                             </CardTitle>
-                            <CardDescription>Latest admin actions</CardDescription>
+                            <CardDescription>{t('admin.dashboard.latest_actions')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Deferred data="recent_audit" fallback={
@@ -577,7 +573,7 @@ export default function Dashboard({
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground">No recent activity</p>
+                                    <p className="text-sm text-muted-foreground">{t('admin.dashboard.no_activity')}</p>
                                 )}
                             </Deferred>
                         </CardContent>
@@ -613,7 +609,7 @@ export default function Dashboard({
                                 className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
                             >
                                 <Trophy className="size-3.5" />
-                                View Full Rankings
+                                {t('admin.dashboard.view_full_rankings')}
                             </Link>
                         </div>
                     </Deferred>
@@ -622,9 +618,9 @@ export default function Dashboard({
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Zap className="size-5" />
-                                Game Events
+                                {t('admin.dashboard.game_events')}
                             </CardTitle>
-                            <CardDescription>Deaths, PvP, crafting, and connections</CardDescription>
+                            <CardDescription>{t('admin.dashboard.game_events_description')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <Deferred data="game_events" fallback={

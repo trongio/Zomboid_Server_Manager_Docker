@@ -28,7 +28,7 @@ Zomboid Manager wraps a Dockerized Project Zomboid dedicated server with a Larav
 - **Docker Engine API** — Container lifecycle control (start, stop, restart, update) via the Docker socket
 - **File I/O** — Direct read/write access to PZ config files (`server.ini`, sandbox Lua) mounted from the game server volume
 
-19 admin pages, a public status page, player portal, item shop, 40+ API endpoints, Discord notifications, an interactive player map, inventory management, safe zones, and more — all from a browser.
+21 admin pages, a public status page, player portal, item shop, 40+ API endpoints, Discord notifications, an interactive player map, inventory management, safe zones, site customization, i18n, and more — all from a browser.
 
 ## Feature Status
 
@@ -64,12 +64,26 @@ Zomboid Manager wraps a Dockerized Project Zomboid dedicated server with a Larav
 | Purchase History & Wallets | Done | Admin views for purchases, delivery tracking, wallet management |
 | In-Game Money Deposit | Done | Convert Base.Money/MoneyBundle to wallet coins via Lua bridge |
 | Lua Bridge Mod | Done | Server-side enforcement for safe zones + respawn |
+| Site Customization | Done | Branding, logo/favicon, hero content, feature cards, section layout |
+| Theme Colors | Done | Admin-configurable color scheme (hex to oklch) |
+| i18n / Translations | Done | Dynamic languages, JSON import/export, DB overrides, language switcher |
 
 ## Features
 
+### Site Customization & i18n
+
+Admin-editable site settings at `/admin/site-settings`: site name, logo/favicon upload, footer text, hero section content, feature cards (up to 8 with icon picker), landing page section visibility and ordering, and theme color customization (hex color picker with automatic oklch conversion). Full internationalization system at `/admin/translations`: dynamic language management, JSON file defaults with database overrides, JSON import/export for offline translation workflow, and a language switcher on public pages. Georgian font (Noto Sans Georgian) included.
+
+<details>
+<summary>Screenshots</summary>
+
+![Site Settings](docs/screenshots/site-settings.png)
+![Translations](docs/screenshots/translations.png)
+</details>
+
 ### Welcome Page
 
-Public landing page with live server status, community stats (total players, zombie kills, hours survived, deaths), a top survivors podium, and a feature overview. No login required.
+Public landing page with live server status, community stats (total players, zombie kills, hours survived, deaths), a top survivors podium, and a feature overview. Sections render in admin-configured order; disabled sections are hidden. All content is editable from the Site Settings admin page. No login required.
 
 <details>
 <summary>Screenshot</summary>

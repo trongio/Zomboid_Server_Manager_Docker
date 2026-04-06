@@ -21,12 +21,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem, ModEntry } from '@/types';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Mods', href: '/admin/mods' },
-];
 
 function SortableModRow({
     mod,
@@ -88,6 +84,12 @@ function SortableModRow({
 }
 
 export default function Mods({ mods }: { mods: ModEntry[] }) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.mods.title'), href: '/admin/mods' },
+    ];
     const [showAdd, setShowAdd] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<ModEntry | null>(null);
     const [workshopId, setWorkshopId] = useState('');
@@ -130,7 +132,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
             data: {
                 mods: reordered.map((m) => ({ workshop_id: m.workshop_id, mod_id: m.mod_id })),
             },
-            successMessage: 'Mod load order updated',
+            successMessage: t('admin.mods.toast_order_updated'),
         });
 
         setRestartRequired(Boolean(result?.restart_required));
@@ -142,7 +144,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
         setLoading(true);
         await fetchAction('/admin/mods', {
             data: { workshop_id: workshopId, mod_id: modId, map_folder: mapFolder || null },
-            successMessage: `Added mod ${modId}`,
+            successMessage: t('admin.mods.toast_added', { mod_id: modId }),
         });
         setLoading(false);
         setShowAdd(false);
@@ -156,7 +158,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
         setLoading(true);
         await fetchAction(`/admin/mods/${mod.workshop_id}`, {
             method: 'DELETE',
-            successMessage: `Removed mod ${mod.mod_id}`,
+            successMessage: t('admin.mods.toast_removed', { mod_id: mod.mod_id }),
         });
         setLoading(false);
         setDeleteTarget(null);
@@ -165,18 +167,18 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Mod Manager" />
+            <Head title={t('admin.mods.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Mod Manager</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.mods.title')}</h1>
                         <p className="text-muted-foreground">
-                            {mods.length} mod{mods.length !== 1 ? 's' : ''} installed
+                            {t('admin.mods.mods_installed', { count: String(mods.length) })}
                         </p>
                     </div>
                     <Button onClick={() => setShowAdd(true)}>
                         <Plus className="mr-1.5 size-4" />
-                        Add Mod
+                        {t('admin.mods.add_mod')}
                     </Button>
                 </div>
 
@@ -186,16 +188,16 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                             <div>
                                 <CardTitle className="flex items-center gap-2">
                                     <Package className="size-5" />
-                                    Installed Mods
+                                    {t('admin.mods.installed_mods')}
                                 </CardTitle>
                                 <CardDescription>
-                                    {filteredMods.length} of {mods.length} mods &middot; Drag to reorder load order
+                                    {t('admin.mods.installed_mods_description', { filtered: String(filteredMods.length), total: String(mods.length) })}
                                 </CardDescription>
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                                 <Input
-                                    placeholder="Search mods..."
+                                    placeholder={t('admin.mods.search_placeholder')}
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="pl-9 sm:w-[200px]"
@@ -208,7 +210,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                             <Alert className="mb-4">
                                 <AlertTriangle className="size-4" />
                                 <AlertDescription>
-                                    Mod load order changed. A server restart is required for changes to take effect.
+                                    {t('admin.mods.restart_required')}
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -218,9 +220,9 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                                     <TableHeader>
                                         <TableRow>
                                             <TableHead className="w-[50px]">{isFiltering ? '#' : ''}</TableHead>
-                                            <TableHead>Mod ID</TableHead>
-                                            <TableHead className="hidden sm:table-cell">Workshop ID</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
+                                            <TableHead>{t('admin.mods.table_mod_id')}</TableHead>
+                                            <TableHead className="hidden sm:table-cell">{t('admin.mods.table_workshop_id')}</TableHead>
+                                            <TableHead className="text-right">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <SortableContext
@@ -243,7 +245,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                             </DndContext>
                         ) : (
                             <p className="py-8 text-center text-muted-foreground">
-                                {search ? 'No mods match your search' : 'No mods installed'}
+                                {search ? t('admin.mods.no_mods_search') : t('admin.mods.no_mods')}
                             </p>
                         )}
                     </CardContent>
@@ -254,44 +256,44 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
             <Dialog open={showAdd} onOpenChange={setShowAdd}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Add Mod</DialogTitle>
+                        <DialogTitle>{t('admin.mods.add_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Add a Steam Workshop mod. Both Workshop ID and Mod ID are required.
+                            {t('admin.mods.add_dialog_description')}
                         </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="workshop-id">Workshop ID</Label>
+                            <Label htmlFor="workshop-id">{t('admin.mods.table_workshop_id')}</Label>
                             <Input
                                 id="workshop-id"
                                 value={workshopId}
                                 onChange={(e) => setWorkshopId(e.target.value)}
-                                placeholder="e.g. 2313387159"
+                                placeholder={t('admin.mods.workshop_id_placeholder')}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="mod-id">Mod ID</Label>
+                            <Label htmlFor="mod-id">{t('admin.mods.table_mod_id')}</Label>
                             <Input
                                 id="mod-id"
                                 value={modId}
                                 onChange={(e) => setModId(e.target.value)}
-                                placeholder="e.g. Arsenal(26)GunFighter"
+                                placeholder={t('admin.mods.mod_id_placeholder')}
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="map-folder">Map Folder (optional)</Label>
+                            <Label htmlFor="map-folder">{t('admin.mods.map_folder_label')}</Label>
                             <Input
                                 id="map-folder"
                                 value={mapFolder}
                                 onChange={(e) => setMapFolder(e.target.value)}
-                                placeholder="Only for map mods"
+                                placeholder={t('admin.mods.map_folder_placeholder')}
                             />
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAdd(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
                         <Button disabled={loading || !workshopId || !modId} onClick={addMod}>
-                            Add Mod
+                            {t('admin.mods.add_mod')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -301,20 +303,19 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
             <Dialog open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Remove Mod</DialogTitle>
+                        <DialogTitle>{t('admin.mods.delete_dialog_title')}</DialogTitle>
                         <DialogDescription>
-                            Are you sure you want to remove <strong>{deleteTarget?.mod_id}</strong> ({deleteTarget?.workshop_id})?
-                            A server restart will be required.
+                            {t('admin.mods.delete_dialog_description', { mod_id: deleteTarget?.mod_id ?? '', workshop_id: deleteTarget?.workshop_id ?? '' })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
                         <Button
                             variant="destructive"
                             disabled={loading}
                             onClick={() => deleteTarget && removeMod(deleteTarget)}
                         >
-                            Remove Mod
+                            {t('admin.mods.delete_dialog_title')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

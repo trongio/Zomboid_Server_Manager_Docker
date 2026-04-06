@@ -6,17 +6,20 @@ import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useTranslation } from '@/hooks/use-translation';
 import AuthLayout from '@/layouts/auth-layout';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
 
 export default function ForgotPassword({ status }: { status?: string }) {
+    const { t } = useTranslation();
+
     return (
         <AuthLayout
-            title="Forgot password"
+            title={t('auth.forgot_password_title')}
             description="Enter your email to receive a password reset link"
         >
-            <Head title="Forgot password" />
+            <Head title={t('auth.forgot_password_title')} />
 
             {status && (
                 <div className="mb-4 text-center text-sm font-medium text-green-600">
@@ -51,7 +54,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
                                     {processing && (
                                         <LoaderCircle className="h-4 w-4 animate-spin" />
                                     )}
-                                    Email password reset link
+                                    {t('auth.email_reset_link')}
                                 </Button>
                             </div>
                         </>
@@ -59,8 +62,8 @@ export default function ForgotPassword({ status }: { status?: string }) {
                 </Form>
 
                 <div className="space-x-1 text-center text-sm text-muted-foreground">
-                    <span>Or, return to</span>
-                    <TextLink href={login()}>log in</TextLink>
+                    <span>{t('auth.or_return_to')}</span>
+                    <TextLink href={login()}>{t('auth.login')}</TextLink>
                 </div>
             </div>
         </AuthLayout>

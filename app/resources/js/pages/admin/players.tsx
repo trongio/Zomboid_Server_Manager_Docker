@@ -16,6 +16,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 
@@ -46,11 +47,6 @@ type RespawnConfig = {
 type SortKey = 'status' | 'username' | 'kills' | 'hours' | 'joined';
 type StatusFilter = 'all' | 'online' | 'offline';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Dashboard', href: '/dashboard' },
-    { title: 'Players', href: '/admin/players' },
-];
-
 const roleBadgeVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
     super_admin: 'default',
     admin: 'default',
@@ -66,6 +62,13 @@ type PlayersProps = {
 };
 
 export default function Players({ players, respawn_cooldowns = {}, respawn_config }: PlayersProps) {
+    const { t } = useTranslation();
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: t('nav.dashboard'), href: '/dashboard' },
+        { title: t('admin.players.title'), href: '/admin/players' },
+    ];
+
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const { sortKey, sortDir, toggleSort } = useTableSort<SortKey>('status', 'desc');
@@ -118,18 +121,18 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Players" />
+            <Head title={t('admin.players.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Player Management</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.players.title')}</h1>
                         <p className="text-muted-foreground">
-                            {onlineCount} online, {players.length} total
+                            {t('admin.players.subtitle', { online: String(onlineCount), total: String(players.length) })}
                         </p>
                     </div>
                     <Badge variant="outline" className="text-sm">
                         <Circle className="mr-1.5 size-2 fill-green-500 text-green-500" />
-                        Live
+                        {t('common.live')}
                     </Badge>
                 </div>
 
@@ -137,16 +140,16 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                     <CardHeader>
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <CardTitle>Players</CardTitle>
+                                <CardTitle>{t('admin.players.card_title')}</CardTitle>
                                 <CardDescription>
-                                    {filteredPlayers.length} of {players.length} players
+                                    {t('admin.players.card_description', { filtered: String(filteredPlayers.length), total: String(players.length) })}
                                 </CardDescription>
                             </div>
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <div className="relative">
                                     <Search className="absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
                                     <Input
-                                        placeholder="Search players..."
+                                        placeholder={t('admin.players.search_placeholder')}
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="pl-9 sm:w-[200px]"
@@ -157,9 +160,9 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="all">All</SelectItem>
-                                        <SelectItem value="online">Online</SelectItem>
-                                        <SelectItem value="offline">Offline</SelectItem>
+                                        <SelectItem value="all">{t('common.all')}</SelectItem>
+                                        <SelectItem value="online">{t('common.online')}</SelectItem>
+                                        <SelectItem value="offline">{t('common.offline')}</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -177,32 +180,32 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                         </TableHead>
                                         <TableHead>
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('username')}>
-                                                Player
+                                                {t('admin.players.table_player')}
                                                 <SortIcon column="username" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
-                                        <TableHead className="hidden sm:table-cell">Role</TableHead>
+                                        <TableHead className="hidden sm:table-cell">{t('admin.players.table_role')}</TableHead>
                                         <TableHead className="hidden md:table-cell">
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('kills')}>
                                                 <Skull className="mr-1 size-3" />
-                                                Kills
+                                                {t('admin.players.table_kills')}
                                                 <SortIcon column="kills" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
                                         <TableHead className="hidden md:table-cell">
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('hours')}>
                                                 <Clock className="mr-1 size-3" />
-                                                Hours
+                                                {t('admin.players.table_hours')}
                                                 <SortIcon column="hours" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
                                         <TableHead className="hidden lg:table-cell">
                                             <button type="button" className="flex items-center hover:text-foreground" onClick={() => toggleSort('joined')}>
-                                                Joined
+                                                {t('admin.players.table_joined')}
                                                 <SortIcon column="joined" sortKey={sortKey} sortDir={sortDir} />
                                             </button>
                                         </TableHead>
-                                        <TableHead className="text-right">Actions</TableHead>
+                                        <TableHead className="text-right">{t('common.actions')}</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -244,7 +247,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                             </TableCell>
                                             <TableCell className="text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" asChild title="Inventory">
+                                                    <Button variant="ghost" size="sm" asChild title={t('admin.players.tooltip_inventory')}>
                                                         <Link href={`/admin/players/${player.username}/inventory`}>
                                                             <Backpack className="size-3.5" />
                                                         </Link>
@@ -253,7 +256,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => setAccessTarget(player.username)}
-                                                        title="Set access level"
+                                                        title={t('admin.players.tooltip_access_level')}
                                                     >
                                                         <ShieldCheck className="size-3.5" />
                                                     </Button>
@@ -262,7 +265,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => setPasswordTarget(player.username)}
-                                                            title="Set password"
+                                                            title={t('admin.players.tooltip_set_password')}
                                                         >
                                                             <KeyRound className="size-3.5" />
                                                         </Button>
@@ -272,7 +275,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => setResetTimerTarget(player.username)}
-                                                            title="Reset respawn timer"
+                                                            title={t('admin.players.tooltip_reset_timer')}
                                                         >
                                                             <TimerReset className="size-3.5" />
                                                         </Button>
@@ -284,7 +287,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                                             onClick={() => {
                                                                 setKickTarget(player.username);
                                                             }}
-                                                            title="Kick player"
+                                                            title={t('admin.players.tooltip_kick')}
                                                         >
                                                             <UserX className="size-3.5" />
                                                         </Button>
@@ -295,7 +298,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                                                         onClick={() => {
                                                             setBanTarget(player.username);
                                                         }}
-                                                        title="Ban player"
+                                                        title={t('admin.players.tooltip_ban')}
                                                     >
                                                         <Ban className="size-3.5 text-destructive" />
                                                     </Button>
@@ -307,7 +310,7 @@ export default function Players({ players, respawn_cooldowns = {}, respawn_confi
                             </Table>
                         ) : (
                             <p className="py-8 text-center text-muted-foreground">
-                                {search || statusFilter !== 'all' ? 'No players match your filters' : 'No players'}
+                                {search || statusFilter !== 'all' ? t('admin.players.no_players_filtered') : t('admin.players.no_players')}
                             </p>
                         )}
                     </CardContent>

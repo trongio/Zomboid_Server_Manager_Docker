@@ -4,6 +4,7 @@ import { GameStateWidget } from '@/components/game-state-widget';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePing } from '@/hooks/use-ping';
+import { useTranslation } from '@/hooks/use-translation';
 import PublicLayout from '@/layouts/public-layout';
 import type { StatusPageData } from '@/types';
 
@@ -14,11 +15,12 @@ export default function Status({
     server_name,
 }: StatusPageData) {
     usePoll(5000, { only: ['server', 'game_state'] });
+    const { t } = useTranslation();
     const ping = usePing('/ping', 15000);
 
     return (
         <>
-            <Head title={`${server_name} — Server Status`} />
+            <Head title={`${server_name} — ${t('status.page_title')}`} />
             <PublicLayout>
                 {/* Content */}
                 <main className="mx-auto max-w-7xl px-4 py-8">
@@ -43,10 +45,10 @@ export default function Status({
                                       : 'text-red-500'
                             }`}>
                                 {server.status === 'online'
-                                    ? 'Online'
+                                    ? t('status.online')
                                     : server.status === 'starting'
-                                      ? 'Starting'
-                                      : 'Offline'}
+                                      ? t('status.starting')
+                                      : t('status.offline')}
                             </span>
                             {ping !== null && server.status === 'online' && (
                                 <span className="text-sm text-muted-foreground">— {ping}ms</span>
@@ -65,7 +67,7 @@ export default function Status({
                     <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Players</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('status.players_card')}</CardTitle>
                                 <Users className="size-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -82,7 +84,7 @@ export default function Status({
 
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Map</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('status.map')}</CardTitle>
                                 <Map className="size-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -94,7 +96,7 @@ export default function Status({
 
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Uptime</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('status.uptime')}</CardTitle>
                                 <Clock className="size-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -106,7 +108,7 @@ export default function Status({
 
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Mods</CardTitle>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">{t('status.mods')}</CardTitle>
                                 <Package className="size-4 text-muted-foreground" />
                             </CardHeader>
                             <CardContent>
@@ -121,10 +123,10 @@ export default function Status({
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Users className="size-5" />
-                                    Online Players
+                                    {t('status.online_players_title')}
                                 </CardTitle>
                                 <CardDescription>
-                                    {server.player_count} player{server.player_count !== 1 ? 's' : ''} connected
+                                    {t(server.player_count !== 1 ? 'status.players_connected_plural' : 'status.players_connected', { count: String(server.player_count) })}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -143,10 +145,10 @@ export default function Status({
                                 ) : (
                                     <p className="text-sm text-muted-foreground">
                                         {server.status === 'online'
-                                            ? 'No players online'
+                                            ? t('status.no_players_online')
                                             : server.status === 'starting'
-                                              ? 'Server is starting...'
-                                              : 'Server is offline'}
+                                              ? t('status.server_starting')
+                                              : t('status.server_offline')}
                                     </p>
                                 )}
                             </CardContent>
@@ -157,10 +159,10 @@ export default function Status({
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <Package className="size-5" />
-                                    Installed Mods
+                                    {t('status.installed_mods_title')}
                                 </CardTitle>
                                 <CardDescription>
-                                    {mods.length} mod{mods.length !== 1 ? 's' : ''} installed
+                                    {t(mods.length !== 1 ? 'status.mods_installed_plural' : 'status.mods_installed', { count: String(mods.length) })}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
@@ -181,7 +183,7 @@ export default function Status({
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground">No mods installed</p>
+                                    <p className="text-sm text-muted-foreground">{t('status.no_mods_installed')}</p>
                                 )}
                             </CardContent>
                         </Card>

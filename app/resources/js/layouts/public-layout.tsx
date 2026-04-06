@@ -1,51 +1,61 @@
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, Skull } from 'lucide-react';
-import { useState, type PropsWithChildren } from 'react';
+import { useMemo, useState, type PropsWithChildren } from 'react';
 import { Button } from '@/components/ui/button';
+import { LanguageSwitcher } from '@/components/language-switcher';
+import { ThemeProvider } from '@/components/theme-provider';
 import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
 } from '@/components/ui/sheet';
+import { useTranslation } from '@/hooks/use-translation';
 import { login, register } from '@/routes';
 
 const adminRoles = ['super_admin', 'admin', 'moderator'];
 
+function NavLink({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) {
+    const { url } = usePage();
+    const isActive = useMemo(() => url.startsWith(href), [url, href]);
+    return (
+        <Link
+            href={href}
+            className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                isActive
+                    ? 'bg-accent text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+            }`}
+            onClick={onClick}
+        >
+            {children}
+        </Link>
+    );
+}
+
 function NavLinks({ className, onClick }: { className?: string; onClick?: () => void }) {
     const { auth } = usePage().props;
+    const { t } = useTranslation();
     const isAdmin = auth.user && adminRoles.includes((auth.user as { role: string }).role);
 
     return (
         <nav className={className}>
-            <Link
-                href="/status"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
-                Server Status
-            </Link>
-            <Link
-                href="/rankings"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
-                Rankings
-            </Link>
-            <Link
-                href="/shop"
-                className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-                onClick={onClick}
-            >
-                Shop
-            </Link>
+            <NavLink href="/status" onClick={onClick}>
+                {t('nav.server_status')}
+            </NavLink>
+            <NavLink href="/rankings" onClick={onClick}>
+                {t('nav.rankings')}
+            </NavLink>
+            <NavLink href="/shop" onClick={onClick}>
+                {t('nav.shop')}
+            </NavLink>
             {auth.user ? (
                 <Link
                     href={isAdmin ? '/dashboard' : '/portal'}
                     className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                     onClick={onClick}
                 >
-                    {isAdmin ? 'Dashboard' : 'My Account'}
+                    {isAdmin ? t('nav.dashboard') : t('nav.my_account')}
                 </Link>
             ) : (
                 <>
@@ -54,14 +64,14 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
                         className="rounded-md px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                         onClick={onClick}
                     >
-                        Log in
+                        {t('nav.login')}
                     </Link>
                     <Link
                         href={register()}
                         className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
                         onClick={onClick}
                     >
-                        Register
+                        {t('nav.register')}
                     </Link>
                 </>
             )}
@@ -70,19 +80,28 @@ function NavLinks({ className, onClick }: { className?: string; onClick?: () => 
 }
 
 export default function PublicLayout({ children }: PropsWithChildren) {
+    const { site } = usePage().props;
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
+        <ThemeProvider>
         <div className="min-h-screen bg-background">
             <header className="sticky top-0 z-50 border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
                     <Link href="/" className="flex items-center gap-2">
-                        <Skull className="size-6" />
-                        <span className="text-lg font-semibold tracking-tight">Zomboid Manager</span>
+                        {site.logo_url ? (
+                            <img src={site.logo_url} alt={site.name} className="size-6 object-contain" />
+                        ) : (
+                            <Skull className="size-6" />
+                        )}
+                        <span className="text-lg font-semibold tracking-tight">{site.name}</span>
                     </Link>
 
                     {/* Desktop nav */}
-                    <NavLinks className="hidden items-center gap-3 md:flex" />
+                    <div className="hidden items-center gap-3 md:flex">
+                        <NavLinks className="flex items-center gap-3" />
+                        <LanguageSwitcher />
+                    </div>
 
                     {/* Mobile hamburger */}
                     <Button
@@ -103,8 +122,12 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                     <SheetHeader>
                         <SheetTitle>
                             <Link href="/" className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-                                <Skull className="size-5" />
-                                <span className="font-semibold">Zomboid Manager</span>
+                                {site.logo_url ? (
+                                    <img src={site.logo_url} alt={site.name} className="size-5 object-contain" />
+                                ) : (
+                                    <Skull className="size-5" />
+                                )}
+                                <span className="font-semibold">{site.name}</span>
                             </Link>
                         </SheetTitle>
                     </SheetHeader>
@@ -112,6 +135,9 @@ export default function PublicLayout({ children }: PropsWithChildren) {
                         className="flex flex-col gap-1 px-4"
                         onClick={() => setMobileOpen(false)}
                     />
+                    <div className="px-4 pt-2">
+                        <LanguageSwitcher />
+                    </div>
                 </SheetContent>
             </Sheet>
 
@@ -119,9 +145,10 @@ export default function PublicLayout({ children }: PropsWithChildren) {
 
             <footer className="border-t border-border/40 py-8">
                 <div className="mx-auto max-w-7xl px-4 text-center text-sm text-muted-foreground">
-                    Powered by Zomboid Manager
+                    {site.footer_text}
                 </div>
             </footer>
         </div>
+        </ThemeProvider>
     );
 }

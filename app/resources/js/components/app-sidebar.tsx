@@ -5,11 +5,13 @@ import {
     Bell,
     Coins,
     Crosshair,
+    Languages,
     Timer,
     Gamepad2,
     LayoutGrid,
     MapPin,
     Package,
+    Palette,
     ScrollText,
     Shield,
     ShieldAlert,
@@ -35,83 +37,87 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useTranslation } from '@/hooks/use-translation';
 import type { Auth, NavGroup, NavItem } from '@/types';
 import AppLogo from './app-logo';
 import { dashboard } from '@/routes';
-
-const adminNavGroups: NavGroup[] = [
-    {
-        label: 'Server',
-        items: [
-            { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-            { title: 'Players', href: '/admin/players', icon: Users },
-            { title: 'Player Map', href: '/admin/players/map', icon: MapPin },
-            { title: 'Config', href: '/admin/config', icon: Wrench },
-            { title: 'Mods', href: '/admin/mods', icon: Package },
-            { title: 'Backups', href: '/admin/backups', icon: Archive },
-            { title: 'Auto Restart', href: '/admin/auto-restart', icon: Timer },
-            { title: 'RCON Console', href: '/admin/rcon', icon: Terminal },
-            { title: 'Server Logs', href: '/admin/logs', icon: Activity },
-        ],
-    },
-    {
-        label: 'Security',
-        items: [
-            { title: 'Whitelist', href: '/admin/whitelist', icon: Shield },
-            { title: 'Moderation', href: '/admin/moderation', icon: Crosshair },
-            { title: 'Safe Zones', href: '/admin/safe-zones', icon: ShieldAlert },
-        ],
-    },
-    {
-        label: 'Shop',
-        items: [
-            { title: 'Items & Categories', href: '/admin/shop', icon: Store },
-            { title: 'Bundles', href: '/admin/shop/bundles', icon: Package },
-            { title: 'Promotions', href: '/admin/shop/promotions', icon: Tag },
-            { title: 'Purchases', href: '/admin/shop/purchases', icon: ShoppingBag },
-            { title: 'Wallets', href: '/admin/wallets', icon: Wallet },
-        ],
-    },
-];
-
-const playerNavGroups: NavGroup[] = [
-    {
-        label: 'Menu',
-        items: [
-            { title: 'Player Portal', href: '/portal', icon: Gamepad2 },
-            { title: 'My Wallet', href: '/shop/my/wallet', icon: Coins },
-            { title: 'Shop', href: '/shop', icon: ShoppingBag },
-            { title: 'Rankings', href: '/rankings', icon: Trophy },
-        ],
-    },
-];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Server Status',
-        href: '/status',
-        icon: Activity,
-    }
-];
 
 const adminRoles = ['super_admin', 'admin', 'moderator'];
 
 export function AppSidebar() {
     const { auth } = usePage<{ auth: Auth }>().props;
+    const { t } = useTranslation();
     const isAdmin = adminRoles.includes(auth.user.role);
 
+    const adminNavGroups: NavGroup[] = [
+        {
+            label: t('nav.group.server'),
+            items: [
+                { title: t('nav.dashboard'), href: dashboard(), icon: LayoutGrid },
+                { title: t('nav.players'), href: '/admin/players', icon: Users },
+                { title: t('nav.player_map'), href: '/admin/players/map', icon: MapPin },
+                { title: t('nav.config'), href: '/admin/config', icon: Wrench },
+                { title: t('nav.mods'), href: '/admin/mods', icon: Package },
+                { title: t('nav.backups'), href: '/admin/backups', icon: Archive },
+                { title: t('nav.auto_restart'), href: '/admin/auto-restart', icon: Timer },
+                { title: t('nav.rcon_console'), href: '/admin/rcon', icon: Terminal },
+                { title: t('nav.server_logs'), href: '/admin/logs', icon: Activity },
+            ],
+        },
+        {
+            label: t('nav.group.security'),
+            items: [
+                { title: t('nav.whitelist'), href: '/admin/whitelist', icon: Shield },
+                { title: t('nav.moderation'), href: '/admin/moderation', icon: Crosshair },
+                { title: t('nav.safe_zones'), href: '/admin/safe-zones', icon: ShieldAlert },
+            ],
+        },
+        {
+            label: t('nav.group.shop'),
+            items: [
+                { title: t('nav.items_categories'), href: '/admin/shop', icon: Store },
+                { title: t('nav.bundles'), href: '/admin/shop/bundles', icon: Package },
+                { title: t('nav.promotions'), href: '/admin/shop/promotions', icon: Tag },
+                { title: t('nav.purchases'), href: '/admin/shop/purchases', icon: ShoppingBag },
+                { title: t('nav.wallets'), href: '/admin/wallets', icon: Wallet },
+            ],
+        },
+    ];
+
+    const playerNavGroups: NavGroup[] = [
+        {
+            label: t('nav.group.menu'),
+            items: [
+                { title: t('nav.player_portal'), href: '/portal', icon: Gamepad2 },
+                { title: t('nav.my_wallet'), href: '/shop/my/wallet', icon: Coins },
+                { title: t('nav.shop'), href: '/shop', icon: ShoppingBag },
+                { title: t('nav.rankings'), href: '/rankings', icon: Trophy },
+            ],
+        },
+    ];
+
+    const footerNavItems: NavItem[] = [
+        {
+            title: t('nav.server_status'),
+            href: '/status',
+            icon: Activity,
+        }
+    ];
+
     const myStatsItem: NavItem = {
-        title: 'My Stats',
+        title: t('nav.my_stats'),
         href: `/rankings/${auth.user.username}`,
         icon: User,
     };
 
     const communityGroup: NavGroup = {
-        label: 'Community',
+        label: t('nav.group.community'),
         items: [
-            { title: 'Discord', href: '/admin/discord', icon: Bell },
-            { title: 'Audit Log', href: '/admin/audit', icon: ScrollText },
-            { title: 'Rankings', href: '/rankings', icon: Trophy },
+            { title: t('nav.discord'), href: '/admin/discord', icon: Bell },
+            { title: t('nav.audit_log'), href: '/admin/audit', icon: ScrollText },
+            { title: t('nav.site_settings'), href: '/admin/site-settings', icon: Palette },
+            { title: t('nav.translations'), href: '/admin/translations', icon: Languages },
+            { title: t('nav.rankings'), href: '/rankings', icon: Trophy },
             myStatsItem,
         ],
     };
