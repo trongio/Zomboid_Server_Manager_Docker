@@ -10,13 +10,13 @@ use App\Services\AuditLogger;
 use App\Services\TranslationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TranslationController extends Controller
 {
-    private const LOCALE_REGEX = '/\A[a-zA-Z0-9_-]+\z/';
 
     public function __construct(
         private readonly AuditLogger $auditLogger,
@@ -56,7 +56,7 @@ class TranslationController extends Controller
     public function updateTranslation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
             'key' => ['required', 'string', 'max:255'],
             'value' => ['required', 'string', 'max:5000'],
         ]);
@@ -88,7 +88,7 @@ class TranslationController extends Controller
     public function deleteTranslation(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
             'key' => ['required', 'string', 'max:255'],
         ]);
 
@@ -100,18 +100,29 @@ class TranslationController extends Controller
 
         TranslationService::bustCache($validated['locale']);
 
+        $this->auditLogger->log(
+            actor: $request->user()->name ?? 'admin',
+            action: 'translation.delete',
+            details: [
+                'locale' => $validated['locale'],
+                'key' => $validated['key'],
+            ],
+            ip: $request->ip(),
+        );
+
         return response()->json(['message' => 'Translation override removed']);
     }
 
     public function storeLanguage(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX, 'unique:languages,code'],
+            'code' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX, 'unique:languages,code'],
             'name' => ['required', 'string', 'max:100'],
             'native_name' => ['required', 'string', 'max:100'],
         ]);
 
         Language::query()->create($validated);
+        Cache::forget('active_languages');
 
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
@@ -148,6 +159,7 @@ class TranslationController extends Controller
         }
 
         $language->update($validated);
+        Cache::forget('active_languages');
 
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
@@ -171,6 +183,7 @@ class TranslationController extends Controller
 
         $code = $language->code;
         $language->delete();
+        Cache::forget('active_languages');
 
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
@@ -188,7 +201,7 @@ class TranslationController extends Controller
      */
     public function exportLocale(string $locale): StreamedResponse
     {
-        if (strlen($locale) > 10 || ! preg_match(self::LOCALE_REGEX, $locale)) {
+        if (strlen($locale) > 10 || ! preg_match(Language::LOCALE_REGEX, $locale)) {
             abort(404);
         }
 
@@ -213,7 +226,7 @@ class TranslationController extends Controller
     public function importLocale(Request $request): JsonResponse
     {
         $request->validate([
-            'locale' => ['required', 'string', 'max:10', 'regex:'.self::LOCALE_REGEX],
+            'locale' => ['required', 'string', 'max:10', 'regex:'.Language::LOCALE_REGEX],
             'file' => ['required', 'file', 'max:1024', 'mimes:json,txt'],
         ]);
 

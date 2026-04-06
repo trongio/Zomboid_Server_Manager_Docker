@@ -19,6 +19,11 @@ class Language extends Model
 {
     use HasFactory;
 
+    /**
+     * Regex for validating locale codes. Shared across controllers, middleware, and services.
+     */
+    public const LOCALE_REGEX = '/\A[a-zA-Z0-9_-]+\z/';
+
     protected $fillable = [
         'code',
         'name',

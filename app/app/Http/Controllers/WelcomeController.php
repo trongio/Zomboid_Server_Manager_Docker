@@ -38,8 +38,8 @@ class WelcomeController extends Controller
             'top_players' => Inertia::defer(fn () => $this->playerStatsService->getLeaderboard('zombie_kills', 3)),
             'server_name' => config('zomboid.server_name', 'Project Zomboid Server'),
             'connection' => fn () => [
-                'ip' => ServerSetting::instance()->server_ip,
-                'port' => ServerSetting::instance()->server_port,
+                'ip' => ($ss = ServerSetting::instance())->server_ip,
+                'port' => $ss->server_port,
             ],
             'hero' => [
                 'badge' => $siteSettings->hero_badge,

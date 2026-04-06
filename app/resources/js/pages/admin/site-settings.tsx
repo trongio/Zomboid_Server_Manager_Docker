@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { ImageIcon, Palette, RotateCcw, Save, Trash2, Type, Upload } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { fetchAction } from '@/lib/fetch-action';
 import AppLayout from '@/layouts/app-layout';
@@ -76,6 +76,27 @@ export default function SiteSettings({ settings, available_icons, available_sect
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [faviconFile, setFaviconFile] = useState<File | null>(null);
     const [saving, setSaving] = useState(false);
+
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [faviconPreview, setFaviconPreview] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (logoFile) {
+            const url = logoPreview!;
+            setLogoPreview(url);
+            return () => URL.revokeObjectURL(url);
+        }
+        setLogoPreview(null);
+    }, [logoFile]);
+
+    useEffect(() => {
+        if (faviconFile) {
+            const url = faviconPreview!;
+            setFaviconPreview(url);
+            return () => URL.revokeObjectURL(url);
+        }
+        setFaviconPreview(null);
+    }, [faviconFile]);
 
     const logoInputRef = useRef<HTMLInputElement>(null);
     const faviconInputRef = useRef<HTMLInputElement>(null);
@@ -283,7 +304,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 ) : logoFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
-                                            src={URL.createObjectURL(logoFile)}
+                                            src={logoPreview!}
                                             alt="New logo preview"
                                             className="size-10 rounded-md border object-contain"
                                         />
@@ -332,7 +353,7 @@ export default function SiteSettings({ settings, available_icons, available_sect
                                 ) : faviconFile ? (
                                     <div className="flex items-center gap-3">
                                         <img
-                                            src={URL.createObjectURL(faviconFile)}
+                                            src={faviconPreview!}
                                             alt="New favicon preview"
                                             className="size-8 rounded border object-contain"
                                         />

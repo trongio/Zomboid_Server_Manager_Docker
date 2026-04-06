@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Language;
 use App\Models\Translation;
 use Illuminate\Support\Facades\Cache;
 
@@ -105,6 +106,6 @@ class TranslationService
 
     private static function isValidLocale(string $locale): bool
     {
-        return $locale !== '' && strlen($locale) <= 10 && preg_match('/\A[a-zA-Z0-9_-]+\z/', $locale);
+        return $locale !== '' && strlen($locale) <= 10 && preg_match(Language::LOCALE_REGEX, $locale);
     }
 }

@@ -97,6 +97,23 @@ describe('Translation CRUD', function () {
         expect(Translation::where('locale', 'ka')->where('key', 'nav.dashboard')->exists())->toBeFalse();
     });
 
+    it('creates audit log on translation delete', function () {
+        Translation::create([
+            'locale' => 'ka',
+            'key' => 'nav.dashboard',
+            'value' => 'Test',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->deleteJson(route('admin.translations.delete'), [
+                'locale' => 'ka',
+                'key' => 'nav.dashboard',
+            ])
+            ->assertOk();
+
+        expect(AuditLog::where('action', 'translation.delete')->exists())->toBeTrue();
+    });
+
     it('creates audit log on translation update', function () {
         $this->actingAs($this->admin)
             ->patchJson(route('admin.translations.update'), [

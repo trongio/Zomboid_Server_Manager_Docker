@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
@@ -11,8 +13,10 @@ return new class extends Migration
     public function up(): void
     {
         DB::table('translations')->whereNull('group')->update(['group' => '']);
-        DB::statement("ALTER TABLE translations ALTER COLUMN \"group\" SET DEFAULT ''");
-        DB::statement('ALTER TABLE translations ALTER COLUMN "group" SET NOT NULL');
+
+        Schema::table('translations', function (Blueprint $table) {
+            $table->string('group')->default('')->change();
+        });
     }
 
     /**
@@ -20,6 +24,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        DB::statement('ALTER TABLE translations ALTER COLUMN "group" DROP NOT NULL');
+        Schema::table('translations', function (Blueprint $table) {
+            $table->string('group')->nullable()->default(null)->change();
+        });
     }
 };

@@ -17,7 +17,7 @@ export function LanguageSwitcher() {
 
     function switchLocale(code: string) {
         // Set cookie and reload with the new locale
-        document.cookie = `locale=${code};path=/;max-age=${60 * 60 * 24 * 30}`;
+        document.cookie = `locale=${code};path=/;max-age=${60 * 60 * 24 * 30};SameSite=Lax`;
         router.reload();
     }
 

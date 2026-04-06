@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\AuditLog;
+use App\Models\Language;
 use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -267,5 +268,78 @@ describe('Site settings validation', function () {
             ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('features');
+    });
+
+    it('rejects invalid theme color format', function () {
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.site-settings.update'), [
+                'theme_colors' => ['primary' => 'not-a-color'],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('theme_colors.primary');
+    });
+
+    it('accepts valid theme color hex codes', function () {
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.site-settings.update'), [
+                'site_name' => 'Test',
+                'footer_text' => 'Test',
+                'hero_badge' => 'Test',
+                'hero_title' => 'Test',
+                'hero_subtitle' => 'Test',
+                'hero_description' => 'Test',
+                'hero_button_text' => 'Test',
+                'theme_colors' => ['primary' => '#ff5500', 'accent' => '#00aaFF'],
+            ])
+            ->assertOk();
+
+        $colors = SiteSetting::instance()->theme_colors;
+        expect($colors['primary'])->toBe('#ff5500');
+    });
+
+    it('rejects feature icons not in the allowed list', function () {
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.site-settings.update'), [
+                'features' => [
+                    ['icon' => 'NotARealIcon', 'title' => 'Test', 'description' => 'Test'],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('features.0.icon');
+    });
+
+    it('rejects default_locale not matching a configured language', function () {
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.site-settings.update'), [
+                'site_name' => 'Test',
+                'footer_text' => 'Test',
+                'hero_badge' => 'Test',
+                'hero_title' => 'Test',
+                'hero_subtitle' => 'Test',
+                'hero_description' => 'Test',
+                'hero_button_text' => 'Test',
+                'default_locale' => 'xx',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('default_locale');
+    });
+
+    it('accepts default_locale when it matches an active language', function () {
+        Language::factory()->create(['code' => 'ka', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->postJson(route('admin.site-settings.update'), [
+                'site_name' => 'Test',
+                'footer_text' => 'Test',
+                'hero_badge' => 'Test',
+                'hero_title' => 'Test',
+                'hero_subtitle' => 'Test',
+                'hero_description' => 'Test',
+                'hero_button_text' => 'Test',
+                'default_locale' => 'ka',
+            ])
+            ->assertOk();
+
+        expect(SiteSetting::instance()->default_locale)->toBe('ka');
     });
 });

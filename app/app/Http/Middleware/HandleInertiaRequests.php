@@ -7,6 +7,7 @@ use App\Models\SiteSetting;
 use App\Services\TranslationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -64,10 +65,11 @@ class HandleInertiaRequests extends Middleware
             ],
             'locale' => fn () => App::getLocale(),
             'translations' => fn () => TranslationService::getForLocale(App::getLocale()),
-            'available_locales' => fn () => Language::query()
+            'available_locales' => fn () => Cache::remember('active_languages', 3600, fn () => Language::query()
                 ->where('is_active', true)
                 ->get(['code', 'name', 'native_name'])
                 ->toArray(),
+            ),
         ];
     }
 }

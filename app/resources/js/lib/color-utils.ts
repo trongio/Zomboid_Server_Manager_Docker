@@ -2,7 +2,10 @@
  * Convert a hex color string to oklch CSS value.
  * Conversion path: hex → sRGB → linear RGB → XYZ D65 → Oklab → Oklch
  */
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
 export function hexToOklch(hex: string): string {
+    if (!HEX_RE.test(hex)) return 'oklch(0.205 0 0)';
     const rgb = hexToSrgb(hex);
     const linear = rgb.map(srgbToLinear);
     const [l, a, b] = linearRgbToOklab(linear[0], linear[1], linear[2]);
@@ -17,6 +20,7 @@ export function hexToOklch(hex: string): string {
  * Get an appropriate foreground color (light or dark) for a given hex background.
  */
 export function autoForeground(hex: string): string {
+    if (!HEX_RE.test(hex)) return 'oklch(0.985 0 0)';
     const rgb = hexToSrgb(hex);
     const linear = rgb.map(srgbToLinear);
     const [l] = linearRgbToOklab(linear[0], linear[1], linear[2]);

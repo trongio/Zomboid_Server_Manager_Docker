@@ -70,7 +70,7 @@ class SetLocale
             return 'en';
         }
 
-        if (strlen($default) > 10 || ! preg_match('/\A[a-zA-Z0-9_-]+\z/', $default)) {
+        if (strlen($default) > 10 || ! preg_match(Language::LOCALE_REGEX, $default)) {
             return 'en';
         }
 
