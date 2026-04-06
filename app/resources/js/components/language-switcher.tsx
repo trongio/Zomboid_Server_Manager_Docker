@@ -16,9 +16,10 @@ export function LanguageSwitcher() {
     }
 
     function switchLocale(code: string) {
-        // Set cookie and reload with the new locale
-        document.cookie = `locale=${code};path=/;max-age=${60 * 60 * 24 * 30};SameSite=Lax`;
-        router.reload();
+        // Navigate with ?lang= so SetLocale middleware picks it up and sets the cookie server-side
+        const url = new URL(window.location.href);
+        url.searchParams.set('lang', code);
+        router.visit(url.toString());
     }
 
     const current = available_locales.find((l) => l.code === locale);
