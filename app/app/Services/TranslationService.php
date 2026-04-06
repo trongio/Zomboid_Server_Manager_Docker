@@ -69,6 +69,17 @@ class TranslationService
     }
 
     /**
+     * Get only the JSON file defaults for a locale (no English fallback, no DB overrides).
+     * Used by the translation editor to show per-locale base values.
+     *
+     * @return array<string, string>
+     */
+    public static function getJsonDefaults(string $locale): array
+    {
+        return self::loadJsonFile($locale);
+    }
+
+    /**
      * @return array<string, string>
      */
     private static function loadJsonFile(string $locale): array

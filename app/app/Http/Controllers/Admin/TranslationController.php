@@ -41,13 +41,24 @@ class TranslationController extends Controller
             $filteredKeys = array_values(array_filter($allKeys, fn ($key) => str_contains($key, $search)));
         }
 
-        // Load defaults for display
+        // Load defaults for display — English base plus each locale's JSON file defaults
         $defaults = TranslationService::getForLocale('en');
 
+        $activeLanguages = Language::query()->orderByDesc('is_default')->orderBy('name')->get();
+
+        // Build per-locale JSON defaults so the editor shows the correct base value per language
+        $localeDefaults = [];
+        foreach ($activeLanguages as $lang) {
+            if ($lang->code !== 'en') {
+                $localeDefaults[$lang->code] = TranslationService::getJsonDefaults($lang->code);
+            }
+        }
+
         return Inertia::render('admin/translations', [
-            'languages' => Language::query()->orderByDesc('is_default')->orderBy('name')->get(),
+            'languages' => $activeLanguages,
             'keys' => $filteredKeys,
             'defaults' => $defaults,
+            'locale_defaults' => $localeDefaults,
             'overrides' => $overrides,
             'search' => $search,
         ]);

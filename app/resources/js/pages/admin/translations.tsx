@@ -35,6 +35,7 @@ type Props = {
     languages: LanguageEntry[];
     keys: string[];
     defaults: Record<string, string>;
+    locale_defaults: Record<string, Record<string, string>>;
     overrides: Record<string, Record<string, string>>;
     search: string;
 };
@@ -44,7 +45,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Translations', href: '/admin/translations' },
 ];
 
-export default function Translations({ languages, keys, defaults, overrides, search }: Props) {
+export default function Translations({ languages, keys, defaults, locale_defaults, overrides, search }: Props) {
     const [searchValue, setSearchValue] = useState(search);
     const [editingCell, setEditingCell] = useState<{ key: string; locale: string } | null>(null);
     const [editValue, setEditValue] = useState('');
@@ -64,7 +65,7 @@ export default function Translations({ languages, keys, defaults, overrides, sea
     }
 
     function startEdit(key: string, locale: string) {
-        const current = overrides[locale]?.[key] ?? defaults[key] ?? '';
+        const current = overrides[locale]?.[key] ?? locale_defaults[locale]?.[key] ?? defaults[key] ?? '';
         setEditValue(current);
         setEditingCell({ key, locale });
     }
@@ -175,11 +176,11 @@ export default function Translations({ languages, keys, defaults, overrides, sea
     }
 
     function getCellValue(key: string, locale: string): string {
-        return overrides[locale]?.[key] ?? defaults[key] ?? '';
+        return overrides[locale]?.[key] ?? locale_defaults[locale]?.[key] ?? defaults[key] ?? '';
     }
 
     function hasOverride(key: string, locale: string): boolean {
-        return !!overrides[locale]?.[key];
+        return !!overrides[locale]?.[key] || !!locale_defaults[locale]?.[key];
     }
 
     return (
