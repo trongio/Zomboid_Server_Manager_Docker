@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Coins, RotateCcw } from 'lucide-react';
 import { formatDateTime } from '@/lib/dates';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { WalletTransaction } from '@/types/server';
@@ -35,13 +36,15 @@ function TransactionIcon({ type }: { type: string }) {
 }
 
 export default function MyWallet({ balance, transactions }: Props) {
+    const { t } = useTranslation();
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Wallet" />
+            <Head title={t('wallet.title')} />
             <div className="mx-auto max-w-2xl space-y-6 p-4 lg:p-6">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">My Wallet</h1>
-                    <p className="text-muted-foreground text-sm">Your currency balance and transaction history</p>
+                    <h1 className="text-2xl font-bold tracking-tight">{t('wallet.title')}</h1>
+                    <p className="text-muted-foreground text-sm">{t('wallet.description')}</p>
                 </div>
 
                 {/* Balance card */}
@@ -49,15 +52,15 @@ export default function MyWallet({ balance, transactions }: Props) {
                     <CardContent className="flex flex-col items-center gap-2 py-8">
                         <Coins className="size-10 text-amber-500" />
                         <span className="text-4xl font-bold tabular-nums">{Math.round(balance)}</span>
-                        <span className="text-muted-foreground text-sm">Current Balance</span>
+                        <span className="text-muted-foreground text-sm">{t('wallet.current_balance')}</span>
                     </CardContent>
                 </Card>
 
                 {/* Transaction history */}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Transaction History</CardTitle>
-                        <CardDescription>Recent transactions</CardDescription>
+                        <CardTitle>{t('wallet.transaction_history')}</CardTitle>
+                        <CardDescription>{t('wallet.recent_transactions')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {transactions.data.length > 0 ? (
@@ -104,7 +107,7 @@ export default function MyWallet({ balance, transactions }: Props) {
                             </div>
                         ) : (
                             <p className="text-muted-foreground py-8 text-center text-sm">
-                                No transactions yet.
+                                {t('wallet.no_transactions')}
                             </p>
                         )}
                     </CardContent>

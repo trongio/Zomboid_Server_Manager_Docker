@@ -262,9 +262,9 @@ describe('TranslationService', function () {
 
         // The overridden key has the Georgian value
         expect($translations['nav.dashboard'])->toBe('მართვის პანელი');
-        // Other English keys are still present as fallback
+        // Other keys are present (from ka.json or English fallback)
         expect($translations)->toHaveKey('nav.players');
-        expect($translations['nav.players'])->toBe('Players');
+        expect($translations['nav.players'])->toBe('მოთამაშეები');
     });
 });
 
@@ -292,9 +292,9 @@ describe('Translation export', function () {
 
         $data = json_decode($response->streamedContent(), true);
 
-        // Should contain English defaults as base template
+        // Should contain translations (Georgian from ka.json overlaying English base)
         expect($data)->toHaveKey('nav.dashboard');
-        expect($data['nav.dashboard'])->toBe('Dashboard');
+        expect($data['nav.dashboard'])->toBe('მართვის პანელი');
     });
 
     it('exports with DB overrides merged in', function () {

@@ -1,4 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
+import { useTranslation } from '@/hooks/use-translation';
 import { ArrowDownToLine, CheckCircle, Clock, Coins, Copy, Loader2, Package, Search, ShoppingBag, Star, Tag, X, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -173,6 +174,7 @@ export default function ShopIndex({
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const purchasePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const { t } = useTranslation();
 
     // ── Derived ──────────────────────────────────────────────────────
     const filteredItems = useMemo(() => {
@@ -254,9 +256,9 @@ export default function ShopIndex({
             if (data.availableBalance !== undefined) setAvailableBalance(data.availableBalance);
             if (data.is_complete) {
                 setPendingPurchaseId(null);
-                if (data.delivery_status === 'delivered') toast.success('Items delivered and payment confirmed!');
-                else if (data.delivery_status === 'failed') toast.error('Delivery failed — no payment was charged.');
-                else toast.warning('Some items could not be delivered.');
+                if (data.delivery_status === 'delivered') toast.success(t('shop.items_delivered'));
+                else if (data.delivery_status === 'failed') toast.error(t('shop.delivery_failed'));
+                else toast.warning(t('shop.delivery_partial'));
                 router.reload();
             }
         } catch { /* ignore */ }
@@ -279,7 +281,7 @@ export default function ShopIndex({
         setLoading(true);
         const result = await fetchAction(`/shop/${buyItem.slug}/purchase`, {
             data: { quantity, promotion_code: promoCode || undefined },
-            successMessage: `Delivering ${quantity}x ${buyItem.name}...`,
+            successMessage: t('shop.delivering_item', { count: String(quantity), name: buyItem.name }),
         });
         setLoading(false);
         if (result) {
@@ -297,7 +299,7 @@ export default function ShopIndex({
         setLoading(true);
         const result = await fetchAction(`/shop/bundle/${buyBundle.slug}/purchase`, {
             data: { promotion_code: promoCode || undefined },
-            successMessage: `Delivering ${buyBundle.name}...`,
+            successMessage: t('shop.delivering_bundle', { name: buyBundle.name }),
         });
         setLoading(false);
         if (result) {
@@ -327,10 +329,10 @@ export default function ShopIndex({
         try {
             const res = await fetch('/shop/deposit', { method: 'POST', headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' } });
             const json = await res.json().catch(() => ({}));
-            if (res.ok) { toast.success('Deposit request sent! Stay online in-game.'); setPendingDeposit(true); setLastDepositResult(null); }
-            else if (res.status === 429) { startCooldown(parseInt(res.headers.get('Retry-After') || '60', 10)); setDepositError('Too many deposit requests. Please wait.'); }
+            if (res.ok) { toast.success(t('shop.deposit_request_sent')); setPendingDeposit(true); setLastDepositResult(null); }
+            else if (res.status === 429) { startCooldown(parseInt(res.headers.get('Retry-After') || '60', 10)); setDepositError(t('shop.too_many_requests')); }
             else { setDepositError(json.error || json.message || `Request failed (${res.status})`); }
-        } catch { setDepositError('Network error — could not reach the server'); }
+        } catch { setDepositError(t('shop.network_error')); }
         setDepositLoading(false);
     }
 
@@ -341,13 +343,13 @@ export default function ShopIndex({
 
     return (
         <PublicLayout>
-            <Head title="Shop" />
+            <Head title={t('shop.title')} />
             <div className="mx-auto max-w-7xl space-y-6 p-4 lg:p-6">
                 {/* Header */}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Shop</h1>
-                        <p className="text-muted-foreground text-sm">Browse and purchase items for your character</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('shop.title')}</h1>
+                        <p className="text-muted-foreground text-sm">{t('shop.description')}</p>
                     </div>
                     {balance !== null && (
                         <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2">
@@ -355,7 +357,7 @@ export default function ShopIndex({
                             <div className="flex flex-col items-end">
                                 <span className="text-lg font-bold tabular-nums">{coin(balance)}</span>
                                 {availableBalance !== null && availableBalance < balance && (
-                                    <span className="text-muted-foreground text-xs tabular-nums">{coin(availableBalance)} available</span>
+                                    <span className="text-muted-foreground text-xs tabular-nums">{t('shop.available', { count: String(coin(availableBalance)) })}</span>
                                 )}
                             </div>
                         </div>
@@ -369,45 +371,45 @@ export default function ShopIndex({
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <ArrowDownToLine className="size-5 text-green-600 dark:text-green-400" />
-                            <CardTitle>Deposit In-Game Money</CardTitle>
+                            <CardTitle>{t('shop.deposit_title')}</CardTitle>
                         </div>
-                        <CardDescription>Convert Money and MoneyBundle items from your inventory into shop coins</CardDescription>
+                        <CardDescription>{t('shop.deposit_description')}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <p className="text-sm font-medium">How It Works</p>
+                                <p className="text-sm font-medium">{t('shop.how_it_works')}</p>
                                 <ol className="text-muted-foreground space-y-1 text-sm">
-                                    <li>1. Make sure you are online in-game</li>
-                                    <li>2. Click "Deposit" below</li>
-                                    <li>3. Within ~15 seconds, all money items are removed from your inventory</li>
-                                    <li>4. Your wallet is credited automatically</li>
+                                    <li>{t('shop.deposit_step_1')}</li>
+                                    <li>{t('shop.deposit_step_2')}</li>
+                                    <li>{t('shop.deposit_step_3')}</li>
+                                    <li>{t('shop.deposit_step_4')}</li>
                                 </ol>
                                 <div className="flex gap-3 pt-1">
-                                    <Badge variant="outline" className="text-xs"><Coins className="mr-1 size-3 text-amber-500" />Money = 1 coin</Badge>
-                                    <Badge variant="outline" className="text-xs"><Coins className="mr-1 size-3 text-amber-500" />MoneyBundle = 100 coins</Badge>
+                                    <Badge variant="outline" className="text-xs"><Coins className="mr-1 size-3 text-amber-500" />{t('shop.money_rate')}</Badge>
+                                    <Badge variant="outline" className="text-xs"><Coins className="mr-1 size-3 text-amber-500" />{t('shop.bundle_rate')}</Badge>
                                 </div>
                             </div>
                             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-4">
                                 {!isAuthenticated ? (
                                     <>
-                                        <p className="text-muted-foreground text-center text-sm">Log in to deposit money</p>
-                                        <Button size="sm" onClick={() => router.visit('/login?redirect=/shop')}>Log In</Button>
+                                        <p className="text-muted-foreground text-center text-sm">{t('shop.login_to_deposit')}</p>
+                                        <Button size="sm" onClick={() => router.visit('/login?redirect=/shop')}>{t('auth.login')}</Button>
                                     </>
                                 ) : !hasPzAccount ? (
-                                    <p className="text-muted-foreground text-center text-sm">Link your PZ account first via the whitelist to use deposits</p>
+                                    <p className="text-muted-foreground text-center text-sm">{t('shop.link_pz_account')}</p>
                                 ) : pendingDeposit ? (
                                     <>
                                         <Loader2 className="size-6 animate-spin text-amber-500" />
-                                        <p className="text-sm font-medium">Deposit in progress...</p>
-                                        <p className="text-muted-foreground text-center text-xs">Stay online in-game. Your money will be collected shortly.</p>
+                                        <p className="text-sm font-medium">{t('shop.deposit_in_progress')}</p>
+                                        <p className="text-muted-foreground text-center text-xs">{t('shop.stay_online')}</p>
                                     </>
                                 ) : (
                                     <Button onClick={handleDeposit} disabled={depositLoading || depositCooldown > 0}>
                                         {depositLoading ? <Loader2 className="mr-1.5 size-4 animate-spin" />
                                             : depositCooldown > 0 ? <Clock className="mr-1.5 size-4" />
                                             : <ArrowDownToLine className="mr-1.5 size-4" />}
-                                        {depositCooldown > 0 ? `Wait ${depositCooldown}s` : 'Deposit Money'}
+                                        {depositCooldown > 0 ? t('shop.wait_seconds', { seconds: String(depositCooldown) }) : t('shop.deposit_money')}
                                     </Button>
                                 )}
                                 {depositError && !pendingDeposit && (
@@ -422,8 +424,8 @@ export default function ShopIndex({
                                         {lastDepositResult.status === 'success' ? <CheckCircle className="size-3.5 shrink-0" /> : <XCircle className="size-3.5 shrink-0" />}
                                         <span className="flex-1">
                                             {lastDepositResult.status === 'success'
-                                                ? `Deposited ${lastDepositResult.total_coins} coins (${lastDepositResult.money_count} Money + ${lastDepositResult.bundle_count ?? 0} MoneyBundle)`
-                                                : lastDepositResult.message || 'Deposit failed'}
+                                                ? t('shop.deposit_success', { coins: String(lastDepositResult.total_coins), money: String(lastDepositResult.money_count), bundles: String(lastDepositResult.bundle_count ?? 0) })
+                                                : lastDepositResult.message || t('shop.deposit_failed')}
                                         </span>
                                         <button type="button" onClick={dismissDepositResult} className="shrink-0 rounded p-0.5 hover:bg-black/10 dark:hover:bg-white/10" aria-label="Dismiss"><X className="size-3.5" /></button>
                                     </div>
@@ -438,8 +440,8 @@ export default function ShopIndex({
                     <div className="flex items-center gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 dark:border-blue-700 dark:bg-blue-950/40">
                         <Loader2 className="size-5 animate-spin text-blue-500" />
                         <div>
-                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Delivering items...</p>
-                            <p className="text-xs text-blue-600 dark:text-blue-400">Payment will be charged once delivery is confirmed.</p>
+                            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">{t('shop.delivering_items')}</p>
+                            <p className="text-xs text-blue-600 dark:text-blue-400">{t('shop.payment_on_delivery')}</p>
                         </div>
                     </div>
                 )}
@@ -450,7 +452,7 @@ export default function ShopIndex({
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <Star className="size-5 text-amber-500" />
-                                <CardTitle>Featured</CardTitle>
+                                <CardTitle>{t('shop.featured')}</CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -493,7 +495,7 @@ export default function ShopIndex({
                 {/* Category tabs + search */}
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
-                        <Button variant={activeCategory === null ? 'default' : 'outline'} size="sm" onClick={() => setActiveCategory(null)}>All</Button>
+                        <Button variant={activeCategory === null ? 'default' : 'outline'} size="sm" onClick={() => setActiveCategory(null)}>{t('shop.all')}</Button>
                         {categories.map((cat) => (
                             <Button key={cat.id} variant={activeCategory === cat.id ? 'default' : 'outline'} size="sm" onClick={() => setActiveCategory(cat.id)}>
                                 {cat.name}
@@ -502,7 +504,7 @@ export default function ShopIndex({
                     </div>
                     <div className="relative">
                         <Search className="text-muted-foreground absolute left-2.5 top-2.5 size-4" />
-                        <Input placeholder="Search items..." value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-9 sm:w-[250px]" />
+                        <Input placeholder={t('shop.search_items')} value={filter} onChange={(e) => setFilter(e.target.value)} className="pl-9 sm:w-[250px]" />
                     </div>
                 </div>
 
@@ -519,14 +521,14 @@ export default function ShopIndex({
                             <span className="truncate text-sm font-medium">{item.name}</span>
                             {item.description && <span className="text-muted-foreground line-clamp-2 text-xs">{item.description}</span>}
                             <CoinPrice amount={coin(item.price)} />
-                            {item.quantity > 1 && <span className="text-muted-foreground text-xs">x{item.quantity} per purchase</span>}
+                            {item.quantity > 1 && <span className="text-muted-foreground text-xs">{t('shop.per_purchase', { count: String(item.quantity) })}</span>}
                             {item.stock !== null && item.stock <= 5 && (
-                                <Badge variant="destructive" className="text-xs">{item.stock === 0 ? 'Out of stock' : `Only ${item.stock} left`}</Badge>
+                                <Badge variant="destructive" className="text-xs">{item.stock === 0 ? t('shop.out_of_stock') : t('shop.only_left', { count: String(item.stock) })}</Badge>
                             )}
                         </button>
                     ))}
                 </div>
-                {filteredItems.length === 0 && <p className="text-muted-foreground py-12 text-center">No items found.</p>}
+                {filteredItems.length === 0 && <p className="text-muted-foreground py-12 text-center">{t('shop.no_items_found')}</p>}
 
                 {/* Bundles */}
                 {bundles.length > 0 && (
@@ -534,9 +536,9 @@ export default function ShopIndex({
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <Package className="size-5" />
-                                <CardTitle>Bundles</CardTitle>
+                                <CardTitle>{t('shop.bundles')}</CardTitle>
                             </div>
-                            <CardDescription>Save with item bundles</CardDescription>
+                            <CardDescription>{t('shop.save_with_bundles')}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -561,7 +563,7 @@ export default function ShopIndex({
                                             {bundle.description && <p className="text-muted-foreground mt-1 text-sm">{bundle.description}</p>}
                                             <div className="mt-3 flex items-center gap-3">
                                                 <BundleIcons items={bundle.items} />
-                                                <span className="text-muted-foreground text-xs">{bundle.items.length} items</span>
+                                                <span className="text-muted-foreground text-xs">{t('shop.items_count', { count: String(bundle.items.length) })}</span>
                                             </div>
                                         </button>
                                     );
@@ -576,8 +578,8 @@ export default function ShopIndex({
             <Dialog open={buyItem !== null} onOpenChange={(open) => { if (!open) { setBuyItem(null); setQuantity(1); setPromoCode(''); } }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Purchase Item</DialogTitle>
-                        <DialogDescription>Confirm your purchase.</DialogDescription>
+                        <DialogTitle>{t('shop.purchase_item')}</DialogTitle>
+                        <DialogDescription>{t('shop.confirm_purchase')}</DialogDescription>
                     </DialogHeader>
                     {buyItem && (
                         <div className="space-y-4">
@@ -586,36 +588,36 @@ export default function ShopIndex({
                                 <div className="flex-1">
                                     <p className="font-medium">{buyItem.name}</p>
                                     <p className="text-muted-foreground text-sm">
-                                        <CoinPrice amount={coin(buyItem.price)} size="sm" /> each {buyItem.quantity > 1 && <span>· x{buyItem.quantity} items per unit</span>}
+                                        <CoinPrice amount={coin(buyItem.price)} size="sm" /> {t('shop.each')} {buyItem.quantity > 1 && <span>· {t('shop.items_per_unit', { count: String(buyItem.quantity) })}</span>}
                                     </p>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-2">
-                                    <Label>Quantity</Label>
+                                    <Label>{t('shop.quantity')}</Label>
                                     <Input type="number" min={1} max={buyItem.max_per_player || 100} value={quantity} onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Promo Code</Label>
-                                    <Input placeholder="Optional" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} />
+                                    <Label>{t('shop.promo_code')}</Label>
+                                    <Input placeholder={t('shop.optional')} value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} />
                                 </div>
                             </div>
                             <div className="flex items-center justify-between rounded-md bg-muted p-3">
-                                <span className="text-sm font-medium">Total</span>
+                                <span className="text-sm font-medium">{t('shop.total')}</span>
                                 <CoinPrice amount={itemTotal} size="lg" />
                             </div>
                             {!canAffordItem && (
                                 <p className="text-sm text-destructive">
-                                    Insufficient balance. You need {itemTotal - coin(availableBalance!)} more.
-                                    {availableBalance! < (balance ?? 0) && ' (some balance is held for pending deliveries)'}
+                                    {t('shop.insufficient_balance', { amount: String(itemTotal - coin(availableBalance!)) })}
+                                    {availableBalance! < (balance ?? 0) && ` ${t('shop.pending_deliveries_note')}`}
                                 </p>
                             )}
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setBuyItem(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setBuyItem(null)}>{t('common.cancel')}</Button>
                         <Button disabled={!buyItem || loading || pendingPurchaseId !== null || !canAffordItem} onClick={handleBuyItem}>
-                            <ShoppingBag className="mr-1.5 size-4" />Buy Now
+                            <ShoppingBag className="mr-1.5 size-4" />{t('shop.buy_now')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -625,8 +627,8 @@ export default function ShopIndex({
             <Dialog open={buyBundle !== null} onOpenChange={(open) => { if (!open) { setBuyBundle(null); setPromoCode(''); } }}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Purchase Bundle</DialogTitle>
-                        <DialogDescription>Confirm your bundle purchase.</DialogDescription>
+                        <DialogTitle>{t('shop.purchase_bundle')}</DialogTitle>
+                        <DialogDescription>{t('shop.confirm_bundle')}</DialogDescription>
                     </DialogHeader>
                     {buyBundle && (() => {
                         const total = bundleItemsTotal(buyBundle);
@@ -642,7 +644,7 @@ export default function ShopIndex({
                                     {buyBundle.description && <p className="text-muted-foreground mt-1 text-sm">{buyBundle.description}</p>}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-sm">Includes:</Label>
+                                    <Label className="text-sm">{t('shop.includes')}</Label>
                                     {buyBundle.items.map((item) => (
                                         <div key={item.id} className="flex items-center justify-between text-sm">
                                             <div className="flex items-center gap-2">
@@ -655,40 +657,40 @@ export default function ShopIndex({
                                     ))}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Promo Code</Label>
-                                    <Input placeholder="Optional" value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} />
+                                    <Label>{t('shop.promo_code')}</Label>
+                                    <Input placeholder={t('shop.optional')} value={promoCode} onChange={(e) => setPromoCode(e.target.value.toUpperCase())} />
                                 </div>
                                 <div className="space-y-1 rounded-md bg-muted p-3 text-sm">
                                     {discount > 0 && (
                                         <>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Items total:</span>
+                                                <span className="text-muted-foreground">{t('shop.items_total')}</span>
                                                 <span className="tabular-nums">{total}</span>
                                             </div>
                                             <div className="flex justify-between text-green-600 dark:text-green-400">
-                                                <span>Bundle discount ({discount}%):</span>
+                                                <span>{t('shop.bundle_discount', { percent: String(discount) })}:</span>
                                                 <span className="tabular-nums">-{saving}</span>
                                             </div>
                                         </>
                                     )}
                                     <div className={`flex items-center justify-between ${discount > 0 ? 'border-t pt-1 font-medium' : 'font-medium'}`}>
-                                        <span>Total</span>
+                                        <span>{t('shop.total')}</span>
                                         <CoinPrice amount={coin(buyBundle.price)} size="lg" />
                                     </div>
                                 </div>
                                 {!canAffordBundle && (
                                     <p className="text-sm text-destructive">
-                                        Insufficient balance. You need {coin(buyBundle.price) - coin(availableBalance!)} more.
-                                        {availableBalance! < (balance ?? 0) && ' (some balance is held for pending deliveries)'}
+                                        {t('shop.insufficient_balance', { amount: String(coin(buyBundle.price) - coin(availableBalance!)) })}
+                                        {availableBalance! < (balance ?? 0) && ` ${t('shop.pending_deliveries_note')}`}
                                     </p>
                                 )}
                             </div>
                         );
                     })()}
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setBuyBundle(null)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => setBuyBundle(null)}>{t('common.cancel')}</Button>
                         <Button disabled={!buyBundle || loading || pendingPurchaseId !== null || !canAffordBundle} onClick={handleBuyBundle}>
-                            <ShoppingBag className="mr-1.5 size-4" />Buy Now
+                            <ShoppingBag className="mr-1.5 size-4" />{t('shop.buy_now')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

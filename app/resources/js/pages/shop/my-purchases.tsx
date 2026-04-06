@@ -3,6 +3,7 @@ import { Coins, Package } from 'lucide-react';
 import { formatDateTime } from '@/lib/dates';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { ShopPurchase } from '@/types/server';
@@ -30,14 +31,16 @@ const statusColors: Record<string, string> = {
 };
 
 export default function MyPurchases({ purchases, balance }: Props) {
+    const { t } = useTranslation();
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="My Purchases" />
+            <Head title={t('purchases.title')} />
             <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">My Purchases</h1>
-                        <p className="text-muted-foreground text-sm">Your purchase history</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{t('purchases.title')}</h1>
+                        <p className="text-muted-foreground text-sm">{t('purchases.description')}</p>
                     </div>
                     <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2">
                         <Coins className="size-5 text-amber-500" />
@@ -47,8 +50,8 @@ export default function MyPurchases({ purchases, balance }: Props) {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Purchase History</CardTitle>
-                        <CardDescription>{purchases.data.length} purchases</CardDescription>
+                        <CardTitle>{t('purchases.history')}</CardTitle>
+                        <CardDescription>{t('purchases.count', { count: String(purchases.data.length) })}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {purchases.data.length > 0 ? (
@@ -65,8 +68,8 @@ export default function MyPurchases({ purchases, balance }: Props) {
                                                     <span className="text-sm font-medium">
                                                         {purchase.metadata?.item_name ||
                                                             purchase.metadata?.items
-                                                                ? 'Bundle'
-                                                                : 'Item'}
+                                                                ? t('purchases.bundle')
+                                                                : t('purchases.item')}
                                                         {purchase.quantity_bought > 1 && ` x${purchase.quantity_bought}`}
                                                     </span>
                                                 </div>
@@ -131,7 +134,7 @@ export default function MyPurchases({ purchases, balance }: Props) {
                             </div>
                         ) : (
                             <p className="text-muted-foreground py-8 text-center">
-                                No purchases yet. Visit the shop to buy items!
+                                {t('purchases.no_purchases')}
                             </p>
                         )}
                     </CardContent>
