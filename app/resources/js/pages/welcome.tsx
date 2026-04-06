@@ -186,33 +186,33 @@ function HeroSection({
                             <DialogHeader>
                                 <DialogTitle>{hero.button_text}</DialogTitle>
                                 <DialogDescription>
-                                    Use the connection details below to connect in Project Zomboid.
+                                    {t('connection.description')}
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="space-y-3 py-2">
                                 {connection.ip ? (
                                     <>
-                                        <CopyField label="Server IP" value={connection.ip} />
-                                        <CopyField label="Port" value={connection.port} />
+                                        <CopyField label={t('connection.server_ip')} value={connection.ip} />
+                                        <CopyField label={t('connection.port')} value={connection.port} />
                                     </>
                                 ) : (
                                     <p className="text-sm text-muted-foreground">
-                                        Connection details are not configured yet. Contact the server admin.
+                                        {t('connection.not_configured')}
                                     </p>
                                 )}
                                 <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2.5 text-sm text-muted-foreground">
-                                    <p className="mb-1 font-medium text-foreground">How to connect:</p>
+                                    <p className="mb-1 font-medium text-foreground">{t('connection.how_to')}</p>
                                     <ol className="list-inside list-decimal space-y-0.5">
-                                        <li>Open Project Zomboid</li>
-                                        <li>Go to Multiplayer &rarr; Join</li>
-                                        <li>Enter the IP and port above</li>
-                                        <li>Click Connect</li>
+                                        <li>{t('connection.step_1')}</li>
+                                        <li>{t('connection.step_2')}</li>
+                                        <li>{t('connection.step_3')}</li>
+                                        <li>{t('connection.step_4')}</li>
                                     </ol>
                                 </div>
                             </div>
                             <DialogFooter>
                                 <DialogClose asChild>
-                                    <Button variant="outline">Close</Button>
+                                    <Button variant="outline">{t('common.close')}</Button>
                                 </DialogClose>
                             </DialogFooter>
                         </DialogContent>
@@ -220,7 +220,7 @@ function HeroSection({
                     <Button asChild variant="outline" size="lg">
                         <Link href="/rankings">
                             <Trophy className="mr-1.5 size-4" />
-                            View Rankings
+                            {t('landing.view_rankings')}
                         </Link>
                     </Button>
                 </motion.div>
@@ -341,10 +341,10 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
                                             </div>
                                             <p className="truncate text-sm font-semibold">{top_players[1].username}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {top_players[1].zombie_kills.toLocaleString()} kills
+                                                {top_players[1].zombie_kills.toLocaleString()} {t('common.kills')}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {top_players[1].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h survived
+                                                {top_players[1].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h {t('common.survived')}
                                             </p>
                                             {top_players[1].profession && (
                                                 <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-xs">
@@ -370,10 +370,10 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
                                         </div>
                                         <p className="truncate font-semibold">{top_players[0].username}</p>
                                         <p className="text-sm text-muted-foreground">
-                                            {top_players[0].zombie_kills.toLocaleString()} kills
+                                            {top_players[0].zombie_kills.toLocaleString()} {t('common.kills')}
                                         </p>
                                         <p className="text-sm text-muted-foreground">
-                                            {top_players[0].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h survived
+                                            {top_players[0].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h {t('common.survived')}
                                         </p>
                                         {top_players[0].profession && (
                                             <span className="mt-1 inline-block rounded bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
@@ -399,10 +399,10 @@ function TopPlayersSection({ top_players }: Pick<WelcomePageData, 'top_players'>
                                             </div>
                                             <p className="truncate text-sm font-semibold">{top_players[2].username}</p>
                                             <p className="text-xs text-muted-foreground">
-                                                {top_players[2].zombie_kills.toLocaleString()} kills
+                                                {top_players[2].zombie_kills.toLocaleString()} {t('common.kills')}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
-                                                {top_players[2].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h survived
+                                                {top_players[2].hours_survived.toLocaleString(undefined, { maximumFractionDigits: 1 })}h {t('common.survived')}
                                             </p>
                                             {top_players[2].profession && (
                                                 <span className="mt-1 inline-block rounded bg-muted px-1.5 py-0.5 text-xs">
