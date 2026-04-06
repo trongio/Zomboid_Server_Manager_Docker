@@ -73,6 +73,26 @@ function Assert-DockerEnvironment {
     }
 }
 
+function Invoke-CompatibleWebRequest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+
+        [int]$TimeoutSec = 5
+    )
+
+    $params = @{
+        Uri        = $Uri
+        TimeoutSec = $TimeoutSec
+    }
+
+    if ($PSVersionTable.PSEdition -eq "Desktop") {
+        $params.UseBasicParsing = $true
+    }
+
+    return Invoke-WebRequest @params
+}
+
 function Test-VolumeExists {
     param([string]$Name)
     docker volume inspect $Name 2>$null | Out-Null
@@ -188,7 +208,7 @@ function Do-Arch {
 }
 
 function Do-Info {
-    $publicIp = try { (Invoke-WebRequest -Uri "https://api.ipify.org" -TimeoutSec 5 -UseBasicParsing).Content.Trim() } catch { "" }
+    $publicIp = try { (Invoke-CompatibleWebRequest -Uri "https://api.ipify.org" -TimeoutSec 5).Content.Trim() } catch { "" }
 
     Write-Host ""
     Write-Host ([char]0x2554 + ([string][char]0x2550 * 46) + [char]0x2557) -ForegroundColor Cyan
@@ -269,13 +289,25 @@ function Do-DbBackup {
     if (-not (Test-Path "db-backups")) { New-Item -ItemType Directory -Path "db-backups" | Out-Null }
     $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
     $backupFile = "db-backups\backup-$timestamp.sql"
+    $stderrFile = [System.IO.Path]::GetTempFileName()
     Write-Host "Backing up database..."
-    $result = docker exec pz-db pg_dump -U zomboid -d zomboid --no-owner 2>$null
-    if ($LASTEXITCODE -eq 0 -and $result) {
-        [System.IO.File]::WriteAllText($backupFile, ($result -join "`n"), [System.Text.UTF8Encoding]::new($false))
-        Write-Host "Backup saved to $backupFile"
-    } else {
-        Write-Host "No database to backup (first run?)" -ForegroundColor Yellow
+    try {
+        $process = Start-Process -FilePath "docker" `
+            -ArgumentList @("exec", "pz-db", "pg_dump", "-U", "zomboid", "-d", "zomboid", "--no-owner") `
+            -RedirectStandardOutput $backupFile `
+            -RedirectStandardError $stderrFile `
+            -NoNewWindow `
+            -PassThru `
+            -Wait
+
+        if ($process.ExitCode -eq 0 -and (Test-Path $backupFile) -and (Get-Item $backupFile).Length -gt 0) {
+            Write-Host "Backup saved to $backupFile"
+        } else {
+            Remove-Item -Force -ErrorAction SilentlyContinue $backupFile
+            Write-Host "No database to backup (first run?)" -ForegroundColor Yellow
+        }
+    } finally {
+        Remove-Item -Force -ErrorAction SilentlyContinue $stderrFile
     }
 }
 

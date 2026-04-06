@@ -77,7 +77,8 @@ function Set-EnvValue {
 function Write-FileUtf8NoBom {
     param([string]$Path, [string]$Content)
     $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+    $normalized = $Content -replace "`r`n", "`n"
+    [System.IO.File]::WriteAllText($Path, $normalized, $utf8NoBom)
 }
 
 function Get-DetectedIPv4Addresses {
@@ -142,6 +143,30 @@ function Assert-DockerEnvironment {
         Write-Host "       Windows container mode is not supported." -ForegroundColor Yellow
         exit 1
     }
+}
+
+function Invoke-CompatibleWebRequest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Uri,
+
+        [int]$TimeoutSec = 5,
+
+        [string]$Method = "Get"
+    )
+
+    $params = @{
+        Uri         = $Uri
+        TimeoutSec  = $TimeoutSec
+        ErrorAction = "Stop"
+        Method      = $Method
+    }
+
+    if ($PSVersionTable.PSEdition -eq "Desktop") {
+        $params.UseBasicParsing = $true
+    }
+
+    return Invoke-WebRequest @params
 }
 
 $GENERATE_SELF_SIGNED = $false
@@ -244,7 +269,7 @@ $PZ_SERVER_PASSWORD = Read-Prompt "Server password (empty = open)" ""
 Write-Section "Web Panel (HTTPS)"
 
 Write-Host "  Detecting server public IP..." -ForegroundColor DarkGray
-$SERVER_IP = try { (Invoke-WebRequest -Uri "https://api.ipify.org" -TimeoutSec 5 -UseBasicParsing).Content.Trim() } catch { "" }
+$SERVER_IP = try { (Invoke-CompatibleWebRequest -Uri "https://api.ipify.org" -TimeoutSec 5).Content.Trim() } catch { "" }
 if ($SERVER_IP) {
     Write-Host "  Detected: $SERVER_IP" -ForegroundColor DarkGray
 } else {
@@ -263,10 +288,10 @@ if ([string]::IsNullOrEmpty($enablePublic)) { $enablePublic = "n" }
 if ($enablePublic.ToLower() -ne "y") {
     # Local-only mode
     $SITE_HOST = "localhost"
-    $APP_URL = "http://localhost:$APP_PORT"
+    $APP_URL = "https://localhost"
     $CADDY_SITE = "localhost"
     $CADDY_TLS = "`ttls internal"
-    Write-Host "  Panel will be available locally at http://localhost:$APP_PORT" -ForegroundColor Green
+    Write-Host "  Panel will be available locally at https://localhost" -ForegroundColor Green
 } else {
     $ADMIN_PUBLIC_ENABLED = $true
 
@@ -626,7 +651,7 @@ http://$CADDY_SITE {
 }
 Write-FileUtf8NoBom "caddy\Caddyfile" $caddyfile
 
-# Update .firewall.conf with CADDY_ENABLED=true
+# Update .firewall.conf with the current CADDY_ENABLED state
 if (Test-Path ".firewall.conf") {
     $fwContent = Get-Content ".firewall.conf" -Raw
     $fwValue = if ($ADMIN_PUBLIC_ENABLED) { "true" } else { "false" }
@@ -757,7 +782,7 @@ Write-Host "Verifying app is running..."
 $HEALTH_OK = $false
 for ($attempt = 1; $attempt -le 5; $attempt++) {
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:$APP_PORT/" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+        $response = Invoke-CompatibleWebRequest -Uri "http://localhost:$APP_PORT/" -TimeoutSec 5
         if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 400) {
             $HEALTH_OK = $true
             break
