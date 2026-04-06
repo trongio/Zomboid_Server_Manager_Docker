@@ -170,12 +170,17 @@ function Do-Test {
 }
 
 function Do-Exec {
-    $cmd = $script:CmdArgs -join " "
-    if (-not $cmd) {
-        Write-Host "Usage: .\make.ps1 exec `"php artisan ...`"" -ForegroundColor Yellow
+    if (-not $script:CmdArgs -or $script:CmdArgs.Count -eq 0) {
+        Write-Host "Usage: .\make.ps1 exec php artisan ..." -ForegroundColor Yellow
         return
     }
-    Invoke-Compose @("exec", "app", "sh", "-lc", $cmd)
+
+    if ($script:CmdArgs.Count -eq 1) {
+        Invoke-Compose @("exec", "app", "sh", "-lc", $script:CmdArgs[0])
+        return
+    }
+
+    Invoke-Compose (@("exec", "app") + $script:CmdArgs)
 }
 
 function Do-Arch {
@@ -407,7 +412,7 @@ function Do-UpdateVersion {
     $content = Get-Content "game-version.conf"
     $content = $content -replace "^PZ_VERSION=.*", "PZ_VERSION=$ver"
     $content = $content -replace "^PZ_VERSION_FULL=.*", "PZ_VERSION_FULL=$full"
-    $content | Set-Content "game-version.conf"
+    [System.IO.File]::WriteAllLines("game-version.conf", $content, [System.Text.UTF8Encoding]::new($false))
     Write-Host ""
     Write-Host "Updated game-version.conf:"
     Write-Host "  PZ_VERSION=$ver"

@@ -52,7 +52,7 @@ Linux auto-detects the firewall backend (firewalld, ufw, or manual). Windows use
 |-------|---------|-------------|
 | `make migrate` | `.\make.ps1 migrate` | Run database migrations |
 | `make test` | `.\make.ps1 test` | Run the test suite |
-| `make exec CMD="..."` | `.\make.ps1 exec "..."` | Run command in app container |
+| `make exec CMD="..."` | `.\make.ps1 exec php artisan ...` | Run command in app container |
 
 ### Common exec examples
 
