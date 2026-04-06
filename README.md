@@ -14,7 +14,7 @@
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 
-[Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [API Reference](#rest-api-reference) · [Architecture](#architecture) · [Security](#security)
+[Features](#features) · [Quick Start](#quick-start) · [Docs](#documentation) · [Screenshots](#screenshots) · [API Reference](#rest-api-reference) · [Architecture](#architecture) · [Security](#security)
 
 </div>
 
@@ -421,15 +421,28 @@ Volumes: pz-data, pz-server-files, pz-backups, pz-lua-bridge, pz-map-tiles,
 
 ### Requirements
 
-- Docker and Docker Compose v2
-- GNU Make
-- `openssl` (for secret generation)
+**Linux:** Docker Engine, Docker Compose v2, Git, Make — see [full Linux guide](docs/installation-linux.md)
+
+**Windows (alpha):** PowerShell wrappers are included, but they require Docker CLI + Compose with a Linux container backend. On Windows Server, use a Linux VM or other Linux container host. See [full Windows guide](docs/installation-windows.md)
 
 ### Start
 
 ```bash
+# Linux
 git clone <repo-url> && cd Zomboid_Server
 make init
+```
+
+```powershell
+# Windows (PowerShell)
+git clone <repo-url>; cd Zomboid_Server
+.\make.ps1 init
+```
+
+Or use the wrapper:
+
+```powershell
+.\easy-init.ps1
 ```
 
 The interactive setup wizard will:
@@ -464,6 +477,18 @@ Navigate to the URL shown at the end of setup and log in with the displayed cred
 - **Can't reach the public URL?** The panel is always accessible at `http://localhost:8000` on the server itself. If the public URL doesn't work, check `make info` for your configured ports, run `make admin-expose` to open the firewall, and verify router port forwarding.
 - **Browser shows a certificate warning?** Expected with IP-address mode (self-signed cert). Click through to proceed.
 - **Want to change access mode?** Re-run `make init` — it will detect existing config and offer to reconfigure.
+
+## Documentation
+
+| Guide | Description |
+|-------|-------------|
+| [Linux Installation](docs/installation-linux.md) | Requirements, setup, and step-by-step instructions for Linux |
+| [Windows Installation](docs/installation-windows.md) | Windows desktop and Windows Server guidance for PowerShell wrappers and Linux backends **(alpha)** |
+| [Command Reference](docs/commands.md) | All `make` / `.\make.ps1` commands with Linux and Windows equivalents |
+| [Troubleshooting](docs/troubleshooting.md) | Common issues, cloud provider notes, hardware requirements |
+| [Firewall — UFW](docs/firewall-ufw.md) | Ubuntu/Debian firewall details |
+| [Firewall — firewalld](docs/firewall-firewalld.md) | Fedora/RHEL firewall details |
+| [Firewall — Manual](docs/firewall-manual.md) | Manual iptables/nftables instructions |
 
 ## Configuration
 
@@ -509,6 +534,12 @@ After editing `.env`, restart to apply:
 
 ```bash
 make down && make up
+```
+
+On Windows PowerShell, the equivalent is:
+
+```powershell
+.\easy-deploy.ps1
 ```
 
 ## Firewall & Network Access
