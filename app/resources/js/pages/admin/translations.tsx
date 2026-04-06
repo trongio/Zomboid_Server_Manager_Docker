@@ -180,6 +180,10 @@ export default function Translations({ languages, keys, defaults, locale_default
     }
 
     function hasOverride(key: string, locale: string): boolean {
+        return !!overrides[locale]?.[key];
+    }
+
+    function hasLocaleValue(key: string, locale: string): boolean {
         return !!overrides[locale]?.[key] || !!locale_defaults[locale]?.[key];
     }
 

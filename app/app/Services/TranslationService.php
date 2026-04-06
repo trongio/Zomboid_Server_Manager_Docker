@@ -46,12 +46,16 @@ class TranslationService
         if ($locale) {
             Cache::forget("translations.{$locale}");
         } else {
-            // Clear all known locale caches
+            // Clear DB locale caches
             $locales = Translation::query()->distinct()->pluck('locale')->all();
             foreach ($locales as $loc) {
                 Cache::forget("translations.{$loc}");
             }
-            // Also clear common ones
+            // Also clear caches for active languages (may have JSON-only translations)
+            $activeCodes = Language::query()->where('is_active', true)->pluck('code')->all();
+            foreach ($activeCodes as $code) {
+                Cache::forget("translations.{$code}");
+            }
             Cache::forget('translations.en');
         }
     }

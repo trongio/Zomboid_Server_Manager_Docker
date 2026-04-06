@@ -65,11 +65,19 @@ class HandleInertiaRequests extends Middleware
             ],
             'locale' => fn () => App::getLocale(),
             'translations' => fn () => TranslationService::getForLocale(App::getLocale()),
-            'available_locales' => fn () => Cache::remember('active_languages', 3600, fn () => Language::query()
-                ->where('is_active', true)
-                ->get(['code', 'name', 'native_name'])
-                ->toArray(),
-            ),
+            'available_locales' => fn () => Cache::remember('active_languages', 3600, function () {
+                $locales = Language::query()
+                    ->where('is_active', true)
+                    ->get(['code', 'name', 'native_name'])
+                    ->toArray();
+
+                // Ensure English is always available even if not in the languages table
+                if (! collect($locales)->contains('code', 'en')) {
+                    array_unshift($locales, ['code' => 'en', 'name' => 'English', 'native_name' => 'English']);
+                }
+
+                return $locales;
+            }),
         ];
     }
 }
