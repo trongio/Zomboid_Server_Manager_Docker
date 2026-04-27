@@ -7,8 +7,10 @@ use App\Services\AuditLogger;
 use App\Services\ModManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 
 class ModController extends Controller
 {
@@ -29,6 +31,7 @@ class ModController extends Controller
 
         return Inertia::render('admin/mods', [
             'mods' => $mods,
+            'protectedWorkshopIds' => ModManager::PROTECTED_WORKSHOP_IDS,
         ]);
     }
 
@@ -40,12 +43,20 @@ class ModController extends Controller
             'map_folder' => 'nullable|string|max:255',
         ]);
 
-        $this->modManager->add(
-            config('zomboid.paths.server_ini'),
-            $validated['workshop_id'],
-            $validated['mod_id'],
-            $validated['map_folder'] ?? null,
-        );
+        try {
+            $this->modManager->add(
+                config('zomboid.paths.server_ini'),
+                $validated['workshop_id'],
+                $validated['mod_id'],
+                $validated['map_folder'] ?? null,
+            );
+        } catch (RuntimeException $e) {
+            Log::error('Failed to add mod', ['exception' => $e, 'mod' => $validated]);
+
+            return response()->json([
+                'error' => 'Could not save mod to server config.',
+            ], 500);
+        }
 
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
@@ -63,10 +74,24 @@ class ModController extends Controller
 
     public function destroy(Request $request, string $workshopId): JsonResponse
     {
-        $removed = $this->modManager->remove(
-            config('zomboid.paths.server_ini'),
-            $workshopId,
-        );
+        if (ModManager::isProtected($workshopId)) {
+            return response()->json([
+                'error' => 'This mod is required by the manager and cannot be removed.',
+            ], 422);
+        }
+
+        try {
+            $removed = $this->modManager->remove(
+                config('zomboid.paths.server_ini'),
+                $workshopId,
+            );
+        } catch (RuntimeException $e) {
+            Log::error('Failed to remove mod', ['exception' => $e, 'workshop_id' => $workshopId]);
+
+            return response()->json([
+                'error' => 'Could not save mod removal to server config.',
+            ], 500);
+        }
 
         if (! $removed) {
             return response()->json(['error' => 'Mod not found'], 404);
@@ -94,10 +119,18 @@ class ModController extends Controller
             'mods.*.mod_id' => 'required|string',
         ]);
 
-        $this->modManager->reorder(
-            config('zomboid.paths.server_ini'),
-            $validated['mods'],
-        );
+        try {
+            $this->modManager->reorder(
+                config('zomboid.paths.server_ini'),
+                $validated['mods'],
+            );
+        } catch (RuntimeException $e) {
+            Log::error('Failed to reorder mods', ['exception' => $e]);
+
+            return response()->json([
+                'error' => 'Could not save mod order to server config.',
+            ], 500);
+        }
 
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',

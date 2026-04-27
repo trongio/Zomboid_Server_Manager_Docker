@@ -68,7 +68,7 @@ fi
 # run_server.sh (which may overwrite them). configure-server.sh uses this
 # as a last-resort fallback when no .mod_state file exists yet.
 INI_FILE="/home/steam/Zomboid/Server/${SERVERNAME:-${SERVER_NAME:-ZomboidServer}}.ini"
-MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
+MOD_STATE_BACKUP="/home/steam/Zomboid/Server/.mod_state_backup"
 if [ -f "$INI_FILE" ]; then
     CURRENT_MODS=$(grep "^Mods=" "$INI_FILE" | head -1)
     CURRENT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | head -1)

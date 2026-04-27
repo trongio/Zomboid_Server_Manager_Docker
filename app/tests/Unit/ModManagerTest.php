@@ -16,7 +16,7 @@ afterEach(function () {
     if (file_exists($this->iniPath)) {
         unlink($this->iniPath);
     }
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
     if (file_exists($stateFile)) {
         unlink($stateFile);
     }
@@ -111,7 +111,7 @@ it('removes map folder when removing map mod', function () {
 it('writes mod state file when adding a mod', function () {
     $this->manager->add($this->iniPath, '1111111111', 'TestMod');
 
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
 
     expect(file_exists($stateFile))->toBeTrue();
 
@@ -123,7 +123,7 @@ it('writes mod state file when adding a mod', function () {
 it('writes mod state file when removing a mod', function () {
     $this->manager->remove($this->iniPath, '2561774086');
 
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
 
     expect(file_exists($stateFile))->toBeTrue();
 
@@ -138,7 +138,7 @@ it('writes mod state file when reordering mods', function () {
         ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
     ]);
 
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
 
     expect(file_exists($stateFile))->toBeTrue();
 
@@ -148,7 +148,7 @@ it('writes mod state file when reordering mods', function () {
 });
 
 it('does not write mod state file when adding duplicate mod', function () {
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
     if (file_exists($stateFile)) {
         unlink($stateFile);
     }
@@ -159,7 +159,7 @@ it('does not write mod state file when adding duplicate mod', function () {
 });
 
 it('does not write mod state file when removing nonexistent mod', function () {
-    $stateFile = $this->tempDir.'/.mod_state';
+    $stateFile = $this->tempDir.'/Server/.mod_state';
     if (file_exists($stateFile)) {
         unlink($stateFile);
     }
@@ -168,3 +168,49 @@ it('does not write mod state file when removing nonexistent mod', function () {
 
     expect(file_exists($stateFile))->toBeFalse();
 });
+
+it('flags protected workshop ids', function () {
+    expect(ModManager::isProtected('3685323705'))->toBeTrue()
+        ->and(ModManager::isProtected('1111111111'))->toBeFalse();
+});
+
+it('allows reorder that keeps required mod', function () {
+    $this->manager->add($this->iniPath, '3685323705', 'ZomboidManager');
+
+    $this->manager->reorder($this->iniPath, [
+        ['workshop_id' => '3685323705', 'mod_id' => 'ZomboidManager'],
+        ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
+        ['workshop_id' => '2286126274', 'mod_id' => 'Hydrocraft'],
+    ]);
+
+    $mods = $this->manager->list($this->iniPath);
+    expect($mods[0]['workshop_id'])->toBe('3685323705');
+});
+
+it('throws RuntimeException when state file directory is not writable', function () {
+    chmod($this->tempDir.'/Server', 0555);
+
+    try {
+        expect(fn () => $this->manager->add($this->iniPath, '1111111111', 'TestMod'))
+            ->toThrow(RuntimeException::class);
+    } finally {
+        chmod($this->tempDir.'/Server', 0777);
+    }
+})->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');
+
+it('rolls back the INI when state file write fails', function () {
+    $iniBefore = file_get_contents($this->iniPath);
+    chmod($this->tempDir.'/Server', 0555);
+
+    try {
+        try {
+            $this->manager->add($this->iniPath, '1111111111', 'TestMod');
+        } catch (RuntimeException) {
+            // expected
+        }
+    } finally {
+        chmod($this->tempDir.'/Server', 0777);
+    }
+
+    expect(file_get_contents($this->iniPath))->toBe($iniBefore);
+})->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');

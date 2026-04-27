@@ -4,9 +4,22 @@ namespace App\Services;
 
 class ModManager
 {
+    /**
+     * Workshop IDs of mods that must remain installed for the manager to work.
+     * The proprietary ZomboidManager mod provides the Lua bridge used by
+     * inventory, delivery, and player-position features — removing it breaks
+     * core functionality, so the API/UI refuse to remove these.
+     */
+    public const PROTECTED_WORKSHOP_IDS = ['3685323705'];
+
     public function __construct(
         private readonly ServerIniParser $iniParser,
     ) {}
+
+    public static function isProtected(string $workshopId): bool
+    {
+        return in_array($workshopId, self::PROTECTED_WORKSHOP_IDS, true);
+    }
 
     /**
      * Get the current mod list parsed from server.ini.
@@ -65,8 +78,7 @@ class ModManager
             }
         }
 
-        $this->iniParser->write($iniPath, $updates);
-        $this->writeModState($iniPath);
+        $this->writeIniAndState($iniPath, $updates);
     }
 
     /**
@@ -106,8 +118,7 @@ class ModManager
             $updates['Map'] = implode(';', array_values($maps));
         }
 
-        $this->iniParser->write($iniPath, $updates);
-        $this->writeModState($iniPath);
+        $this->writeIniAndState($iniPath, $updates);
 
         return $removed;
     }
@@ -122,11 +133,42 @@ class ModManager
         $workshopIds = array_column($orderedMods, 'workshop_id');
         $modIds = array_column($orderedMods, 'mod_id');
 
-        $this->iniParser->write($iniPath, [
+        $existing = $this->splitList($this->iniParser->read($iniPath)['WorkshopItems'] ?? '');
+        foreach (self::PROTECTED_WORKSHOP_IDS as $required) {
+            if (in_array($required, $existing, true) && ! in_array($required, $workshopIds, true)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mods' => ["Reorder cannot drop required mod {$required}."],
+                ]);
+            }
+        }
+
+        $this->writeIniAndState($iniPath, [
             'WorkshopItems' => implode(';', $workshopIds),
             'Mods' => implode(';', $modIds),
         ]);
-        $this->writeModState($iniPath);
+    }
+
+    /**
+     * Apply INI updates and write the mod state snapshot atomically. If the
+     * state-file write fails, the prior INI content is restored so callers see
+     * an all-or-nothing outcome rather than a partially-applied change.
+     *
+     * @param  array<string, string>  $updates
+     */
+    private function writeIniAndState(string $iniPath, array $updates): void
+    {
+        $previousIni = @file_get_contents($iniPath);
+
+        $this->iniParser->write($iniPath, $updates);
+
+        try {
+            $this->writeModState($iniPath);
+        } catch (\Throwable $e) {
+            if ($previousIni !== false) {
+                @file_put_contents($iniPath, $previousIni);
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -143,25 +185,28 @@ class ModManager
         $mods = str_replace(["\n", "\r"], '', $config['Mods'] ?? '');
         $workshopItems = str_replace(["\n", "\r"], '', $config['WorkshopItems'] ?? '');
 
-        $stateFile = dirname($iniPath, 2).'/.mod_state';
+        $stateFile = dirname($iniPath).'/.mod_state';
         $stateDir = dirname($stateFile);
         $contents = "Mods=$mods\nWorkshopItems=$workshopItems\n";
-        $tempFile = tempnam($stateDir, '.mod_state.');
+        $tempFile = @tempnam($stateDir, '.mod_state.');
 
-        if ($tempFile === false) {
+        if ($tempFile === false || dirname($tempFile) !== $stateDir) {
+            if ($tempFile !== false) {
+                @unlink($tempFile);
+            }
             throw new \RuntimeException("Unable to create temporary mod state file in {$stateDir}.");
         }
 
         try {
-            if (file_put_contents($tempFile, $contents) === false) {
+            if (@file_put_contents($tempFile, $contents) === false) {
                 throw new \RuntimeException("Unable to write temporary mod state file {$tempFile}.");
             }
 
-            if (! rename($tempFile, $stateFile)) {
+            if (! @rename($tempFile, $stateFile)) {
                 throw new \RuntimeException("Unable to atomically replace mod state file {$stateFile}.");
             }
 
-            chmod($stateFile, 0644);
+            @chmod($stateFile, 0644);
         } finally {
             if (is_file($tempFile)) {
                 @unlink($tempFile);

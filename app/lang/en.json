@@ -250,6 +250,7 @@
     "admin.mods.mods_installed": ":count mod(s) installed",
     "admin.mods.no_mods": "No mods installed",
     "admin.mods.no_mods_search": "No mods match your search",
+    "admin.mods.required_badge": "Required",
     "admin.mods.restart_required": "Mod load order changed. A server restart is required for changes to take effect.",
     "admin.mods.search_placeholder": "Search mods...",
     "admin.mods.table_mod_id": "Mod ID",

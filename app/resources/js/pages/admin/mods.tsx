@@ -29,12 +29,15 @@ function SortableModRow({
     index,
     onDelete,
     isDragDisabled,
+    isProtected,
 }: {
     mod: ModEntry;
     index: number;
     onDelete: (mod: ModEntry) => void;
     isDragDisabled: boolean;
+    isProtected: boolean;
 }) {
+    const { t } = useTranslation();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: mod.workshop_id,
         disabled: isDragDisabled,
@@ -63,28 +66,40 @@ function SortableModRow({
                     <span className="font-mono text-xs text-muted-foreground">{index + 1}</span>
                 )}
             </TableCell>
-            <TableCell className="font-medium">{mod.mod_id}</TableCell>
+            <TableCell className="font-medium">
+                <span className="flex items-center gap-2">
+                    {mod.mod_id}
+                    {isProtected && (
+                        <Badge variant="outline" className="text-xs">
+                            {t('admin.mods.required_badge')}
+                        </Badge>
+                    )}
+                </span>
+            </TableCell>
             <TableCell className="hidden sm:table-cell">
                 <Badge variant="secondary" className="text-xs">
                     {mod.workshop_id}
                 </Badge>
             </TableCell>
             <TableCell className="text-right">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => onDelete(mod)}
-                >
-                    <Trash2 className="size-4" />
-                </Button>
+                {!isProtected && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => onDelete(mod)}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
+                )}
             </TableCell>
         </TableRow>
     );
 }
 
-export default function Mods({ mods }: { mods: ModEntry[] }) {
+export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEntry[]; protectedWorkshopIds?: string[] }) {
     const { t } = useTranslation();
+    const protectedSet = useMemo(() => new Set(protectedWorkshopIds), [protectedWorkshopIds]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: t('nav.dashboard'), href: '/dashboard' },
@@ -237,6 +252,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                                                     index={index}
                                                     onDelete={setDeleteTarget}
                                                     isDragDisabled={isFiltering}
+                                                    isProtected={protectedSet.has(mod.workshop_id)}
                                                 />
                                             ))}
                                         </TableBody>
