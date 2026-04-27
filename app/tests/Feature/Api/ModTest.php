@@ -175,6 +175,8 @@ it('returns JSON 500 with error message when state file write fails', function (
     } finally {
         chmod($this->tempDir.'/Server', 0777);
     }
+
+    Log::shouldHaveReceived('error')->once();
 })->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');
 
 // ── Auth ─────────────────────────────────────────────────────────────

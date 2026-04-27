@@ -53,7 +53,7 @@ class ModController extends Controller
             Log::error('Failed to add mod', ['exception' => $e, 'mod' => $validated]);
 
             return response()->json([
-                'error' => 'Could not save mod to server config: '.$e->getMessage(),
+                'error' => 'Could not save mod to server config.',
             ], 500);
         }
 
@@ -82,7 +82,7 @@ class ModController extends Controller
             Log::error('Failed to remove mod', ['exception' => $e, 'workshop_id' => $workshopId]);
 
             return response()->json([
-                'error' => 'Could not save mod removal to server config: '.$e->getMessage(),
+                'error' => 'Could not save mod removal to server config.',
             ], 500);
         }
 
@@ -121,7 +121,7 @@ class ModController extends Controller
             Log::error('Failed to reorder mods', ['exception' => $e]);
 
             return response()->json([
-                'error' => 'Could not save mod order to server config: '.$e->getMessage(),
+                'error' => 'Could not save mod order to server config.',
             ], 500);
         }
 

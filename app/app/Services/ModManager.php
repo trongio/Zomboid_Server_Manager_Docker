@@ -156,15 +156,15 @@ class ModManager
         }
 
         try {
-            if (file_put_contents($tempFile, $contents) === false) {
+            if (@file_put_contents($tempFile, $contents) === false) {
                 throw new \RuntimeException("Unable to write temporary mod state file {$tempFile}.");
             }
 
-            if (! rename($tempFile, $stateFile)) {
+            if (! @rename($tempFile, $stateFile)) {
                 throw new \RuntimeException("Unable to atomically replace mod state file {$stateFile}.");
             }
 
-            chmod($stateFile, 0644);
+            @chmod($stateFile, 0644);
         } finally {
             if (is_file($tempFile)) {
                 @unlink($tempFile);

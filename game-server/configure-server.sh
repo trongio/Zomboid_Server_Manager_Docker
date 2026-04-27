@@ -74,6 +74,23 @@ apply_setting() {
     fi
 }
 
+# Like apply_setting, but writes empty values too. Used for mod lists where
+# the user removing every mod via the UI must actually clear the INI.
+apply_setting_force() {
+    local key="$1"
+    local value="$2"
+    local file="$3"
+
+    local escaped_value
+    escaped_value=$(printf '%s' "$value" | sed 's/[\\|&]/\\&/g')
+
+    if grep -q "^${key}=" "$file" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${escaped_value}|" "$file"
+    else
+        echo "${key}=${value}" >> "$file"
+    fi
+}
+
 # Core settings — .config_state (web UI) takes priority over env var defaults
 STATE_VAL=$(read_config_state "DefaultPort")
 apply_setting "DefaultPort"          "${STATE_VAL:-${PZ_GAME_PORT:-16261}}"       "$INI_FILE"
@@ -121,8 +138,10 @@ MOD_STATE_BACKUP="${INI_DIR}/.mod_state_backup"
 if [ -r "$MOD_STATE_FILE" ]; then
     STATE_MODS=$(grep "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//')
     STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//')
-    apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
-    apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
+    # Force-write so an empty state file (user removed all mods) actually
+    # clears the INI instead of letting stale entries reappear.
+    apply_setting_force "Mods"          "$STATE_MODS"     "$INI_FILE"
+    apply_setting_force "WorkshopItems" "$STATE_WORKSHOP" "$INI_FILE"
     echo "[configure-server] Restored mods from .mod_state (web UI)"
 elif [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
     # First-boot seed from .env — subsequent UI changes will own .mod_state.
