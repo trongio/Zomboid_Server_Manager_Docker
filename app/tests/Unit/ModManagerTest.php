@@ -174,14 +174,6 @@ it('flags protected workshop ids', function () {
         ->and(ModManager::isProtected('1111111111'))->toBeFalse();
 });
 
-it('throws when reorder drops a required mod', function () {
-    $this->manager->add($this->iniPath, '3685323705', 'ZomboidManager');
-
-    expect(fn () => $this->manager->reorder($this->iniPath, [
-        ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
-    ]))->toThrow(RuntimeException::class, 'required mod 3685323705');
-});
-
 it('allows reorder that keeps required mod', function () {
     $this->manager->add($this->iniPath, '3685323705', 'ZomboidManager');
 
@@ -204,4 +196,21 @@ it('throws RuntimeException when state file directory is not writable', function
     } finally {
         chmod($this->tempDir.'/Server', 0777);
     }
+})->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');
+
+it('rolls back the INI when state file write fails', function () {
+    $iniBefore = file_get_contents($this->iniPath);
+    chmod($this->tempDir.'/Server', 0555);
+
+    try {
+        try {
+            $this->manager->add($this->iniPath, '1111111111', 'TestMod');
+        } catch (RuntimeException) {
+            // expected
+        }
+    } finally {
+        chmod($this->tempDir.'/Server', 0777);
+    }
+
+    expect(file_get_contents($this->iniPath))->toBe($iniBefore);
 })->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');

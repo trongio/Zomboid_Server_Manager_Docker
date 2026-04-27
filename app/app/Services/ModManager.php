@@ -78,8 +78,7 @@ class ModManager
             }
         }
 
-        $this->iniParser->write($iniPath, $updates);
-        $this->writeModState($iniPath);
+        $this->writeIniAndState($iniPath, $updates);
     }
 
     /**
@@ -119,8 +118,7 @@ class ModManager
             $updates['Map'] = implode(';', array_values($maps));
         }
 
-        $this->iniParser->write($iniPath, $updates);
-        $this->writeModState($iniPath);
+        $this->writeIniAndState($iniPath, $updates);
 
         return $removed;
     }
@@ -138,15 +136,39 @@ class ModManager
         $existing = $this->splitList($this->iniParser->read($iniPath)['WorkshopItems'] ?? '');
         foreach (self::PROTECTED_WORKSHOP_IDS as $required) {
             if (in_array($required, $existing, true) && ! in_array($required, $workshopIds, true)) {
-                throw new \RuntimeException("Reorder cannot drop required mod {$required}.");
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mods' => ["Reorder cannot drop required mod {$required}."],
+                ]);
             }
         }
 
-        $this->iniParser->write($iniPath, [
+        $this->writeIniAndState($iniPath, [
             'WorkshopItems' => implode(';', $workshopIds),
             'Mods' => implode(';', $modIds),
         ]);
-        $this->writeModState($iniPath);
+    }
+
+    /**
+     * Apply INI updates and write the mod state snapshot atomically. If the
+     * state-file write fails, the prior INI content is restored so callers see
+     * an all-or-nothing outcome rather than a partially-applied change.
+     *
+     * @param  array<string, string>  $updates
+     */
+    private function writeIniAndState(string $iniPath, array $updates): void
+    {
+        $previousIni = @file_get_contents($iniPath);
+
+        $this->iniParser->write($iniPath, $updates);
+
+        try {
+            $this->writeModState($iniPath);
+        } catch (\Throwable $e) {
+            if ($previousIni !== false) {
+                @file_put_contents($iniPath, $previousIni);
+            }
+            throw $e;
+        }
     }
 
     /**

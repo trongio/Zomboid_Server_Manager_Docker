@@ -136,8 +136,10 @@ MOD_STATE_FILE="${INI_DIR}/.mod_state"
 MOD_STATE_BACKUP="${INI_DIR}/.mod_state_backup"
 
 if [ -r "$MOD_STATE_FILE" ]; then
-    STATE_MODS=$(grep "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//')
-    STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//')
+    # `|| true` keeps the script alive under `set -e` if the state file is
+    # truncated or missing one of the expected lines.
+    STATE_MODS=$(grep -m1 "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//' || true)
+    STATE_WORKSHOP=$(grep -m1 "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//' || true)
     # Force-write so an empty state file (user removed all mods) actually
     # clears the INI instead of letting stale entries reappear.
     apply_setting_force "Mods"          "$STATE_MODS"     "$INI_FILE"
@@ -149,8 +151,8 @@ elif [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
     apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
     echo "[configure-server] Seeded mods from environment variables (first boot)"
 elif [ -r "$MOD_STATE_BACKUP" ]; then
-    STATE_MODS=$(grep "^Mods=" "$MOD_STATE_BACKUP" | sed 's/^Mods=//')
-    STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_BACKUP" | sed 's/^WorkshopItems=//')
+    STATE_MODS=$(grep -m1 "^Mods=" "$MOD_STATE_BACKUP" | sed 's/^Mods=//' || true)
+    STATE_WORKSHOP=$(grep -m1 "^WorkshopItems=" "$MOD_STATE_BACKUP" | sed 's/^WorkshopItems=//' || true)
     if [ -n "$STATE_MODS" ] || [ -n "$STATE_WORKSHOP" ]; then
         apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
         apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
@@ -192,7 +194,7 @@ fi
 rm -rf /home/steam/ZomboidDedicatedServer/mods/ZomboidManager
 
 # Ensure ZomboidManager is in the Mods= list.
-CURRENT_MODS=$(grep "^Mods=" "$INI_FILE" | sed 's/^Mods=//')
+CURRENT_MODS=$(grep -m1 "^Mods=" "$INI_FILE" | sed 's/^Mods=//' || true)
 if ! echo "$CURRENT_MODS" | grep -q "ZomboidManager"; then
     if [ -n "$CURRENT_MODS" ]; then
         apply_setting "Mods" "${CURRENT_MODS};ZomboidManager" "$INI_FILE"
@@ -203,7 +205,7 @@ if ! echo "$CURRENT_MODS" | grep -q "ZomboidManager"; then
 fi
 
 # Ensure ZomboidManager workshop ID is in WorkshopItems= list.
-CURRENT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//')
+CURRENT_WORKSHOP=$(grep -m1 "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//' || true)
 if ! echo "$CURRENT_WORKSHOP" | grep -q "$ZM_WORKSHOP_ID"; then
     if [ -n "$CURRENT_WORKSHOP" ]; then
         apply_setting "WorkshopItems" "${CURRENT_WORKSHOP};${ZM_WORKSHOP_ID}" "$INI_FILE"
@@ -217,8 +219,8 @@ fi
 # the .ini on shutdown and may prune mods it didn't load; without an initial
 # snapshot, ZomboidManager could disappear after the next restart cycle.
 if [ ! -f "$MOD_STATE_FILE" ]; then
-    SNAPSHOT_MODS=$(grep "^Mods=" "$INI_FILE" | sed 's/^Mods=//')
-    SNAPSHOT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//')
+    SNAPSHOT_MODS=$(grep -m1 "^Mods=" "$INI_FILE" | sed 's/^Mods=//' || true)
+    SNAPSHOT_WORKSHOP=$(grep -m1 "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//' || true)
     if printf 'Mods=%s\nWorkshopItems=%s\n' "$SNAPSHOT_MODS" "$SNAPSHOT_WORKSHOP" > "$MOD_STATE_FILE" 2>/dev/null; then
         chmod 666 "$MOD_STATE_FILE" 2>/dev/null || true
         echo "[configure-server] Initialized .mod_state from current INI"

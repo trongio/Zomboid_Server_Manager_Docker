@@ -24,21 +24,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem, ModEntry } from '@/types';
 
-const PROTECTED_WORKSHOP_IDS = new Set(['3685323705']);
-
 function SortableModRow({
     mod,
     index,
     onDelete,
     isDragDisabled,
+    isProtected,
 }: {
     mod: ModEntry;
     index: number;
     onDelete: (mod: ModEntry) => void;
     isDragDisabled: boolean;
+    isProtected: boolean;
 }) {
     const { t } = useTranslation();
-    const isProtected = PROTECTED_WORKSHOP_IDS.has(mod.workshop_id);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: mod.workshop_id,
         disabled: isDragDisabled,
@@ -98,8 +97,9 @@ function SortableModRow({
     );
 }
 
-export default function Mods({ mods }: { mods: ModEntry[] }) {
+export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEntry[]; protectedWorkshopIds?: string[] }) {
     const { t } = useTranslation();
+    const protectedSet = useMemo(() => new Set(protectedWorkshopIds), [protectedWorkshopIds]);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: t('nav.dashboard'), href: '/dashboard' },
@@ -252,6 +252,7 @@ export default function Mods({ mods }: { mods: ModEntry[] }) {
                                                     index={index}
                                                     onDelete={setDeleteTarget}
                                                     isDragDisabled={isFiltering}
+                                                    isProtected={protectedSet.has(mod.workshop_id)}
                                                 />
                                             ))}
                                         </TableBody>

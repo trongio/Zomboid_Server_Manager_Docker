@@ -208,8 +208,8 @@ it('refuses to reorder if the required mod is dropped', function () {
             ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
         ],
     ], modApiHeaders())
-        ->assertStatus(500)
-        ->assertJsonStructure(['error']);
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('mods');
 });
 
 // ── Auth ─────────────────────────────────────────────────────────────
