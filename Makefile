@@ -17,7 +17,7 @@ CADDY_HTTPS_PORT ?= 443
 
 FW_DISPATCH := bash scripts/firewall/dispatch.sh
 
-.PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version \
+.PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version update \
 	admin-expose admin-hide expose hide info
 
 # ── First-run setup ──────────────────────────────────────────────────
@@ -229,6 +229,73 @@ db-restore:
 workshop-package:
 	bash scripts/workshop-package.sh
 
+# ── Update from git ─────────────────────────────────────────────────
+# Pulls the latest code, rebuilds, runs migrations, rebuilds frontend
+# assets, and restarts game-server so it picks up entrypoint script
+# changes. Refuses to run if the working tree is dirty.
+update:
+	@echo ""
+	@echo "════════ Zomboid Manager — Update ════════"
+	@echo ""
+	@if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then \
+		echo "Working tree has uncommitted changes:"; \
+		git status --short; \
+		echo ""; \
+		echo "Commit or stash them, then run 'make update' again."; \
+		exit 1; \
+	fi
+	@BRANCH=$$(git rev-parse --abbrev-ref HEAD); \
+	echo "→ Pulling latest from origin/$$BRANCH ..."; \
+	git fetch --tags origin "$$BRANCH" || (echo "git fetch failed."; exit 1); \
+	BEFORE=$$(git rev-parse HEAD); \
+	git pull --ff-only origin "$$BRANCH" || ( \
+		echo ""; \
+		echo "Cannot fast-forward (local has diverged). Resolve manually with:"; \
+		echo "  git status"; \
+		echo "  git log HEAD..origin/$$BRANCH --oneline"; \
+		exit 1 ); \
+	AFTER=$$(git rev-parse HEAD); \
+	if [ "$$BEFORE" = "$$AFTER" ]; then \
+		echo "  Already up to date."; \
+	else \
+		echo "  $$BEFORE → $$AFTER"; \
+		echo ""; \
+		echo "  New commits:"; \
+		git log --oneline "$$BEFORE..$$AFTER" | sed 's/^/    /'; \
+	fi
+	@echo ""
+	@echo "→ Rebuilding containers ..."
+	$(COMPOSE) up -d --build
+	@echo ""
+	@echo "→ Waiting for app container ..."
+	@for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do \
+		if $(COMPOSE) exec -T app php -v >/dev/null 2>&1; then break; fi; \
+		sleep 2; \
+	done
+	@echo "→ Installing PHP dependencies (composer.lock) ..."
+	@$(COMPOSE) exec -T app composer install --no-interaction --no-progress --prefer-dist 2>&1 | tail -3 || true
+	@echo ""
+	@echo "→ Building frontend assets ..."
+	@$(COMPOSE) exec -T app npm install --no-audit --no-fund --silent 2>&1 | tail -3 || true
+	$(COMPOSE) exec -T app npm run build
+	@echo ""
+	@echo "→ Running database migrations ..."
+	@$(COMPOSE) exec -T app php artisan migrate --force --no-interaction || echo "(migration skipped)"
+	@echo ""
+	@echo "→ Clearing application cache ..."
+	@$(COMPOSE) exec -T app php artisan config:clear >/dev/null 2>&1 || true
+	@$(COMPOSE) exec -T app php artisan route:clear >/dev/null 2>&1 || true
+	@$(COMPOSE) exec -T app php artisan view:clear >/dev/null 2>&1 || true
+	@echo ""
+	@echo "→ Restarting game-server (picks up entrypoint script changes) ..."
+	$(COMPOSE) restart game-server
+	@echo ""
+	@echo "════════ Update complete ════════"
+	@echo ""
+	@echo "Tail logs:           make logs"
+	@echo "Game-server only:    docker logs -f pz-game-server"
+	@echo ""
+
 # ── Game version ────────────────────────────────────────────────────
 # Updates game-version.conf with the current PZ version.
 # This file is used by tests — it does NOT control which version SteamCMD downloads.
@@ -295,6 +362,8 @@ help:
 	@echo "  Other:"
 	@echo "    info             - Show URLs, public IP, and firewall status"
 	@echo "    arch             - Show detected CPU architecture"
+	@echo "    update           - Pull latest code, rebuild, migrate, rebuild assets,"
+	@echo "                       and restart game-server (refuses if working tree dirty)"
 	@echo "    update-version   - Update game-version.conf after a PZ game update"
 	@echo "    nuke             - Destroy ALL data and stop services (DANGER)"
 	@echo ""
