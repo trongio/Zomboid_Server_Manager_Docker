@@ -169,6 +169,32 @@ it('does not write mod state file when removing nonexistent mod', function () {
     expect(file_exists($stateFile))->toBeFalse();
 });
 
+it('flags protected workshop ids', function () {
+    expect(ModManager::isProtected('3685323705'))->toBeTrue()
+        ->and(ModManager::isProtected('1111111111'))->toBeFalse();
+});
+
+it('throws when reorder drops a required mod', function () {
+    $this->manager->add($this->iniPath, '3685323705', 'ZomboidManager');
+
+    expect(fn () => $this->manager->reorder($this->iniPath, [
+        ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
+    ]))->toThrow(RuntimeException::class, 'required mod 3685323705');
+});
+
+it('allows reorder that keeps required mod', function () {
+    $this->manager->add($this->iniPath, '3685323705', 'ZomboidManager');
+
+    $this->manager->reorder($this->iniPath, [
+        ['workshop_id' => '3685323705', 'mod_id' => 'ZomboidManager'],
+        ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
+        ['workshop_id' => '2286126274', 'mod_id' => 'Hydrocraft'],
+    ]);
+
+    $mods = $this->manager->list($this->iniPath);
+    expect($mods[0]['workshop_id'])->toBe('3685323705');
+});
+
 it('throws RuntimeException when state file directory is not writable', function () {
     chmod($this->tempDir.'/Server', 0555);
 

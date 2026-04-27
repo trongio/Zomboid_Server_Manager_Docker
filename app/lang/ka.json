@@ -250,6 +250,7 @@
     "admin.mods.mods_installed": ":count მოდი დაინსტალირებული",
     "admin.mods.no_mods": "მოდები არ არის დაინსტალირებული",
     "admin.mods.no_mods_search": "მოდები ვერ მოიძებნა თქვენი ძიებით",
+    "admin.mods.required_badge": "სავალდებულო",
     "admin.mods.restart_required": "მოდების ჩატვირთვის რიგი შეიცვალა. ცვლილებების ასამოქმედებლად საჭიროა სერვერის გადატვირთვა.",
     "admin.mods.search_placeholder": "მოდების ძიება...",
     "admin.mods.table_mod_id": "Mod ID",

@@ -73,6 +73,12 @@ class ModController extends Controller
 
     public function destroy(Request $request, string $workshopId): JsonResponse
     {
+        if (ModManager::isProtected($workshopId)) {
+            return response()->json([
+                'error' => 'This mod is required by the manager and cannot be removed.',
+            ], 422);
+        }
+
         try {
             $removed = $this->modManager->remove(
                 config('zomboid.paths.server_ini'),

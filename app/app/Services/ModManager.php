@@ -4,9 +4,22 @@ namespace App\Services;
 
 class ModManager
 {
+    /**
+     * Workshop IDs of mods that must remain installed for the manager to work.
+     * The proprietary ZomboidManager mod provides the Lua bridge used by
+     * inventory, delivery, and player-position features — removing it breaks
+     * core functionality, so the API/UI refuse to remove these.
+     */
+    public const PROTECTED_WORKSHOP_IDS = ['3685323705'];
+
     public function __construct(
         private readonly ServerIniParser $iniParser,
     ) {}
+
+    public static function isProtected(string $workshopId): bool
+    {
+        return in_array($workshopId, self::PROTECTED_WORKSHOP_IDS, true);
+    }
 
     /**
      * Get the current mod list parsed from server.ini.
@@ -121,6 +134,13 @@ class ModManager
     {
         $workshopIds = array_column($orderedMods, 'workshop_id');
         $modIds = array_column($orderedMods, 'mod_id');
+
+        $existing = $this->splitList($this->iniParser->read($iniPath)['WorkshopItems'] ?? '');
+        foreach (self::PROTECTED_WORKSHOP_IDS as $required) {
+            if (in_array($required, $existing, true) && ! in_array($required, $workshopIds, true)) {
+                throw new \RuntimeException("Reorder cannot drop required mod {$required}.");
+            }
+        }
 
         $this->iniParser->write($iniPath, [
             'WorkshopItems' => implode(';', $workshopIds),

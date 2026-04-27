@@ -24,6 +24,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem, ModEntry } from '@/types';
 
+const PROTECTED_WORKSHOP_IDS = new Set(['3685323705']);
+
 function SortableModRow({
     mod,
     index,
@@ -35,6 +37,8 @@ function SortableModRow({
     onDelete: (mod: ModEntry) => void;
     isDragDisabled: boolean;
 }) {
+    const { t } = useTranslation();
+    const isProtected = PROTECTED_WORKSHOP_IDS.has(mod.workshop_id);
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: mod.workshop_id,
         disabled: isDragDisabled,
@@ -63,21 +67,32 @@ function SortableModRow({
                     <span className="font-mono text-xs text-muted-foreground">{index + 1}</span>
                 )}
             </TableCell>
-            <TableCell className="font-medium">{mod.mod_id}</TableCell>
+            <TableCell className="font-medium">
+                <span className="flex items-center gap-2">
+                    {mod.mod_id}
+                    {isProtected && (
+                        <Badge variant="outline" className="text-xs">
+                            {t('admin.mods.required_badge')}
+                        </Badge>
+                    )}
+                </span>
+            </TableCell>
             <TableCell className="hidden sm:table-cell">
                 <Badge variant="secondary" className="text-xs">
                     {mod.workshop_id}
                 </Badge>
             </TableCell>
             <TableCell className="text-right">
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => onDelete(mod)}
-                >
-                    <Trash2 className="size-4" />
-                </Button>
+                {!isProtected && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => onDelete(mod)}
+                    >
+                        <Trash2 className="size-4" />
+                    </Button>
+                )}
             </TableCell>
         </TableRow>
     );

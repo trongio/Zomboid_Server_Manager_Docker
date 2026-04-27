@@ -84,6 +84,12 @@ class ModController
             ], 404);
         }
 
+        if (ModManager::isProtected($workshopId)) {
+            return response()->json([
+                'error' => 'This mod is required by the manager and cannot be removed.',
+            ], 422);
+        }
+
         try {
             $removed = $this->modManager->remove($path, $workshopId);
         } catch (RuntimeException $e) {

@@ -179,6 +179,39 @@ it('returns JSON 500 with error message when state file write fails', function (
     Log::shouldHaveReceived('error')->once();
 })->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');
 
+// ── Protected (required) mod ────────────────────────────────────────
+
+it('refuses to remove the required ZomboidManager mod', function () {
+    file_put_contents($this->iniPath, str_replace(
+        ['Mods=SuperSurvivors;Hydrocraft', 'WorkshopItems=2561774086;2286126274'],
+        ['Mods=ZomboidManager;SuperSurvivors', 'WorkshopItems=3685323705;2561774086'],
+        file_get_contents($this->iniPath),
+    ));
+
+    $this->deleteJson('/api/config/mods/3685323705', [], modApiHeaders())
+        ->assertStatus(422)
+        ->assertJsonStructure(['error']);
+
+    $response = $this->getJson('/api/config/mods', modApiHeaders())->assertOk();
+    expect($response->json('mods.0.workshop_id'))->toBe('3685323705');
+});
+
+it('refuses to reorder if the required mod is dropped', function () {
+    file_put_contents($this->iniPath, str_replace(
+        ['Mods=SuperSurvivors;Hydrocraft', 'WorkshopItems=2561774086;2286126274'],
+        ['Mods=ZomboidManager;SuperSurvivors', 'WorkshopItems=3685323705;2561774086'],
+        file_get_contents($this->iniPath),
+    ));
+
+    $this->putJson('/api/config/mods/order', [
+        'mods' => [
+            ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
+        ],
+    ], modApiHeaders())
+        ->assertStatus(500)
+        ->assertJsonStructure(['error']);
+});
+
 // ── Auth ─────────────────────────────────────────────────────────────
 
 it('requires auth for mod endpoints', function () {
