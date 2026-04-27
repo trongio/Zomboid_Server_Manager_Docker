@@ -143,12 +143,15 @@ class ModManager
         $mods = str_replace(["\n", "\r"], '', $config['Mods'] ?? '');
         $workshopItems = str_replace(["\n", "\r"], '', $config['WorkshopItems'] ?? '');
 
-        $stateFile = dirname($iniPath, 2).'/.mod_state';
+        $stateFile = dirname($iniPath).'/.mod_state';
         $stateDir = dirname($stateFile);
         $contents = "Mods=$mods\nWorkshopItems=$workshopItems\n";
-        $tempFile = tempnam($stateDir, '.mod_state.');
+        $tempFile = @tempnam($stateDir, '.mod_state.');
 
-        if ($tempFile === false) {
+        if ($tempFile === false || dirname($tempFile) !== $stateDir) {
+            if ($tempFile !== false) {
+                @unlink($tempFile);
+            }
             throw new \RuntimeException("Unable to create temporary mod state file in {$stateDir}.");
         }
 

@@ -7,6 +7,8 @@ use App\Http\Requests\Api\ReorderModsRequest;
 use App\Services\AuditLogger;
 use App\Services\ModManager;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class ModController
 {
@@ -44,7 +46,15 @@ class ModController
         $modId = $request->validated('mod_id');
         $mapFolder = $request->validated('map_folder');
 
-        $this->modManager->add($path, $workshopId, $modId, $mapFolder);
+        try {
+            $this->modManager->add($path, $workshopId, $modId, $mapFolder);
+        } catch (RuntimeException $e) {
+            Log::error('Failed to add mod', ['exception' => $e, 'workshop_id' => $workshopId]);
+
+            return response()->json([
+                'error' => 'Could not save mod to server config: '.$e->getMessage(),
+            ], 500);
+        }
 
         $this->auditLogger->log(
             actor: 'api-key',
@@ -74,7 +84,15 @@ class ModController
             ], 404);
         }
 
-        $removed = $this->modManager->remove($path, $workshopId);
+        try {
+            $removed = $this->modManager->remove($path, $workshopId);
+        } catch (RuntimeException $e) {
+            Log::error('Failed to remove mod', ['exception' => $e, 'workshop_id' => $workshopId]);
+
+            return response()->json([
+                'error' => 'Could not save mod removal to server config: '.$e->getMessage(),
+            ], 500);
+        }
 
         if ($removed === null) {
             return response()->json([
@@ -108,7 +126,15 @@ class ModController
 
         $mods = $request->validated('mods');
 
-        $this->modManager->reorder($path, $mods);
+        try {
+            $this->modManager->reorder($path, $mods);
+        } catch (RuntimeException $e) {
+            Log::error('Failed to reorder mods', ['exception' => $e]);
+
+            return response()->json([
+                'error' => 'Could not save mod order to server config: '.$e->getMessage(),
+            ], 500);
+        }
 
         $this->auditLogger->log(
             actor: 'api-key',

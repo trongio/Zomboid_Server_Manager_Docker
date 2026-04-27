@@ -2,6 +2,7 @@
 
 use App\Models\AuditLog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -13,13 +14,18 @@ function modApiHeaders(): array
 beforeEach(function () {
     config(['zomboid.api_key' => 'test-key-12345']);
 
-    $this->iniPath = tempnam(sys_get_temp_dir(), 'pz_mod_ini_');
+    $this->tempDir = sys_get_temp_dir().'/pz_mod_test_'.uniqid();
+    mkdir($this->tempDir.'/Server', 0777, true);
+    $this->iniPath = $this->tempDir.'/Server/ZomboidServer.ini';
     copy(base_path('tests/fixtures/server.ini'), $this->iniPath);
     config(['zomboid.paths.server_ini' => $this->iniPath]);
 });
 
 afterEach(function () {
+    @unlink($this->tempDir.'/Server/.mod_state');
     @unlink($this->iniPath);
+    @rmdir($this->tempDir.'/Server');
+    @rmdir($this->tempDir);
 });
 
 // ── GET /api/config/mods ─────────────────────────────────────────────
@@ -152,6 +158,24 @@ it('validates reorder requires mods array', function () {
         ->assertUnprocessable()
         ->assertJsonValidationErrors('mods');
 });
+
+// ── Error handling ───────────────────────────────────────────────────
+
+it('returns JSON 500 with error message when state file write fails', function () {
+    Log::spy();
+    chmod($this->tempDir.'/Server', 0555);
+
+    try {
+        $this->postJson('/api/config/mods', [
+            'workshop_id' => '1234567890',
+            'mod_id' => 'NewMod',
+        ], modApiHeaders())
+            ->assertStatus(500)
+            ->assertJsonStructure(['error']);
+    } finally {
+        chmod($this->tempDir.'/Server', 0777);
+    }
+})->skip(getmyuid() === 0, 'chmod restrictions are bypassed by root');
 
 // ── Auth ─────────────────────────────────────────────────────────────
 

@@ -111,28 +111,25 @@ fi
 apply_setting "RCONPort"             "${PZ_RCON_PORT:-${RCON_PORT:-27015}}"         "$INI_FILE"
 apply_setting "RCONPassword"         "${PZ_RCON_PASSWORD:-${RCON_PASSWORD:-changeme}}" "$INI_FILE"
 
-# Mods — env vars take priority; fall back to .mod_state written by web UI.
-MOD_STATE_FILE="/home/steam/Zomboid/.mod_state"
-MOD_STATE_BACKUP="/home/steam/Zomboid/.mod_state_backup"
+# Mods — .mod_state (web UI) is authoritative. Env vars only seed the INI on
+# the very first boot when no state file exists yet. PZ rewrites the .ini on
+# shutdown and may prune entries it didn't load, so we cannot trust the .ini
+# alone across restarts.
+MOD_STATE_FILE="${INI_DIR}/.mod_state"
+MOD_STATE_BACKUP="${INI_DIR}/.mod_state_backup"
 
-if [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
-    # Env vars explicitly set — apply them (operator intent)
-    apply_setting "Mods"          "${PZ_MOD_IDS:-}"        "$INI_FILE"
-    apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
-    echo "[configure-server] Applied mods from environment variables"
-elif [ -r "$MOD_STATE_FILE" ]; then
-    # No env vars — restore from web UI's last-known mod state
+if [ -r "$MOD_STATE_FILE" ]; then
     STATE_MODS=$(grep "^Mods=" "$MOD_STATE_FILE" | sed 's/^Mods=//')
     STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_FILE" | sed 's/^WorkshopItems=//')
-    if [ -n "$STATE_MODS" ] || [ -n "$STATE_WORKSHOP" ]; then
-        apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
-        apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
-        echo "[configure-server] Restored mods from .mod_state (web UI)"
-    else
-        echo "[configure-server] .mod_state exists but is empty — no mods to restore"
-    fi
+    apply_setting "Mods"          "$STATE_MODS"          "$INI_FILE"
+    apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
+    echo "[configure-server] Restored mods from .mod_state (web UI)"
+elif [ -n "${PZ_MOD_IDS:-}" ] || [ -n "${PZ_WORKSHOP_IDS:-}" ]; then
+    # First-boot seed from .env — subsequent UI changes will own .mod_state.
+    apply_setting "Mods"          "${PZ_MOD_IDS:-}"        "$INI_FILE"
+    apply_setting "WorkshopItems" "${PZ_WORKSHOP_IDS:-}"   "$INI_FILE"
+    echo "[configure-server] Seeded mods from environment variables (first boot)"
 elif [ -r "$MOD_STATE_BACKUP" ]; then
-    # Fallback — restore from INI snapshot taken before image config ran
     STATE_MODS=$(grep "^Mods=" "$MOD_STATE_BACKUP" | sed 's/^Mods=//')
     STATE_WORKSHOP=$(grep "^WorkshopItems=" "$MOD_STATE_BACKUP" | sed 's/^WorkshopItems=//')
     if [ -n "$STATE_MODS" ] || [ -n "$STATE_WORKSHOP" ]; then
@@ -140,8 +137,6 @@ elif [ -r "$MOD_STATE_BACKUP" ]; then
         apply_setting "WorkshopItems" "$STATE_WORKSHOP"      "$INI_FILE"
         echo "[configure-server] Restored mods from .mod_state_backup (INI snapshot)"
     fi
-else
-    echo "[configure-server] No mod env vars or state files — keeping INI mods as-is"
 fi
 
 # Disable Lua checksum — required for ZomboidManager mod.
@@ -197,6 +192,18 @@ if ! echo "$CURRENT_WORKSHOP" | grep -q "$ZM_WORKSHOP_ID"; then
         apply_setting "WorkshopItems" "${ZM_WORKSHOP_ID}" "$INI_FILE"
     fi
     echo "[configure-server] Added ZomboidManager workshop ID $ZM_WORKSHOP_ID"
+fi
+
+# Snapshot the post-restore INI mods to .mod_state on first boot. PZ rewrites
+# the .ini on shutdown and may prune mods it didn't load; without an initial
+# snapshot, ZomboidManager could disappear after the next restart cycle.
+if [ ! -f "$MOD_STATE_FILE" ]; then
+    SNAPSHOT_MODS=$(grep "^Mods=" "$INI_FILE" | sed 's/^Mods=//')
+    SNAPSHOT_WORKSHOP=$(grep "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//')
+    if printf 'Mods=%s\nWorkshopItems=%s\n' "$SNAPSHOT_MODS" "$SNAPSHOT_WORKSHOP" > "$MOD_STATE_FILE" 2>/dev/null; then
+        chmod 666 "$MOD_STATE_FILE" 2>/dev/null || true
+        echo "[configure-server] Initialized .mod_state from current INI"
+    fi
 fi
 
 # Pre-create Lua bridge directories for inventory exports
