@@ -237,9 +237,9 @@ update:
 	@echo ""
 	@echo "════════ Zomboid Manager — Update ════════"
 	@echo ""
-	@if [ -n "$$(git status --porcelain 2>/dev/null)" ]; then \
-		echo "Working tree has uncommitted changes:"; \
-		git status --short; \
+	@if ! git diff --quiet || ! git diff --cached --quiet; then \
+		echo "Working tree has uncommitted changes to tracked files:"; \
+		git status --short | grep -v '^??' || true; \
 		echo ""; \
 		echo "Commit or stash them, then run 'make update' again."; \
 		exit 1; \
