@@ -35,10 +35,13 @@ export type ServerStats = {
     most_popular_profession: string | null;
 };
 
+export type ModStatus = 'active' | 'pending_restart' | 'stopped';
+
 export type ModEntry = {
     workshop_id: string;
     mod_id: string;
     position: number;
+    status?: ModStatus;
 };
 
 export type AuditEntry = {

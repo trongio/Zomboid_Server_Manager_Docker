@@ -55,14 +55,13 @@ if [ -f "$FORCE_FILE" ]; then
     rm -f /home/steam/ZomboidDedicatedServer/ProjectZomboid64
 fi
 
-# Prevent renegademaster image from overwriting Mods=/WorkshopItems= with empty values.
-# When these env vars are set to "" the image clears mods added via the web UI.
-if [ -z "${MOD_NAMES:-}" ]; then
-    unset MOD_NAMES
-fi
-if [ -z "${MOD_WORKSHOP_IDS:-}" ]; then
-    unset MOD_WORKSHOP_IDS
-fi
+# configure-server.sh owns mod state via .mod_state. Strip the renegademaster
+# image's MOD_NAMES/MOD_WORKSHOP_IDS env vars unconditionally so its
+# start_server cannot overwrite our INI after configure-server.sh has run.
+# First-boot seeding now happens via PZ_MOD_IDS/PZ_WORKSHOP_IDS in
+# configure-server.sh, the same path ARM64 uses.
+unset MOD_NAMES
+unset MOD_WORKSHOP_IDS
 
 # Snapshot current Mods/WorkshopItems from INI before handing off to
 # run_server.sh (which may overwrite them). configure-server.sh uses this

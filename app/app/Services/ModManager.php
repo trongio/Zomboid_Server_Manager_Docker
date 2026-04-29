@@ -22,16 +22,27 @@ class ModManager
     }
 
     /**
-     * Get the current mod list parsed from server.ini.
+     * Get the current mod list.
+     *
+     * Prefers `.mod_state` (the user's intended list, written by add/remove/reorder)
+     * over the live INI, because PZ rewrites the INI on shutdown/startup and may
+     * leave stale or empty Mods= entries between container restarts. Falls back to
+     * the INI when the state file is missing or malformed.
      *
      * @return array<int, array{workshop_id: string, mod_id: string, position: int}>
      */
     public function list(string $iniPath): array
     {
-        $config = $this->iniParser->read($iniPath);
+        $state = $this->parseStateFile(dirname($iniPath).'/.mod_state');
 
-        $workshopIds = $this->splitList($config['WorkshopItems'] ?? '');
-        $modIds = $this->splitList($config['Mods'] ?? '');
+        if ($state !== null) {
+            $workshopIds = $this->splitList($state['WorkshopItems']);
+            $modIds = $this->splitList($state['Mods']);
+        } else {
+            $config = $this->iniParser->read($iniPath);
+            $workshopIds = $this->splitList($config['WorkshopItems'] ?? '');
+            $modIds = $this->splitList($config['Mods'] ?? '');
+        }
 
         $mods = [];
         $count = max(count($workshopIds), count($modIds));
@@ -45,6 +56,104 @@ class ModManager
         }
 
         return $mods;
+    }
+
+    /**
+     * Get the mod list with per-mod load status.
+     *
+     * Compares `.mod_state` (user intent) against `.mod_state_applied` (the
+     * snapshot configure-server.sh wrote when PZ last started) to decide whether
+     * each mod is actively running, awaiting a restart, or whether the server is
+     * stopped.
+     *
+     * Statuses:
+     *  - 'stopped'         — game server is not running; load state unknown
+     *  - 'pending_restart' — mod is in user intent but not in the running config
+     *  - 'active'          — mod is in user intent and was applied at last start
+     *
+     * When `.mod_state_applied` is missing (legacy containers from before this
+     * file was written), every mod returned by `list()` is treated as 'active' if
+     * the server is running — we can't know what changed since startup without
+     * the snapshot.
+     *
+     * @return array{
+     *     mods: array<int, array{workshop_id: string, mod_id: string, position: int, status: string}>,
+     *     pending_restart: bool,
+     *     server_running: bool,
+     *     applied_snapshot_present: bool,
+     * }
+     */
+    public function listWithStatus(string $iniPath, bool $serverRunning): array
+    {
+        $mods = $this->list($iniPath);
+        $applied = $this->parseStateFile(dirname($iniPath).'/.mod_state_applied');
+        $appliedWorkshopIds = $applied !== null
+            ? $this->splitList($applied['WorkshopItems'])
+            : null;
+
+        $pendingRestart = false;
+
+        foreach ($mods as $i => $mod) {
+            if (! $serverRunning) {
+                $status = 'stopped';
+            } elseif ($appliedWorkshopIds === null) {
+                $status = 'active';
+            } elseif (in_array($mod['workshop_id'], $appliedWorkshopIds, true)) {
+                $status = 'active';
+            } else {
+                $status = 'pending_restart';
+                $pendingRestart = true;
+            }
+
+            $mods[$i]['status'] = $status;
+        }
+
+        if ($serverRunning && $applied !== null) {
+            $intentWorkshopIds = array_column($mods, 'workshop_id');
+            $removedSinceStart = array_diff($appliedWorkshopIds, $intentWorkshopIds);
+            if (! empty($removedSinceStart)) {
+                $pendingRestart = true;
+            }
+        }
+
+        return [
+            'mods' => $mods,
+            'pending_restart' => $pendingRestart,
+            'server_running' => $serverRunning,
+            'applied_snapshot_present' => $applied !== null,
+        ];
+    }
+
+    /**
+     * Parse `.mod_state` into its Mods/WorkshopItems values.
+     *
+     * Returns null when the file is absent, unreadable, or missing either expected
+     * line — partial state is rejected so a corrupted file falls back to the INI
+     * via the caller, rather than half-trusting it.
+     *
+     * @return array{Mods: string, WorkshopItems: string}|null
+     */
+    private function parseStateFile(string $stateFile): ?array
+    {
+        if (! is_readable($stateFile)) {
+            return null;
+        }
+
+        $contents = @file_get_contents($stateFile);
+
+        if ($contents === false) {
+            return null;
+        }
+
+        if (! preg_match('/^Mods=(.*)$/m', $contents, $modsMatch)
+            || ! preg_match('/^WorkshopItems=(.*)$/m', $contents, $workshopMatch)) {
+            return null;
+        }
+
+        return [
+            'Mods' => trim($modsMatch[1]),
+            'WorkshopItems' => trim($workshopMatch[1]),
+        ];
     }
 
     /**

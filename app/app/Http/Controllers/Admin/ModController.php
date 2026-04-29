@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuditLogger;
+use App\Services\DockerManager;
 use App\Services\ModManager;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,21 +18,37 @@ class ModController extends Controller
     public function __construct(
         private readonly ModManager $modManager,
         private readonly AuditLogger $auditLogger,
+        private readonly DockerManager $dockerManager,
     ) {}
 
     public function index(): Response
     {
         $mods = [];
+        $pendingRestart = false;
+        $serverRunning = false;
 
         try {
-            $mods = $this->modManager->list(config('zomboid.paths.server_ini'));
+            $serverRunning = (bool) ($this->dockerManager->getContainerStatus()['running'] ?? false);
         } catch (\Throwable) {
-            // Config not available
+            // Docker socket unreachable — treat server as stopped, keep rendering
+        }
+
+        try {
+            $status = $this->modManager->listWithStatus(
+                config('zomboid.paths.server_ini'),
+                $serverRunning,
+            );
+            $mods = $status['mods'];
+            $pendingRestart = $status['pending_restart'];
+        } catch (\Throwable) {
+            // Config not available — render empty list rather than 500
         }
 
         return Inertia::render('admin/mods', [
             'mods' => $mods,
             'protectedWorkshopIds' => ModManager::PROTECTED_WORKSHOP_IDS,
+            'pendingRestart' => $pendingRestart,
+            'serverRunning' => $serverRunning,
         ]);
     }
 
@@ -139,8 +156,15 @@ class ModController extends Controller
             ip: $request->ip(),
         );
 
+        $serverRunning = (bool) ($this->dockerManager->getContainerStatus()['running'] ?? false);
+        $status = $this->modManager->listWithStatus(
+            config('zomboid.paths.server_ini'),
+            $serverRunning,
+        );
+
         return response()->json([
-            'mods' => $this->modManager->list(config('zomboid.paths.server_ini')),
+            'mods' => $status['mods'],
+            'pending_restart' => $status['pending_restart'],
             'restart_required' => true,
         ]);
     }

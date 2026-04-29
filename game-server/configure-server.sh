@@ -227,6 +227,18 @@ if [ ! -f "$MOD_STATE_FILE" ]; then
     fi
 fi
 
+# Snapshot what we just applied to the INI as the "running config." Laravel
+# diffs this against .mod_state to decide whether mod changes are awaiting a
+# restart. Always written, every boot, so the dashboard's pending-restart
+# indicator clears once the user actually restarts.
+APPLIED_STATE_FILE="${INI_DIR}/.mod_state_applied"
+APPLIED_MODS=$(grep -m1 "^Mods=" "$INI_FILE" | sed 's/^Mods=//' || true)
+APPLIED_WORKSHOP=$(grep -m1 "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//' || true)
+if printf 'Mods=%s\nWorkshopItems=%s\n' "$APPLIED_MODS" "$APPLIED_WORKSHOP" > "$APPLIED_STATE_FILE" 2>/dev/null; then
+    chmod 666 "$APPLIED_STATE_FILE" 2>/dev/null || true
+    echo "[configure-server] Wrote .mod_state_applied snapshot"
+fi
+
 # Pre-create Lua bridge directories for inventory exports
 mkdir -p /home/steam/Zomboid/Lua/inventory 2>/dev/null || echo "[configure-server] WARNING: Cannot create Lua/inventory directory (permission denied)"
 if [ -d /home/steam/Zomboid/Lua/inventory ]; then

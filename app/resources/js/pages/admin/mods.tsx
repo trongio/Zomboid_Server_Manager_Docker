@@ -2,7 +2,7 @@ import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, GripVertical, Package, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, GripVertical, Package, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { fetchAction } from '@/lib/fetch-action';
 import AppLayout from '@/layouts/app-layout';
@@ -23,6 +23,42 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
 import type { BreadcrumbItem, ModEntry } from '@/types';
+
+function StatusBadge({ status }: { status: ModEntry['status'] }) {
+    const { t } = useTranslation();
+
+    if (status === 'active') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                data-testid="mod-status-active"
+            >
+                <CheckCircle2 className="size-3" />
+                {t('admin.mods.status_active')}
+            </Badge>
+        );
+    }
+
+    if (status === 'pending_restart') {
+        return (
+            <Badge
+                variant="outline"
+                className="gap-1 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                data-testid="mod-status-pending"
+            >
+                <Clock className="size-3" />
+                {t('admin.mods.status_pending')}
+            </Badge>
+        );
+    }
+
+    return (
+        <Badge variant="outline" className="gap-1 text-muted-foreground" data-testid="mod-status-stopped">
+            {t('admin.mods.status_stopped')}
+        </Badge>
+    );
+}
 
 function SortableModRow({
     mod,
@@ -81,6 +117,9 @@ function SortableModRow({
                     {mod.workshop_id}
                 </Badge>
             </TableCell>
+            <TableCell>
+                <StatusBadge status={mod.status} />
+            </TableCell>
             <TableCell className="text-right">
                 {!isProtected && (
                     <Button
@@ -97,7 +136,17 @@ function SortableModRow({
     );
 }
 
-export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEntry[]; protectedWorkshopIds?: string[] }) {
+export default function Mods({
+    mods,
+    protectedWorkshopIds = [],
+    pendingRestart = false,
+    serverRunning = false,
+}: {
+    mods: ModEntry[];
+    protectedWorkshopIds?: string[];
+    pendingRestart?: boolean;
+    serverRunning?: boolean;
+}) {
     const { t } = useTranslation();
     const protectedSet = useMemo(() => new Set(protectedWorkshopIds), [protectedWorkshopIds]);
 
@@ -111,9 +160,9 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
     const [modId, setModId] = useState('');
     const [mapFolder, setMapFolder] = useState('');
     const [loading, setLoading] = useState(false);
+    const [restarting, setRestarting] = useState(false);
     const [search, setSearch] = useState('');
     const [orderedMods, setOrderedMods] = useState(mods);
-    const [restartRequired, setRestartRequired] = useState(false);
 
     const isFiltering = search.length > 0;
 
@@ -142,7 +191,7 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
 
         setOrderedMods(reordered);
 
-        const result = await fetchAction('/admin/mods/order', {
+        await fetchAction('/admin/mods/order', {
             method: 'PUT',
             data: {
                 mods: reordered.map((m) => ({ workshop_id: m.workshop_id, mod_id: m.mod_id })),
@@ -150,9 +199,17 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
             successMessage: t('admin.mods.toast_order_updated'),
         });
 
-        setRestartRequired(Boolean(result?.restart_required));
+        router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
+    }
 
-        router.reload({ only: ['mods'] });
+    async function restartServer() {
+        setRestarting(true);
+        await fetchAction('/admin/server/restart', {
+            method: 'POST',
+            successMessage: t('admin.mods.toast_restart_started'),
+        });
+        setRestarting(false);
+        router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
     async function addMod() {
@@ -166,7 +223,7 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
         setWorkshopId('');
         setModId('');
         setMapFolder('');
-        router.reload({ only: ['mods'] });
+        router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
     async function removeMod(mod: ModEntry) {
@@ -177,7 +234,7 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
         });
         setLoading(false);
         setDeleteTarget(null);
-        router.reload({ only: ['mods'] });
+        router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
     return (
@@ -221,11 +278,24 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {restartRequired && (
-                            <Alert className="mb-4">
+                        {pendingRestart && (
+                            <Alert
+                                className="mb-4 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600"
+                                data-testid="pending-restart-banner"
+                            >
                                 <AlertTriangle className="size-4" />
-                                <AlertDescription>
-                                    {t('admin.mods.restart_required')}
+                                <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <span>{t('admin.mods.pending_restart_banner')}</span>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={restarting || !serverRunning}
+                                        onClick={restartServer}
+                                        data-testid="restart-server-button"
+                                    >
+                                        <RotateCcw className={`mr-1.5 size-4 ${restarting ? 'animate-spin' : ''}`} />
+                                        {restarting ? t('admin.mods.restarting') : t('admin.mods.restart_now')}
+                                    </Button>
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -237,6 +307,7 @@ export default function Mods({ mods, protectedWorkshopIds = [] }: { mods: ModEnt
                                             <TableHead className="w-[50px]">{isFiltering ? '#' : ''}</TableHead>
                                             <TableHead>{t('admin.mods.table_mod_id')}</TableHead>
                                             <TableHead className="hidden sm:table-cell">{t('admin.mods.table_workshop_id')}</TableHead>
+                                            <TableHead>{t('admin.mods.table_status')}</TableHead>
                                             <TableHead className="text-right">{t('common.actions')}</TableHead>
                                         </TableRow>
                                     </TableHeader>

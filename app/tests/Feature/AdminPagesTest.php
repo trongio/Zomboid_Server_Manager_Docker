@@ -53,11 +53,26 @@ function mockAdminModManager(array $mods = []): void
 {
     $modManager = Mockery::mock(ModManager::class);
     $modManager->shouldReceive('list')->andReturn($mods)->byDefault();
+    $modManager->shouldReceive('listWithStatus')->andReturn([
+        'mods' => array_map(fn ($m) => $m + ['status' => 'active'], $mods),
+        'pending_restart' => false,
+        'server_running' => true,
+        'applied_snapshot_present' => true,
+    ])->byDefault();
     $modManager->shouldReceive('add')->byDefault();
     $modManager->shouldReceive('remove')->andReturn(['workshop_id' => '123', 'mod_id' => 'Test'])->byDefault();
     $modManager->shouldReceive('reorder')->byDefault();
 
     app()->instance(ModManager::class, $modManager);
+
+    $dockerManager = Mockery::mock(\App\Services\DockerManager::class);
+    $dockerManager->shouldReceive('getContainerStatus')->andReturn([
+        'exists' => true,
+        'running' => true,
+        'status' => 'running',
+    ])->byDefault();
+
+    app()->instance(\App\Services\DockerManager::class, $dockerManager);
 }
 
 function mockAdminIniParser(array $config = []): void
