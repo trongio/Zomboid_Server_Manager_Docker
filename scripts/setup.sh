@@ -672,7 +672,15 @@ make up
 # ensures SteamCMD runs with the correct -beta flag.
 # ══════════════════════════════════════════════════════════════════════════════
 echo "Persisting Steam branch (${PZ_STEAM_BRANCH}) to game-server volume..."
-docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid && printf '%s' '${PZ_STEAM_BRANCH}' > /home/steam/Zomboid/.steam_branch" >/dev/null 2>&1 || true
+
+# Write the branch to a temp file and `docker cp` it into the container.
+# Avoids quoting/encoding pitfalls (custom branches with single quotes,
+# CRLF when this is later cross-edited from Windows, etc.).
+TMP_BRANCH_FILE=$(mktemp)
+printf '%s' "$PZ_STEAM_BRANCH" > "$TMP_BRANCH_FILE"
+docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid" >/dev/null 2>&1 || true
+docker cp "$TMP_BRANCH_FILE" pz-game-server:/home/steam/Zomboid/.steam_branch >/dev/null 2>&1 || true
+rm -f "$TMP_BRANCH_FILE"
 
 if [ "$PZ_STEAM_BRANCH" != "public" ]; then
     echo "Restarting game-server to apply '${PZ_STEAM_BRANCH}' branch..."

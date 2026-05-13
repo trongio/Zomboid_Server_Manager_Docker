@@ -755,7 +755,22 @@ if ($LASTEXITCODE -ne 0) {
 # non-public branch) ensures SteamCMD runs with the correct -beta flag.
 # ══════════════════════════════════════════════════════════════════════
 Write-Host "Persisting Steam branch ($PZ_STEAM_BRANCH) to game-server volume..."
-docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid && printf '%s' '$PZ_STEAM_BRANCH' > /home/steam/Zomboid/.steam_branch" 2>$null | Out-Null
+
+# Write the branch value to a UTF-8 no-BOM temp file and copy it into the
+# container with `docker cp`. This avoids PowerShell -> docker.exe -> sh
+# quoting/encoding pitfalls on Windows (single quotes, CRLF, code pages).
+$tempBranchFile = Join-Path ([System.IO.Path]::GetTempPath()) ("pz-steam-branch-" + [System.Guid]::NewGuid().ToString("N") + ".txt")
+try {
+    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+    [System.IO.File]::WriteAllText($tempBranchFile, $PZ_STEAM_BRANCH, $utf8NoBom)
+
+    # Ensure the destination directory exists inside the container (volume
+    # is mounted there, but be defensive against race with entrypoint init).
+    docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid" 2>$null | Out-Null
+    docker cp $tempBranchFile "pz-game-server:/home/steam/Zomboid/.steam_branch" 2>$null | Out-Null
+} finally {
+    Remove-Item -Force -ErrorAction SilentlyContinue $tempBranchFile
+}
 
 if ($PZ_STEAM_BRANCH -ne "public") {
     Write-Host "Restarting game-server to apply '$PZ_STEAM_BRANCH' branch..."
@@ -768,6 +783,7 @@ if (Test-Path "game-version.conf") {
     if ($gvContent -match "(?m)^PZ_BRANCH=") {
         $gvContent = $gvContent -replace "(?m)^PZ_BRANCH=.*", "PZ_BRANCH=$PZ_STEAM_BRANCH"
     } else {
+        # Write-FileUtf8NoBom normalizes CRLF -> LF, so use LF here
         $gvContent = $gvContent.TrimEnd() + "`nPZ_BRANCH=$PZ_STEAM_BRANCH`n"
     }
     Write-FileUtf8NoBom "game-version.conf" $gvContent
