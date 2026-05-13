@@ -665,6 +665,30 @@ fi
 make up
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Persist Steam branch into game-server volume
+# Without this, the AMD64 image silently downloads the stable "public" branch
+# when GAME_VERSION isn't honored on first boot. Writing the override file
+# (and restarting the container when the user picked a non-public branch)
+# ensures SteamCMD runs with the correct -beta flag.
+# ══════════════════════════════════════════════════════════════════════════════
+echo "Persisting Steam branch (${PZ_STEAM_BRANCH}) to game-server volume..."
+docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid && printf '%s' '${PZ_STEAM_BRANCH}' > /home/steam/Zomboid/.steam_branch" >/dev/null 2>&1 || true
+
+if [ "$PZ_STEAM_BRANCH" != "public" ]; then
+    echo "Restarting game-server to apply '${PZ_STEAM_BRANCH}' branch..."
+    docker restart pz-game-server >/dev/null 2>&1 || true
+fi
+
+# Record the selected branch in game-version.conf for informational use
+if [ -f game-version.conf ]; then
+    if grep -q '^PZ_BRANCH=' game-version.conf; then
+        sed -i "s|^PZ_BRANCH=.*|PZ_BRANCH=${PZ_STEAM_BRANCH}|" game-version.conf
+    else
+        printf 'PZ_BRANCH=%s\n' "$PZ_STEAM_BRANCH" >> game-version.conf
+    fi
+fi
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Sync passwords into existing volumes (re-run safe)
 # ══════════════════════════════════════════════════════════════════════════════
 # PostgreSQL: volume retains the password from the first initdb — sync it

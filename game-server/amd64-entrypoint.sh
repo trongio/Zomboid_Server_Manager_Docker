@@ -38,13 +38,18 @@ if [ -f "$CONFIGURE_SCRIPT" ] && ! grep -q "configure-server.sh" /home/steam/run
     echo "[entrypoint] Patched run_server.sh to run configure-server.sh before start"
 fi
 
-# Branch override from shared volume (written by web UI)
+# Branch override from shared volume (written by web UI / setup wizard).
+# Falls back to the GAME_VERSION env var (set by docker-compose from
+# PZ_STEAM_BRANCH). Always export so child shells (run_server.sh, SteamCMD)
+# see the value — without this, the renegademaster image silently defaults
+# to the stable "public" branch when GAME_VERSION isn't re-exported here.
 OVERRIDE_FILE="/home/steam/Zomboid/.steam_branch"
 if [ -f "$OVERRIDE_FILE" ]; then
-    GAME_VERSION=$(cat "$OVERRIDE_FILE")
-    export GAME_VERSION
-    echo "[entrypoint] Branch override: $GAME_VERSION"
+    GAME_VERSION=$(tr -d '[:space:]' < "$OVERRIDE_FILE")
+    echo "[entrypoint] Branch override from $OVERRIDE_FILE: $GAME_VERSION"
 fi
+export GAME_VERSION="${GAME_VERSION:-public}"
+echo "[entrypoint] Steam branch: $GAME_VERSION"
 
 # Force update flag from shared volume (written by web UI)
 FORCE_FILE="/home/steam/Zomboid/.force_update"
