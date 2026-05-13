@@ -470,7 +470,7 @@ function Do-Help {
     Write-Host "    .\make.ps1 ps               List running containers"
     Write-Host "    .\make.ps1 pull             Pull latest images"
     Write-Host ""
-    Write-Host "  Firewall (Windows Firewall — requires Administrator):" -ForegroundColor White
+    Write-Host "  Firewall (Windows Firewall - requires Administrator):" -ForegroundColor White
     Write-Host "    .\make.ps1 expose           Open game ports (UDP)"
     Write-Host "    .\make.ps1 hide             Close game ports (UDP)"
     Write-Host "    .\make.ps1 admin-expose     Open admin HTTPS ports"

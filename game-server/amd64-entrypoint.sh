@@ -38,12 +38,16 @@ if [ -f "$CONFIGURE_SCRIPT" ] && ! grep -q "configure-server.sh" /home/steam/run
     echo "[entrypoint] Patched run_server.sh to run configure-server.sh before start"
 fi
 
-# Branch override from shared volume (written by web UI)
+# Branch override from shared volume (written by web UI or setup wizard)
 OVERRIDE_FILE="/home/steam/Zomboid/.steam_branch"
 if [ -f "$OVERRIDE_FILE" ]; then
     GAME_VERSION=$(cat "$OVERRIDE_FILE")
     export GAME_VERSION
     echo "[entrypoint] Branch override: $GAME_VERSION"
+elif [ -n "$GAME_VERSION" ]; then
+    # Ensure GAME_VERSION is exported if set via environment
+    export GAME_VERSION
+    echo "[entrypoint] Using GAME_VERSION from environment: $GAME_VERSION"
 fi
 
 # Force update flag from shared volume (written by web UI)
