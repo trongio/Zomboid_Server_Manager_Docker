@@ -1,4 +1,6 @@
 #Requires -Version 5.1
+Set-Location $PSScriptRoot
+Set-Location ..
 <#
 .SYNOPSIS
     Zomboid Manager — First-Time Setup Wizard (Windows)
@@ -75,10 +77,24 @@ function Set-EnvValue {
 }
 
 function Write-FileUtf8NoBom {
-    param([string]$Path, [string]$Content)
-    $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
-    $normalized = $Content -replace "`r`n", "`n"
-    [System.IO.File]::WriteAllText($Path, $normalized, $utf8NoBom)
+    param(
+        [string]$Path,
+        [string]$Content
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    $normalized = $Content -replace "`r?`n", "`r`n"
+
+    $root = Split-Path $PSScriptRoot -Parent
+    $fullPath = Join-Path $root $Path
+
+    $dir = Split-Path $fullPath -Parent
+
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
+
+    [System.IO.File]::WriteAllText($fullPath, $normalized, $utf8NoBom)
 }
 
 function Get-DetectedIPv4Addresses {
@@ -745,6 +761,50 @@ if ($stale) {
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Failed to start services. Check Docker is running." -ForegroundColor Red
     exit 1
+}
+
+# ══════════════════════════════════════════════════════════════════════
+# Set Steam branch override for game server (first boot)
+# ══════════════════════════════════════════════════════════════════════
+Write-Host "Setting Steam branch override..."
+# Write the branch to the game server's data volume so the entrypoint picks it up
+$branchSet = $false
+for ($attempt = 1; $attempt -le 10; $attempt++) {
+    docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid && echo -n '$PZ_STEAM_BRANCH' > /home/steam/Zomboid/.steam_branch" 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  Steam branch set to: $PZ_STEAM_BRANCH" -ForegroundColor Green
+        $branchSet = $true
+        break
+    }
+    if ($attempt -lt 10) {
+        Start-Sleep -Seconds 1
+    }
+}
+if (-not $branchSet) {
+    Write-Host "  WARNING: Could not set Steam branch (game server may still be starting)" -ForegroundColor Yellow
+}
+
+# If branch is not 'public' (the default), restart the game server to ensure it uses the correct branch
+if ($PZ_STEAM_BRANCH -ne "public" -and $branchSet) {
+    Write-Host "Restarting game server to apply branch change..."
+    docker restart pz-game-server 2>$null | Out-Null
+    Start-Sleep -Seconds 5
+}
+
+# Update game-version.conf to reflect the selected branch
+# Note: This is a temporary marker. After SteamCMD finishes downloading, run:
+#       .\make.ps1 update-version
+# to get the actual game version number.
+Write-Host "Updating game version configuration..."
+if (Test-Path "game-version.conf") {
+    $versionContent = Get-Content "game-version.conf" -Raw
+    # Update PZ_VERSION to indicate the branch (e.g., "unstable" or "42.16.1")
+    if ($PZ_STEAM_BRANCH -ne "public") {
+        $versionContent = $versionContent -replace "^PZ_VERSION=.*", "PZ_VERSION=$PZ_STEAM_BRANCH"
+        $versionContent = $versionContent -replace "^PZ_VERSION_FULL=.*", "PZ_VERSION_FULL=$PZ_STEAM_BRANCH (branch)"
+    }
+    Write-FileUtf8NoBom "game-version.conf" $versionContent
+    Write-Host "  Game version config updated (branch: $PZ_STEAM_BRANCH)" -ForegroundColor Green
 }
 
 # ══════════════════════════════════════════════════════════════════════
