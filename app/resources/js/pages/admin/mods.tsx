@@ -1,11 +1,10 @@
-import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors  } from '@dnd-kit/core';
+import type {DragEndEvent} from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, Clock, GripVertical, Package, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import { fetchAction } from '@/lib/fetch-action';
-import AppLayout from '@/layouts/app-layout';
+import { AlertTriangle, CheckCircle2, Clock, GripVertical, Loader2, Package, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,9 +19,35 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTranslation } from '@/hooks/use-translation';
+import AppLayout from '@/layouts/app-layout';
+import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem, ModEntry } from '@/types';
+
+type LookupResult = {
+    found: boolean;
+    workshop_id: string;
+    title?: string;
+    preview_url?: string | null;
+    mod_ids?: string[];
+    map_folders?: string[];
+};
+
+type LookupState =
+    | { status: 'idle' }
+    | { status: 'loading' }
+    | { status: 'success'; title: string; previewUrl: string | null; modIds: string[]; mapFolders: string[] }
+    | { status: 'not_found' }
+    | { status: 'no_mod_ids'; title: string; previewUrl: string | null; mapFolders: string[] }
+    | { status: 'error' };
 
 function StatusBadge({ status }: { status: ModEntry['status'] }) {
     const { t } = useTranslation();
@@ -163,12 +188,109 @@ export default function Mods({
     const [restarting, setRestarting] = useState(false);
     const [search, setSearch] = useState('');
     const [orderedMods, setOrderedMods] = useState(mods);
+    const [lookup, setLookup] = useState<LookupState>({ status: 'idle' });
+    const [manualOverride, setManualOverride] = useState(false);
+    const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lookupAbort = useRef<AbortController | null>(null);
 
     const isFiltering = search.length > 0;
 
     useEffect(() => {
         setOrderedMods(mods);
     }, [mods]);
+
+    const resetLookupState = useCallback(() => {
+        setLookup({ status: 'idle' });
+        setModId('');
+        setMapFolder('');
+        setManualOverride(false);
+    }, []);
+
+    const runLookup = useCallback(async (rawId: string) => {
+        const trimmed = rawId.trim();
+        if (!/^\d{1,20}$/.test(trimmed)) {
+            setLookup({ status: 'idle' });
+            return;
+        }
+
+        lookupAbort.current?.abort();
+        const controller = new AbortController();
+        lookupAbort.current = controller;
+        setLookup({ status: 'loading' });
+
+        const csrfToken =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+
+        try {
+            const res = await fetch('/admin/mods/lookup', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken,
+                },
+                body: JSON.stringify({ workshop_id: trimmed }),
+                signal: controller.signal,
+            });
+            const json = (await res.json().catch(() => ({}))) as LookupResult;
+
+            if (res.status === 404 || json.found === false) {
+                setLookup({ status: 'not_found' });
+                setModId('');
+                setMapFolder('');
+                setManualOverride(true);
+                return;
+            }
+
+            if (!res.ok) {
+                setLookup({ status: 'error' });
+                setManualOverride(true);
+                return;
+            }
+
+            const modIds = json.mod_ids ?? [];
+            const mapFolders = json.map_folders ?? [];
+            const title = json.title ?? '';
+            const previewUrl = json.preview_url ?? null;
+
+            if (modIds.length === 0) {
+                setLookup({ status: 'no_mod_ids', title, previewUrl, mapFolders });
+                setModId('');
+                setMapFolder(mapFolders[0] ?? '');
+                setManualOverride(true);
+                return;
+            }
+
+            setLookup({ status: 'success', title, previewUrl, modIds, mapFolders });
+            setModId(modIds[0]);
+            setMapFolder(mapFolders[0] ?? '');
+            setManualOverride(false);
+        } catch (err) {
+            if ((err as DOMException)?.name === 'AbortError') return;
+            setLookup({ status: 'error' });
+            setManualOverride(true);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!showAdd) {
+            return;
+        }
+        if (lookupTimer.current) {
+            clearTimeout(lookupTimer.current);
+        }
+        const trimmed = workshopId.trim();
+        if (trimmed === '') {
+            resetLookupState();
+            return;
+        }
+        lookupTimer.current = setTimeout(() => {
+            runLookup(trimmed);
+        }, 400);
+        return () => {
+            if (lookupTimer.current) clearTimeout(lookupTimer.current);
+        };
+    }, [workshopId, showAdd, runLookup, resetLookupState]);
 
     const filteredMods = useMemo(() => {
         if (!search) return orderedMods;
@@ -212,6 +334,12 @@ export default function Mods({
         router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
+    function closeAddDialog() {
+        setShowAdd(false);
+        setWorkshopId('');
+        resetLookupState();
+    }
+
     async function addMod() {
         setLoading(true);
         await fetchAction('/admin/mods', {
@@ -219,10 +347,7 @@ export default function Mods({
             successMessage: t('admin.mods.toast_added', { mod_id: modId }),
         });
         setLoading(false);
-        setShowAdd(false);
-        setWorkshopId('');
-        setModId('');
-        setMapFolder('');
+        closeAddDialog();
         router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
@@ -340,7 +465,7 @@ export default function Mods({
             </div>
 
             {/* Add Mod Dialog */}
-            <Dialog open={showAdd} onOpenChange={setShowAdd}>
+            <Dialog open={showAdd} onOpenChange={(open) => (open ? setShowAdd(true) : closeAddDialog())}>
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t('admin.mods.add_dialog_title')}</DialogTitle>
@@ -351,35 +476,132 @@ export default function Mods({
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="workshop-id">{t('admin.mods.table_workshop_id')}</Label>
-                            <Input
-                                id="workshop-id"
-                                value={workshopId}
-                                onChange={(e) => setWorkshopId(e.target.value)}
-                                placeholder={t('admin.mods.workshop_id_placeholder')}
-                            />
+                            <div className="relative">
+                                <Input
+                                    id="workshop-id"
+                                    inputMode="numeric"
+                                    value={workshopId}
+                                    onChange={(e) => setWorkshopId(e.target.value)}
+                                    placeholder={t('admin.mods.workshop_id_placeholder')}
+                                    data-testid="workshop-id-input"
+                                />
+                                {lookup.status === 'loading' && (
+                                    <Loader2 className="absolute right-2.5 top-2.5 size-4 animate-spin text-muted-foreground" />
+                                )}
+                            </div>
+                            {(lookup.status === 'success' || lookup.status === 'no_mod_ids') && (
+                                <div
+                                    className="flex items-center gap-3 rounded-md border bg-muted/30 p-2"
+                                    data-testid="workshop-preview"
+                                >
+                                    {lookup.previewUrl && (
+                                        <img
+                                            src={lookup.previewUrl}
+                                            alt=""
+                                            className="size-10 rounded object-cover"
+                                        />
+                                    )}
+                                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                                        {lookup.title}
+                                    </p>
+                                </div>
+                            )}
+                            {lookup.status === 'not_found' && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    {t('admin.mods.lookup_not_found')}
+                                </p>
+                            )}
+                            {lookup.status === 'error' && (
+                                <p className="text-xs text-destructive">
+                                    {t('admin.mods.lookup_error')}
+                                </p>
+                            )}
+                            {lookup.status === 'no_mod_ids' && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                    {t('admin.mods.lookup_no_mod_ids')}
+                                </p>
+                            )}
                         </div>
+
                         <div className="space-y-2">
-                            <Label htmlFor="mod-id">{t('admin.mods.table_mod_id')}</Label>
-                            <Input
-                                id="mod-id"
-                                value={modId}
-                                onChange={(e) => setModId(e.target.value)}
-                                placeholder={t('admin.mods.mod_id_placeholder')}
-                            />
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="mod-id">{t('admin.mods.table_mod_id')}</Label>
+                                {lookup.status === 'success' && !manualOverride && (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-auto px-2 py-0.5 text-xs"
+                                        onClick={() => setManualOverride(true)}
+                                        data-testid="mod-id-edit-manually"
+                                    >
+                                        <Pencil className="mr-1 size-3" />
+                                        {t('admin.mods.edit_manually')}
+                                    </Button>
+                                )}
+                            </div>
+                            {lookup.status === 'success' && lookup.modIds.length > 1 && !manualOverride ? (
+                                <Select value={modId} onValueChange={setModId}>
+                                    <SelectTrigger id="mod-id" data-testid="mod-id-select">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {lookup.modIds.map((id) => (
+                                            <SelectItem key={id} value={id}>
+                                                {id}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Input
+                                    id="mod-id"
+                                    value={modId}
+                                    onChange={(e) => setModId(e.target.value)}
+                                    placeholder={t('admin.mods.mod_id_placeholder')}
+                                    disabled={
+                                        lookup.status === 'loading' ||
+                                        (lookup.status === 'success' && !manualOverride)
+                                    }
+                                    data-testid="mod-id-input"
+                                />
+                            )}
+                            {lookup.status === 'success' && !manualOverride && (
+                                <p className="text-xs text-muted-foreground">
+                                    {t('admin.mods.mod_id_auto_filled')}
+                                </p>
+                            )}
                         </div>
+
                         <div className="space-y-2">
                             <Label htmlFor="map-folder">{t('admin.mods.map_folder_label')}</Label>
-                            <Input
-                                id="map-folder"
-                                value={mapFolder}
-                                onChange={(e) => setMapFolder(e.target.value)}
-                                placeholder={t('admin.mods.map_folder_placeholder')}
-                            />
+                            {lookup.status === 'success' && lookup.mapFolders.length > 1 ? (
+                                <Select value={mapFolder || '__none__'} onValueChange={(v) => setMapFolder(v === '__none__' ? '' : v)}>
+                                    <SelectTrigger id="map-folder">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">{t('admin.mods.map_folder_none')}</SelectItem>
+                                        {lookup.mapFolders.map((f) => (
+                                            <SelectItem key={f} value={f}>
+                                                {f}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <Input
+                                    id="map-folder"
+                                    value={mapFolder}
+                                    onChange={(e) => setMapFolder(e.target.value)}
+                                    placeholder={t('admin.mods.map_folder_placeholder')}
+                                />
+                            )}
                         </div>
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowAdd(false)}>{t('common.cancel')}</Button>
-                        <Button disabled={loading || !workshopId || !modId} onClick={addMod}>
+                        <Button variant="outline" onClick={closeAddDialog}>{t('common.cancel')}</Button>
+                        <Button disabled={loading || !workshopId || !modId || lookup.status === 'loading'} onClick={addMod}>
                             {t('admin.mods.add_mod')}
                         </Button>
                     </DialogFooter>
