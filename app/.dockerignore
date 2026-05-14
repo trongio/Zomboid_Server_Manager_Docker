@@ -7,6 +7,10 @@ storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
 storage/framework/views/*
+# Laravel storage:link symlink — entrypoint recreates it inside the container.
+# On Windows hosts the host-side link is often a broken junction that BuildKit
+# rejects with "invalid file request public/storage" and aborts the build.
+public/storage
 tests/
 .git/
 .idea/
