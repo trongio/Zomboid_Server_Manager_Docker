@@ -99,10 +99,31 @@ class ServerIniParser
             }
         }
 
-        $result = file_put_contents($path, implode("\n", $newLines)."\n");
+        $this->atomicWrite($path, implode("\n", $newLines)."\n");
+    }
 
-        if ($result === false) {
-            throw new \RuntimeException("Failed to write config file: {$path}");
+    /**
+     * Write `$content` to `$path` via a temp file + rename. Avoids "Permission denied"
+     * when the target file is owned by another process (e.g. the game-server writes
+     * `server.ini` as root with mode 644 while PHP-FPM runs as www-data). As long as
+     * the parent directory is writable by us, the rename succeeds and the file ends
+     * up owned by the current process.
+     */
+    private function atomicWrite(string $path, string $content): void
+    {
+        $dir = dirname($path);
+        $temp = $path.'.tmp.'.bin2hex(random_bytes(4));
+
+        $bytes = @file_put_contents($temp, $content);
+        if ($bytes === false) {
+            throw new \RuntimeException("Failed to write temp file in: {$dir}");
+        }
+
+        @chmod($temp, 0o666);
+
+        if (! @rename($temp, $path)) {
+            @unlink($temp);
+            throw new \RuntimeException("Failed to replace config file: {$path}");
         }
     }
 }

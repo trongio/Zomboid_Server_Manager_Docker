@@ -5,10 +5,19 @@ namespace App\Services;
 class ModManager
 {
     /**
-     * Workshop IDs of mods that must remain installed for the manager to work.
-     * The proprietary ZomboidManager mod provides the Lua bridge used by
-     * inventory, delivery, and player-position features — removing it breaks
-     * core functionality, so the API/UI refuse to remove these.
+     * Mods that must remain installed for the manager to work, keyed by
+     * Workshop ID with the corresponding `mod_id` as the value. The
+     * proprietary ZomboidManager mod provides the Lua bridge used by
+     * inventory, delivery, and player-position features — removing it
+     * breaks core functionality, so the API/UI refuse to remove these
+     * and write paths re-attach them automatically if they go missing.
+     */
+    public const PROTECTED_MODS = [
+        '3685323705' => 'ZomboidManager',
+    ];
+
+    /**
+     * @var list<string>
      */
     public const PROTECTED_WORKSHOP_IDS = ['3685323705'];
 
@@ -18,7 +27,7 @@ class ModManager
 
     public static function isProtected(string $workshopId): bool
     {
-        return in_array($workshopId, self::PROTECTED_WORKSHOP_IDS, true);
+        return array_key_exists($workshopId, self::PROTECTED_MODS);
     }
 
     /**
@@ -161,12 +170,10 @@ class ModManager
      */
     public function add(string $iniPath, string $workshopId, string $modId, ?string $mapFolder = null): void
     {
-        $config = $this->iniParser->read($iniPath);
+        $current = $this->readCurrentLists($iniPath);
+        $workshopIds = $current['workshop_ids'];
+        $modIds = $current['mod_ids'];
 
-        $workshopIds = $this->splitList($config['WorkshopItems'] ?? '');
-        $modIds = $this->splitList($config['Mods'] ?? '');
-
-        // Don't add duplicates
         if (in_array($workshopId, $workshopIds, true)) {
             return;
         }
@@ -180,6 +187,7 @@ class ModManager
         ];
 
         if ($mapFolder !== null) {
+            $config = $this->iniParser->read($iniPath);
             $maps = $this->splitList($config['Map'] ?? 'Muldraugh, KY', ';');
             if (! in_array($mapFolder, $maps, true)) {
                 $maps[] = $mapFolder;
@@ -197,10 +205,9 @@ class ModManager
      */
     public function remove(string $iniPath, string $workshopId, ?string $mapFolder = null): ?array
     {
-        $config = $this->iniParser->read($iniPath);
-
-        $workshopIds = $this->splitList($config['WorkshopItems'] ?? '');
-        $modIds = $this->splitList($config['Mods'] ?? '');
+        $current = $this->readCurrentLists($iniPath);
+        $workshopIds = $current['workshop_ids'];
+        $modIds = $current['mod_ids'];
 
         $index = array_search($workshopId, $workshopIds, true);
 
@@ -222,6 +229,7 @@ class ModManager
         ];
 
         if ($mapFolder !== null) {
+            $config = $this->iniParser->read($iniPath);
             $maps = $this->splitList($config['Map'] ?? '', ';');
             $maps = array_filter($maps, fn ($m) => $m !== $mapFolder);
             $updates['Map'] = implode(';', array_values($maps));
@@ -242,11 +250,13 @@ class ModManager
         $workshopIds = array_column($orderedMods, 'workshop_id');
         $modIds = array_column($orderedMods, 'mod_id');
 
-        $existing = $this->splitList($this->iniParser->read($iniPath)['WorkshopItems'] ?? '');
-        foreach (self::PROTECTED_WORKSHOP_IDS as $required) {
-            if (in_array($required, $existing, true) && ! in_array($required, $workshopIds, true)) {
+        $existing = $this->readCurrentLists($iniPath)['workshop_ids'];
+        foreach (array_keys(self::PROTECTED_MODS) as $required) {
+            // Cast: PHP coerces numeric-string array keys to int; compare as strings.
+            $requiredStr = (string) $required;
+            if (in_array($requiredStr, $existing, true) && ! in_array($requiredStr, $workshopIds, true)) {
                 throw \Illuminate\Validation\ValidationException::withMessages([
-                    'mods' => ["Reorder cannot drop required mod {$required}."],
+                    'mods' => ["Reorder cannot drop required mod {$requiredStr}."],
                 ]);
             }
         }
@@ -258,6 +268,59 @@ class ModManager
     }
 
     /**
+     * Read the current Workshop/Mods lists used by `add`, `remove`, and `reorder`.
+     *
+     * Prefers `.mod_state` (the web-UI's source of truth) over the live INI,
+     * because PZ rewrites the INI on shutdown and may prune entries it didn't
+     * load. Without this preference, an `add()` call performed while the INI
+     * was pruned would silently drop every previously-installed mod.
+     *
+     * @return array{workshop_ids: list<string>, mod_ids: list<string>}
+     */
+    private function readCurrentLists(string $iniPath): array
+    {
+        $state = $this->parseStateFile(dirname($iniPath).'/.mod_state');
+
+        if ($state !== null) {
+            return [
+                'workshop_ids' => $this->splitList($state['WorkshopItems']),
+                'mod_ids' => $this->splitList($state['Mods']),
+            ];
+        }
+
+        $config = $this->iniParser->read($iniPath);
+
+        return [
+            'workshop_ids' => $this->splitList($config['WorkshopItems'] ?? ''),
+            'mod_ids' => $this->splitList($config['Mods'] ?? ''),
+        ];
+    }
+
+    /**
+     * Re-attach any protected mods that are absent from the given lists.
+     * Mutates both arrays in-place. The protected mod is appended at the
+     * end so the user's ordering of optional mods is preserved.
+     *
+     * @param  list<string>  $workshopIds
+     * @param  list<string>  $modIds
+     */
+    private function ensureProtectedMods(array &$workshopIds, array &$modIds): void
+    {
+        foreach (self::PROTECTED_MODS as $workshopId => $modId) {
+            // PHP coerces numeric string array keys to int, so cast back before
+            // comparing against the string Workshop IDs we get from splitList.
+            // Without the cast, in_array with strict=true treats int 3685323705
+            // and "3685323705" as different and appends a duplicate every write.
+            $workshopIdStr = (string) $workshopId;
+            if (in_array($workshopIdStr, $workshopIds, true)) {
+                continue;
+            }
+            $workshopIds[] = $workshopIdStr;
+            $modIds[] = $modId;
+        }
+    }
+
+    /**
      * Apply INI updates and write the mod state snapshot atomically. If the
      * state-file write fails, the prior INI content is restored so callers see
      * an all-or-nothing outcome rather than a partially-applied change.
@@ -266,6 +329,14 @@ class ModManager
      */
     private function writeIniAndState(string $iniPath, array $updates): void
     {
+        if (isset($updates['WorkshopItems']) && isset($updates['Mods'])) {
+            $workshopIds = $this->splitList($updates['WorkshopItems']);
+            $modIds = $this->splitList($updates['Mods']);
+            $this->ensureProtectedMods($workshopIds, $modIds);
+            $updates['WorkshopItems'] = implode(';', $workshopIds);
+            $updates['Mods'] = implode(';', $modIds);
+        }
+
         $previousIni = @file_get_contents($iniPath);
 
         $this->iniParser->write($iniPath, $updates);

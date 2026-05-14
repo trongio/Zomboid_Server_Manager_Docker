@@ -45,9 +45,11 @@ it('adds a mod to both lists', function () {
 
     $mods = $this->manager->list($this->iniPath);
 
-    expect($mods)->toHaveCount(3)
+    // Existing fixture (2) + user-added (1) + auto-attached ZomboidManager (1) = 4
+    expect($mods)->toHaveCount(4)
         ->and($mods[2]['workshop_id'])->toBe('1111111111')
-        ->and($mods[2]['mod_id'])->toBe('TestMod');
+        ->and($mods[2]['mod_id'])->toBe('TestMod')
+        ->and($mods[3]['mod_id'])->toBe('ZomboidManager');
 });
 
 it('prevents duplicate workshop ids', function () {
@@ -62,8 +64,10 @@ it('removes a mod from both lists', function () {
     expect($removed)->toBe(['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors']);
 
     $mods = $this->manager->list($this->iniPath);
-    expect($mods)->toHaveCount(1)
-        ->and($mods[0]['workshop_id'])->toBe('2286126274');
+    // Hydrocraft survives + auto-attached ZomboidManager
+    expect($mods)->toHaveCount(2)
+        ->and($mods[0]['workshop_id'])->toBe('2286126274')
+        ->and($mods[1]['mod_id'])->toBe('ZomboidManager');
 });
 
 it('returns null when removing nonexistent mod', function () {
@@ -118,8 +122,8 @@ it('writes mod state file when adding a mod', function () {
     expect(file_exists($stateFile))->toBeTrue();
 
     $content = file_get_contents($stateFile);
-    expect($content)->toContain('Mods=SuperSurvivors;Hydrocraft;TestMod')
-        ->and($content)->toContain('WorkshopItems=2561774086;2286126274;1111111111');
+    expect($content)->toContain('Mods=SuperSurvivors;Hydrocraft;TestMod;ZomboidManager')
+        ->and($content)->toContain('WorkshopItems=2561774086;2286126274;1111111111;3685323705');
 });
 
 it('writes mod state file when removing a mod', function () {
@@ -130,8 +134,8 @@ it('writes mod state file when removing a mod', function () {
     expect(file_exists($stateFile))->toBeTrue();
 
     $content = file_get_contents($stateFile);
-    expect($content)->toContain('Mods=Hydrocraft')
-        ->and($content)->toContain('WorkshopItems=2286126274');
+    expect($content)->toContain('Mods=Hydrocraft;ZomboidManager')
+        ->and($content)->toContain('WorkshopItems=2286126274;3685323705');
 });
 
 it('writes mod state file when reordering mods', function () {
@@ -145,8 +149,8 @@ it('writes mod state file when reordering mods', function () {
     expect(file_exists($stateFile))->toBeTrue();
 
     $content = file_get_contents($stateFile);
-    expect($content)->toContain('Mods=Hydrocraft;SuperSurvivors')
-        ->and($content)->toContain('WorkshopItems=2286126274;2561774086');
+    expect($content)->toContain('Mods=Hydrocraft;SuperSurvivors;ZomboidManager')
+        ->and($content)->toContain('WorkshopItems=2286126274;2561774086;3685323705');
 });
 
 it('does not write mod state file when adding duplicate mod', function () {
@@ -252,8 +256,53 @@ it('returns state-file mods even when INI was clobbered to empty', function () {
 
     $mods = $this->manager->list($this->iniPath);
 
-    expect($mods)->toHaveCount(3)
-        ->and(collect($mods)->pluck('mod_id')->all())->toContain('TestMod');
+    // 2 fixture + 1 added + auto ZomboidManager
+    expect($mods)->toHaveCount(4)
+        ->and(collect($mods)->pluck('mod_id')->all())->toContain('TestMod')
+        ->and(collect($mods)->pluck('mod_id')->all())->toContain('ZomboidManager');
+});
+
+it('preserves mods from .mod_state when the INI was pruned by PZ on shutdown', function () {
+    // Simulate PZ rewriting the INI with empty Mods= after a shutdown, while
+    // .mod_state (web-UI source of truth) still reflects the user's choices.
+    file_put_contents(
+        $this->tempDir.'/Server/.mod_state',
+        "Mods=Hydrocraft;ZomboidManager\nWorkshopItems=2286126274;3685323705\n"
+    );
+    $this->parser->write($this->iniPath, ['Mods' => '', 'WorkshopItems' => '']);
+
+    $this->manager->add($this->iniPath, '4242424242', 'NewMod');
+
+    $stateContent = file_get_contents($this->tempDir.'/Server/.mod_state');
+    expect($stateContent)
+        ->toContain('Mods=Hydrocraft;ZomboidManager;NewMod')
+        ->and($stateContent)->toContain('WorkshopItems=2286126274;3685323705;4242424242');
+});
+
+it('re-attaches the protected ZomboidManager mod when add() runs without it', function () {
+    $this->parser->write($this->iniPath, ['Mods' => '', 'WorkshopItems' => '']);
+
+    $this->manager->add($this->iniPath, '4242424242', 'SoloMod');
+
+    $stateContent = file_get_contents($this->tempDir.'/Server/.mod_state');
+    expect($stateContent)
+        ->toContain('Mods=SoloMod;ZomboidManager')
+        ->and($stateContent)->toContain('WorkshopItems=4242424242;3685323705');
+});
+
+it('does not duplicate ZomboidManager when reorder already contains it', function () {
+    // Regression: PHP coerces numeric-string array keys (PROTECTED_MODS) to int,
+    // and a naive in_array(..., $workshopIds, true) treats int 3685323705 and
+    // "3685323705" as different — appending a duplicate every reorder call.
+    $this->manager->reorder($this->iniPath, [
+        ['workshop_id' => '3685323705', 'mod_id' => 'ZomboidManager'],
+        ['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'],
+        ['workshop_id' => '2286126274', 'mod_id' => 'Hydrocraft'],
+    ]);
+
+    $stateContent = file_get_contents($this->tempDir.'/Server/.mod_state');
+    expect(substr_count($stateContent, 'ZomboidManager'))->toBe(1)
+        ->and(substr_count($stateContent, '3685323705'))->toBe(1);
 });
 
 it('rolls back the INI when state file write fails', function () {
@@ -285,9 +334,11 @@ it('marks all mods stopped when server is not running', function () {
 it('marks mods active when state matches applied snapshot', function () {
     $this->manager->add($this->iniPath, '1111111111', 'TestMod');
 
+    // Include the auto-attached ZomboidManager in the applied snapshot so the
+    // user intent matches what the server last loaded.
     file_put_contents(
         $this->tempDir.'/Server/.mod_state_applied',
-        "Mods=SuperSurvivors;Hydrocraft;TestMod\nWorkshopItems=2561774086;2286126274;1111111111\n"
+        "Mods=SuperSurvivors;Hydrocraft;TestMod;ZomboidManager\nWorkshopItems=2561774086;2286126274;1111111111;3685323705\n"
     );
 
     $result = $this->manager->listWithStatus($this->iniPath, serverRunning: true);
@@ -325,9 +376,13 @@ it('flags pending_restart when a mod was removed since last server start', funct
 
     $result = $this->manager->listWithStatus($this->iniPath, serverRunning: true);
 
-    expect($result['pending_restart'])->toBeTrue()
-        ->and(collect($result['mods'])->pluck('status')->all())
-        ->each->toBe('active');
+    // After remove() the auto-attached ZomboidManager (3685323705) is in user intent
+    // but not in .mod_state_applied — so it's correctly flagged pending_restart.
+    expect($result['pending_restart'])->toBeTrue();
+
+    $byId = collect($result['mods'])->keyBy('workshop_id');
+    expect($byId['2561774086']['status'])->toBe('active')
+        ->and($byId['3685323705']['status'])->toBe('pending_restart');
 });
 
 it('falls back to active when applied snapshot is missing on running server', function () {

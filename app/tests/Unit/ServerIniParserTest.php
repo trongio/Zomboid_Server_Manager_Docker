@@ -161,3 +161,19 @@ it('skips comments and blank lines in content', function () {
         ->toHaveKey('MaxPlayers', '16')
         ->toHaveKey('Public', 'true');
 });
+
+it('writes via atomic rename so a read-only target file is still replaceable', function () {
+    // Simulate the production state where the .ini was written by another
+    // process (the game-server, root) with mode 0444 — the previous direct
+    // file_put_contents would have failed with "Permission denied".
+    chmod($this->tempPath, 0o444);
+
+    $this->parser->write($this->tempPath, ['MaxPlayers' => '99']);
+
+    expect($this->parser->read($this->tempPath))
+        ->toHaveKey('MaxPlayers', '99');
+
+    // No leftover .tmp.* files in the directory after the write.
+    $leftovers = glob(dirname($this->tempPath).'/'.basename($this->tempPath).'.tmp.*');
+    expect($leftovers)->toBe([]);
+});

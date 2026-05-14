@@ -29,7 +29,8 @@ class SecurityHeaders
         $connectSrc = "'self'";
         $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net";
         $fontSrc = "'self' https://fonts.bunny.net";
-        $imgSrc = "'self' data:";
+        // Workshop preview thumbnails come from Steam's user-content and static CDNs.
+        $imgSrc = "'self' data: https://*.steamusercontent.com https://*.steamstatic.com";
 
         if ($isLocal) {
             $scriptSrc .= " 'unsafe-eval'";

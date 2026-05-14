@@ -72,9 +72,9 @@ it('adds a mod', function () {
             'restart_required' => true,
         ]);
 
-    // Verify it was added
+    // Verify it was added (2 fixture + new + auto-attached ZomboidManager)
     $response = $this->getJson('/api/config/mods', modApiHeaders())->assertOk();
-    expect($response->json('mods'))->toHaveCount(3);
+    expect($response->json('mods'))->toHaveCount(4);
 
     // Verify audit log
     expect(AuditLog::where('action', 'mod.add')->exists())->toBeTrue();
@@ -120,9 +120,11 @@ it('removes a mod', function () {
             'restart_required' => true,
         ]);
 
+    // Hydrocraft survives + auto-attached ZomboidManager
     $response = $this->getJson('/api/config/mods', modApiHeaders())->assertOk();
-    expect($response->json('mods'))->toHaveCount(1)
-        ->and($response->json('mods.0.workshop_id'))->toBe('2286126274');
+    expect($response->json('mods'))->toHaveCount(2)
+        ->and($response->json('mods.0.workshop_id'))->toBe('2286126274')
+        ->and($response->json('mods.1.mod_id'))->toBe('ZomboidManager');
 
     expect(AuditLog::where('action', 'mod.remove')->exists())->toBeTrue();
 });
