@@ -5,7 +5,13 @@
 
 set -e
 
-SERVER_NAME="${SERVERNAME:-ZomboidServer}"
+# The renegademaster image exposes the server name as SERVER_NAME (with the
+# underscore); accept both for safety so configure-server.sh always writes
+# the same INI that PZ reads via `-servername`. Without this, the script
+# silently fell back to ZomboidServer.ini while PZ kept reading IsnarmServ.ini
+# (or whatever PZ_SERVER_NAME the user picked), and no mod ever made it into
+# the live config.
+SERVER_NAME="${SERVERNAME:-${SERVER_NAME:-${PZ_SERVER_NAME:-ZomboidServer}}}"
 INI_DIR="/home/steam/Zomboid/Server"
 INI_FILE="${INI_DIR}/${SERVER_NAME}.ini"
 SANDBOX_FILE="${INI_DIR}/${SERVER_NAME}_SandboxVars.lua"
@@ -160,6 +166,98 @@ elif [ -r "$MOD_STATE_BACKUP" ]; then
     fi
 fi
 
+# Download missing Workshop mods via SteamCMD.
+# The base SteamCMD script only updates the dedicated server (app 380870) and
+# does NOT pull Workshop items. PZ B42 only loads mods present in the local
+# Workshop cache, so any ID added via the web UI must be downloaded here
+# before start_server runs — otherwise PZ silently drops the mod and may
+# prune Mods= back to empty on its next ini rewrite.
+PZ_WORKSHOP_APP_ID="108600"
+WORKSHOP_CACHE_ROOT="/home/steam/ZomboidDedicatedServer/steamapps/workshop/content/${PZ_WORKSHOP_APP_ID}"
+ZM_WORKSHOP_ID_EARLY="3685323705"
+
+# Re-read the final WorkshopItems= so we cover every restore path above.
+CURRENT_WORKSHOP_LINE=$(grep -m1 "^WorkshopItems=" "$INI_FILE" | sed 's/^WorkshopItems=//' || true)
+MISSING_WORKSHOP_IDS=()
+if [ -n "$CURRENT_WORKSHOP_LINE" ]; then
+    IFS=';' read -ra WS_IDS <<< "$CURRENT_WORKSHOP_LINE"
+    for wid in "${WS_IDS[@]}"; do
+        wid="$(echo "$wid" | tr -d '[:space:]')"
+        if [ -z "$wid" ]; then continue; fi
+        # ZomboidManager is injected manually from the host volume below; skip.
+        if [ "$wid" = "$ZM_WORKSHOP_ID_EARLY" ]; then continue; fi
+        if [ ! -d "$WORKSHOP_CACHE_ROOT/$wid" ]; then
+            MISSING_WORKSHOP_IDS+=("$wid")
+        fi
+    done
+fi
+
+if [ "${#MISSING_WORKSHOP_IDS[@]}" -gt 0 ]; then
+    echo "[configure-server] Downloading ${#MISSING_WORKSHOP_IDS[@]} Workshop mod(s) via SteamCMD: ${MISSING_WORKSHOP_IDS[*]}"
+    STEAMCMD_BIN="$(command -v steamcmd.sh || echo /home/root/.local/steamcmd/steamcmd.sh)"
+    SCMD_ARGS=("+force_install_dir" "/home/steam/ZomboidDedicatedServer" "+login" "anonymous")
+    for wid in "${MISSING_WORKSHOP_IDS[@]}"; do
+        SCMD_ARGS+=("+workshop_download_item" "$PZ_WORKSHOP_APP_ID" "$wid")
+    done
+    SCMD_ARGS+=("+quit")
+    if "$STEAMCMD_BIN" "${SCMD_ARGS[@]}"; then
+        echo "[configure-server] Workshop download complete."
+    else
+        echo "[configure-server] WARNING: SteamCMD workshop download exited non-zero — some mods may be missing."
+    fi
+else
+    echo "[configure-server] All Workshop mods already cached locally."
+fi
+
+# Surface PZ Build 42 mod manifests so the server can discover them.
+# PZ B42 dedicated server scans `<workshop_id>/mods/<id>/mod.info` (root-level),
+# but many B42-only mods only ship `42/mod.info`. Without root-level mod.info,
+# PZ silently skips the mod. Walk every Workshop mod directory and lift the
+# B42 manifest + poster up one level when it's missing.
+if [ -d "$WORKSHOP_CACHE_ROOT" ]; then
+    while IFS= read -r mod_dir; do
+        # Skip ZomboidManager — configure-server.sh handles it below.
+        if [ "$(basename "$(dirname "$mod_dir")")" = "$ZM_WORKSHOP_ID_EARLY" ]; then continue; fi
+        if [ -f "$mod_dir/mod.info" ]; then continue; fi
+        if [ ! -f "$mod_dir/42/mod.info" ]; then continue; fi
+        cp "$mod_dir/42/mod.info" "$mod_dir/mod.info"
+        for asset in poster.png icon.png preview.png; do
+            if [ -f "$mod_dir/42/$asset" ] && [ ! -f "$mod_dir/$asset" ]; then
+                cp "$mod_dir/42/$asset" "$mod_dir/$asset"
+            fi
+        done
+        echo "[configure-server] Surfaced B42 manifest for mod: $(basename "$mod_dir")"
+    done < <(find "$WORKSHOP_CACHE_ROOT" -maxdepth 3 -mindepth 3 -type d -path "*/mods/*")
+fi
+
+# Mirror Workshop-downloaded mods into Zomboid/mods/ so PZ's mod scanner
+# discovers them. The dedicated server's Workshop discovery path expects
+# proper Steam UGC subscriptions — anonymous SteamCMD downloads don't get
+# subscribed, so PZ silently wipes them from `Mods=`/`WorkshopItems=` in
+# the INI on startup. The `Zomboid/mods/` path is always scanned, so a
+# symlink there gives PZ a reliable, always-trusted local copy.
+ZOMBOID_MODS_DIR="/home/steam/Zomboid/mods"
+mkdir -p "$ZOMBOID_MODS_DIR"
+if [ -d "$WORKSHOP_CACHE_ROOT" ]; then
+    while IFS= read -r mod_dir; do
+        mod_name="$(basename "$mod_dir")"
+        # Skip ZomboidManager — its source is bind-mounted from host already.
+        if [ "$mod_name" = "ZomboidManager" ]; then continue; fi
+        target="$ZOMBOID_MODS_DIR/$mod_name"
+        # Replace stale symlinks/dirs that may point to a removed mod.
+        if [ -L "$target" ] || [ -e "$target" ]; then
+            rm -rf "$target"
+        fi
+        if ln -s "$mod_dir" "$target" 2>/dev/null; then
+            echo "[configure-server] Linked $mod_name from Workshop cache into Zomboid/mods/"
+        else
+            # Fallback for filesystems where symlinks aren't allowed in the mount.
+            cp -r "$mod_dir" "$target"
+            echo "[configure-server] Copied $mod_name from Workshop cache into Zomboid/mods/"
+        fi
+    done < <(find "$WORKSHOP_CACHE_ROOT" -maxdepth 3 -mindepth 3 -type d -path "*/mods/*")
+fi
+
 # Disable Lua checksum — required for ZomboidManager mod.
 # Without this, PZ checksums mod Lua files and clients that don't have matching
 # checksums get errors. This does NOT disable anti-cheat (Steam VAC).
@@ -256,4 +354,6 @@ echo "  Port: $(grep '^DefaultPort=' "$INI_FILE" | sed 's/^DefaultPort=//')/udp"
 echo "  RCON: $(grep '^RCONPort=' "$INI_FILE" | sed 's/^RCONPort=//')/tcp"
 echo "  MaxPlayers: $(grep '^MaxPlayers=' "$INI_FILE" | sed 's/^MaxPlayers=//')"
 echo "  Public: $(grep '^Public=' "$INI_FILE" | sed 's/^Public=//')"
+echo "  Mods: $(grep '^Mods=' "$INI_FILE" | sed 's/^Mods=//')"
+echo "  WorkshopItems: $(grep '^WorkshopItems=' "$INI_FILE" | sed 's/^WorkshopItems=//')"
 echo "[configure-server] Done."
