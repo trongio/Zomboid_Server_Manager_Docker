@@ -1,0 +1,23 @@
+* text=auto eol=lf
+
+# Shell scripts MUST stay LF — they run inside Linux containers and break on CRLF.
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Compose / config files consumed by Linux tooling
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+Makefile text eol=lf
+
+# Windows-only artifacts stay CRLF
+*.ps1 text eol=crlf
+*.psm1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
