@@ -247,19 +247,22 @@ $PZ_MAX_PLAYERS = Read-Prompt "Max players" "16"
 $PZ_MAX_RAM = Read-Prompt "Max RAM" "4096m"
 
 Write-Host "  Steam branch:"
+Write-Host "  Note: the ZomboidManager mod (player map, inventory, delivery queue," -ForegroundColor DarkGray
+Write-Host "  live stats) only works on Build 42. Picking 'public' or any non-42" -ForegroundColor DarkGray
+Write-Host "  branch will leave those dashboard features non-functional." -ForegroundColor DarkGray
 do {
-    Write-Host "    1) public   - Stable release (recommended)"
-    Write-Host "    2) unstable - Latest unstable/experimental"
-    Write-Host "    3) Custom   - Enter a branch name manually"
+    Write-Host "    1) unstable - Build 42 multiplayer (recommended, required for ZomboidManager mod)"
+    Write-Host "    2) public   - Build 41.78.x (legacy stable, mod will NOT work)"
+    Write-Host "    3) Custom   - Enter a branch name manually (mod may NOT work)"
     $branchChoice = Read-Host "  [1]"
     if ([string]::IsNullOrEmpty($branchChoice)) { $branchChoice = "1" }
 } while ($branchChoice -notin @("1", "2", "3"))
 
 switch ($branchChoice) {
-    "1" { $PZ_STEAM_BRANCH = "public" }
-    "2" { $PZ_STEAM_BRANCH = "unstable" }
+    "1" { $PZ_STEAM_BRANCH = "unstable" }
+    "2" { $PZ_STEAM_BRANCH = "public" }
     "3" {
-        $PZ_STEAM_BRANCH = Read-Prompt "Branch name" "public"
+        $PZ_STEAM_BRANCH = Read-Prompt "Branch name" "unstable"
     }
 }
 
