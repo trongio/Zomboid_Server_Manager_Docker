@@ -218,58 +218,50 @@ export default function Mods({
         lookupAbort.current = controller;
         setLookup({ status: 'loading' });
 
-        const csrfToken =
-            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+        const json = (await fetchAction('/admin/mods/lookup', {
+            data: { workshop_id: trimmed },
+            silent: true,
+            signal: controller.signal,
+        })) as LookupResult | null;
 
-        try {
-            const res = await fetch('/admin/mods/lookup', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken,
-                },
-                body: JSON.stringify({ workshop_id: trimmed }),
-                signal: controller.signal,
-            });
-            const json = (await res.json().catch(() => ({}))) as LookupResult;
+        if (controller.signal.aborted) return;
 
-            if (res.status === 404 || json.found === false) {
-                setLookup({ status: 'not_found' });
-                setModId('');
-                setMapFolder('');
-                setManualOverride(true);
-                return;
-            }
-
-            if (!res.ok) {
-                setLookup({ status: 'error' });
-                setManualOverride(true);
-                return;
-            }
-
-            const modIds = json.mod_ids ?? [];
-            const mapFolders = json.map_folders ?? [];
-            const title = json.title ?? '';
-            const previewUrl = json.preview_url ?? null;
-
-            if (modIds.length === 0) {
-                setLookup({ status: 'no_mod_ids', title, previewUrl, mapFolders });
-                setModId('');
-                setMapFolder(mapFolders[0] ?? '');
-                setManualOverride(true);
-                return;
-            }
-
-            setLookup({ status: 'success', title, previewUrl, modIds, mapFolders });
-            setModId(modIds[0]);
-            setMapFolder(mapFolders[0] ?? '');
-            setManualOverride(false);
-        } catch (err) {
-            if ((err as DOMException)?.name === 'AbortError') return;
-            setLookup({ status: 'error' });
+        // fetchAction returns null on transport / non-2xx failures.
+        // The "not found" case is structured by the backend as 404 + {found:false},
+        // which fetchAction collapses to null too — treat both the same.
+        if (!json) {
+            setLookup({ status: 'not_found' });
+            setModId('');
+            setMapFolder('');
             setManualOverride(true);
+            return;
         }
+
+        if (json.found === false) {
+            setLookup({ status: 'not_found' });
+            setModId('');
+            setMapFolder('');
+            setManualOverride(true);
+            return;
+        }
+
+        const modIds = json.mod_ids ?? [];
+        const mapFolders = json.map_folders ?? [];
+        const title = json.title ?? '';
+        const previewUrl = json.preview_url ?? null;
+
+        if (modIds.length === 0) {
+            setLookup({ status: 'no_mod_ids', title, previewUrl, mapFolders });
+            setModId('');
+            setMapFolder(mapFolders[0] ?? '');
+            setManualOverride(true);
+            return;
+        }
+
+        setLookup({ status: 'success', title, previewUrl, modIds, mapFolders });
+        setModId(modIds[0]);
+        setMapFolder(mapFolders[0] ?? '');
+        setManualOverride(false);
     }, []);
 
     useEffect(() => {

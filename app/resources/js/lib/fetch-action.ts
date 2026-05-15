@@ -4,18 +4,25 @@ type FetchActionOptions = {
     method?: string;
     data?: Record<string, unknown>;
     successMessage?: string;
+    /** Suppress success/error toasts (useful for typeahead / debounced lookups). */
+    silent?: boolean;
+    /** AbortSignal for cancelling stale requests. */
+    signal?: AbortSignal;
 };
 
 /**
  * Wrapper around fetch for admin actions with automatic toast feedback.
  * Parses JSON response and shows success/error toasts.
  * Returns the parsed JSON data on success, or null on failure.
+ *
+ * Pass `silent: true` to opt out of toasts and `signal` for cancellation.
+ * Aborted requests resolve to `null` without surfacing an error.
  */
 export async function fetchAction(
     url: string,
     options: FetchActionOptions = {},
 ): Promise<Record<string, unknown> | null> {
-    const { method = 'POST', data, successMessage } = options;
+    const { method = 'POST', data, successMessage, silent = false, signal } = options;
     const csrfToken =
         document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
 
@@ -29,7 +36,11 @@ export async function fetchAction(
             ? JSON.stringify({ _method: method })
             : undefined;
 
-    const headers: Record<string, string> = { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' };
+    const headers: Record<string, string> = {
+        'X-CSRF-TOKEN': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json',
+    };
     if (spoofed) {
         headers['X-HTTP-Method-Override'] = method.toUpperCase();
     }
@@ -42,21 +53,32 @@ export async function fetchAction(
             method: actualMethod,
             headers,
             body,
+            credentials: 'same-origin',
+            signal,
         });
 
         const json = await res.json().catch(() => ({}));
 
         if (res.ok) {
-            toast.success(
-                successMessage || json.message || 'Action completed',
-            );
+            if (!silent) {
+                toast.success(
+                    successMessage || json.message || 'Action completed',
+                );
+            }
             return json;
         }
 
-        toast.error(json.error || json.message || `Request failed (${res.status})`);
+        if (!silent) {
+            toast.error(json.error || json.message || `Request failed (${res.status})`);
+        }
         return null;
-    } catch {
-        toast.error('Network error — could not reach the server');
+    } catch (err) {
+        if ((err as DOMException)?.name === 'AbortError') {
+            return null;
+        }
+        if (!silent) {
+            toast.error('Network error — could not reach the server');
+        }
         return null;
     }
 }
