@@ -66,10 +66,13 @@ class GameVersionReader
     {
         $overridePath = config('zomboid.paths.data').'/.steam_branch';
 
-        if (file_exists($overridePath)) {
-            $branch = trim((string) file_get_contents($overridePath));
-            if ($branch !== '') {
-                return $branch;
+        if (is_readable($overridePath)) {
+            $contents = @file_get_contents($overridePath);
+            if ($contents !== false) {
+                $branch = trim($contents);
+                if ($branch !== '') {
+                    return $branch;
+                }
             }
         }
 

@@ -6,6 +6,14 @@ services:
     stdin_open: true
     tty: true
     entrypoint: ["/bin/bash", "/home/steam/entrypoint.sh"]
+    # SteamCMD on newer kernels (6.x) trips Docker's default seccomp filter on
+    # socket() syscalls, producing "CreateBoundSocket: error 38 (ENOSYS)" and
+    # "FAILED (No Connection)". Disable seccomp + IPv6 so SteamCMD can connect.
+    security_opt:
+      - seccomp=unconfined
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
     environment:
       SERVERNAME: ${PZ_SERVER_NAME:-ZomboidServer}
       TZ: ${TZ:-Asia/Tbilisi}

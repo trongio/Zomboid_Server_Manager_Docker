@@ -3,6 +3,14 @@ services:
     # Pin to a specific version tag when available to prevent supply chain attacks
     image: renegademaster/zomboid-dedicated-server:latest
     entrypoint: ["/bin/bash", "/home/steam/amd64-entrypoint.sh"]
+    # SteamCMD on newer kernels (6.x) trips Docker's default seccomp filter on
+    # socket() syscalls, producing "CreateBoundSocket: error 38 (ENOSYS)" and
+    # "FAILED (No Connection)". Disable seccomp + IPv6 so SteamCMD can connect.
+    security_opt:
+      - seccomp=unconfined
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
     environment:
       ADMIN_PASSWORD: ${PZ_ADMIN_PASSWORD:?PZ_ADMIN_PASSWORD must be set in .env}
       ADMIN_USERNAME: ${PZ_ADMIN_USERNAME:-admin}

@@ -768,6 +768,7 @@ try {
     # is mounted there, but be defensive against race with entrypoint init).
     docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid" 2>$null | Out-Null
     docker cp $tempBranchFile "pz-game-server:/home/steam/Zomboid/.steam_branch" 2>$null | Out-Null
+    docker exec pz-game-server sh -c "chmod 0644 /home/steam/Zomboid/.steam_branch" 2>$null | Out-Null
 } finally {
     Remove-Item -Force -ErrorAction SilentlyContinue $tempBranchFile
 }

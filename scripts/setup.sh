@@ -678,8 +678,10 @@ echo "Persisting Steam branch (${PZ_STEAM_BRANCH}) to game-server volume..."
 # CRLF when this is later cross-edited from Windows, etc.).
 TMP_BRANCH_FILE=$(mktemp)
 printf '%s' "$PZ_STEAM_BRANCH" > "$TMP_BRANCH_FILE"
+chmod 0644 "$TMP_BRANCH_FILE"
 docker exec pz-game-server sh -c "mkdir -p /home/steam/Zomboid" >/dev/null 2>&1 || true
 docker cp "$TMP_BRANCH_FILE" pz-game-server:/home/steam/Zomboid/.steam_branch >/dev/null 2>&1 || true
+docker exec pz-game-server sh -c "chmod 0644 /home/steam/Zomboid/.steam_branch" >/dev/null 2>&1 || true
 rm -f "$TMP_BRANCH_FILE"
 
 if [ "$PZ_STEAM_BRANCH" != "public" ]; then
