@@ -9,13 +9,16 @@
         "format": "prettier --write resources/",
         "format:check": "prettier --check resources/",
         "lint": "eslint . --fix",
-        "types": "tsc --noEmit"
+        "types": "tsc --noEmit",
+        "test": "vitest run --config vitest.config.ts",
+        "test:watch": "vitest --config vitest.config.ts"
     },
     "devDependencies": {
         "@eslint/js": "^9.19.0",
         "@laravel/vite-plugin-wayfinder": "^0.1.3",
         "@types/leaflet": "^1.9.21",
         "@types/node": "^22.13.5",
+        "@vitest/ui": "^4.1.6",
         "babel-plugin-react-compiler": "^1.0.0",
         "eslint": "^9.17.0",
         "eslint-config-prettier": "^10.0.1",
@@ -23,9 +26,11 @@
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-react": "^7.37.3",
         "eslint-plugin-react-hooks": "^7.0.0",
+        "jsdom": "^29.1.1",
         "prettier": "^3.4.2",
         "prettier-plugin-tailwindcss": "^0.6.11",
-        "typescript-eslint": "^8.23.0"
+        "typescript-eslint": "^8.23.0",
+        "vitest": "^4.1.6"
     },
     "dependencies": {
         "@dnd-kit/core": "^6.3.1",

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\MapRenderSetting;
 use App\Services\MapConfigBuilder;
+use App\Services\MapRenderService;
 use App\Services\OnlinePlayersReader;
 use App\Services\PlayerPositionReader;
 use App\Services\PlayersDbReader;
@@ -23,6 +25,7 @@ class PlayerMapController extends Controller
         private readonly ServerStatusResolver $statusResolver,
         private readonly MapConfigBuilder $mapConfigBuilder,
         private readonly SafeZoneManager $safeZoneManager,
+        private readonly MapRenderService $renderer,
     ) {}
 
     public function __invoke(): InertiaResponse
@@ -104,6 +107,7 @@ class PlayerMapController extends Controller
 
         $mapConfig = $this->mapConfigBuilder->build();
         $safeZoneConfig = $this->safeZoneManager->getConfig();
+        $renderSetting = MapRenderSetting::instance();
 
         return Inertia::render('admin/player-map', [
             'markers' => $markers,
@@ -114,6 +118,34 @@ class PlayerMapController extends Controller
             'tileProgress' => null,
             'tilesGenerating' => false,
             'safeZones' => $safeZoneConfig['enabled'] ? $safeZoneConfig['zones'] : [],
+            'renderEngine' => [
+                'installed' => $this->renderer->isEngineInstalled(),
+                'enabled' => $renderSetting->engine_enabled,
+                'rendering' => $this->renderer->isRendering(),
+                'paused' => $this->renderer->isPaused(),
+                'has_base_tiles' => $this->renderer->hasBaseTiles(),
+                'progress' => $this->renderer->currentProgress(),
+                'log_progress' => $this->renderer->parseProgressFromLog(),
+                'schedule_preset' => $renderSetting->schedule_preset,
+                'cron_expression' => $renderSetting->cron_expression,
+                'effective_cron' => $renderSetting->effectiveCronExpression(),
+                'last_run_at' => $renderSetting->last_run_at?->toIso8601String(),
+                'last_run_status' => $renderSetting->last_run_status,
+                'last_run_duration_seconds' => $renderSetting->last_run_duration_seconds,
+                'last_run_error' => $renderSetting->last_run_error,
+                'base_rendered_at' => $renderSetting->base_rendered_at?->toIso8601String(),
+                'texturepacks' => [
+                    'present' => $this->renderer->hasTexturepacks(),
+                    'files' => $this->renderer->texturepackFiles(),
+                ],
+                'quality' => [
+                    'preset' => $renderSetting->quality_preset,
+                    'custom_tile_size' => $renderSetting->custom_tile_size,
+                    'custom_omit_levels' => $renderSetting->custom_omit_levels,
+                    'effective_tile_size' => $renderSetting->effectiveTileSize(),
+                    'effective_omit_levels' => $renderSetting->effectiveOmitLevels(),
+                ],
+            ],
         ]);
     }
 
@@ -160,4 +192,5 @@ class PlayerMapController extends Controller
             'Content-Type' => $contentType,
         ]);
     }
+
 }

@@ -280,6 +280,22 @@ it('can update sandbox config', function () {
     $response->assertJson(['restart_required' => true]);
 });
 
+it('accepts dot-notated mod-namespace updates from the admin UI', function () {
+    mockAdminIniParser();
+    mockAdminLuaParser([
+        'Zombies' => 4,
+        'SOTO' => ['BraveHoursToEarnMin' => 504],
+    ]);
+
+    $response = $this->actingAs(adminUser())
+        ->patchJson('/admin/config/sandbox', [
+            'settings' => ['SOTO.BraveHoursToEarnMin' => 999],
+        ]);
+
+    $response->assertOk();
+    $response->assertJson(['restart_required' => true]);
+});
+
 it('creates audit log for admin config updates', function () {
     mockAdminIniParser(['MaxPlayers' => '16']);
     mockAdminLuaParser();

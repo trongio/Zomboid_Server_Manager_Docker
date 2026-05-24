@@ -1,596 +1,565 @@
 export type SettingMeta = {
     type: 'boolean' | 'number' | 'string' | 'enum' | 'list';
-    group: string;
-    description: string;
+    /**
+     * Display category. Optional — when missing, callers compute one with
+     * `inferServerCategory()` for server.ini fields or fall back to
+     * `defaultGroup`. Lets us keep a single source of truth (the inferred
+     * map below) instead of hand-categorising every option.
+     */
+    group?: string;
+    /**
+     * Human-readable description. Optional — for sandbox / mod options it
+     * comes from the live catalog (PZ `Sandbox.json`, mod `Sandbox_<LANG>.txt`,
+     * or inline `_SandboxVars.lua` comments), so the hard-coded SETTING_META
+     * fields don't have to duplicate it.
+     */
+    description?: string;
+    /**
+     * Optional human-readable label that overrides the raw key.
+     * Populated from mod-supplied `Sandbox_<LANG>.txt` files or,
+     * when missing, from a camelCase humaniser at render time.
+     */
+    label?: string;
     default?: string | number | boolean;
     sensitive?: boolean;
     readOnly?: boolean;
     options?: { value: string; label: string }[];
     min?: number;
     max?: number;
+    /**
+     * `true` when the field accepts decimal values. Driven by the
+     * server-ini parser when the `Min:`/`Max:`/`Default:` hint string
+     * contained a decimal point. Used by the slider to switch to
+     * 0.1 step granularity.
+     */
+    float?: boolean;
+    /**
+     * Conditional display: this field is shown disabled with a tooltip until
+     * another setting matches the given value. Inspired by pz-admin's
+     * Requirements: enables natural pairs like "PublicName needs Public=true".
+     */
+    requires?: { key: string; value: string | number | boolean };
 };
 
-// ── Server.ini settings ─────────────────────────────────────────────
+/**
+ * Turn a raw camelCase key (`AddFitXPWhileRun`) into a human-readable label
+ * (`Add Fit XP While Run`). Used as a fallback when the catalog hasn't
+ * supplied an explicit label for a mod-supplied option.
+ */
+export function humaniseKey(key: string): string {
+    // Strip a leading `Namespace.` for mod-prefixed keys.
+    const local = key.includes('.') ? (key.split('.').pop() ?? key) : key;
+    return local
+        .replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase → space
+        .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2') // ACRONYMSplit
+        .replace(/_/g, ' ')
+        .trim();
+}
 
-export const SERVER_INI_META: Record<string, SettingMeta> = {
+/**
+ * Server.ini option categories ported from
+ * https://github.com/beyenilmez/pz-admin/blob/main/frontend/src/assets/options.ts
+ * — that project has spent significant time grouping PZ's 150+ server
+ * options into clear sections, and we reuse their taxonomy verbatim so
+ * `<NAME>.ini` keys always land in a sensible tab without us having to
+ * hand-curate every entry.
+ */
+export const SERVER_INI_CATEGORY_MAP: Record<string, string> = {
     // General
-    ServerName: {
-        type: 'string',
-        group: 'General',
-        description: 'The name of the server as it appears in the server browser.',
-        default: 'servertest',
-    },
-    Public: {
-        type: 'boolean',
-        group: 'General',
-        description: 'Whether the server is visible in the public server browser.',
-        default: true,
-    },
-    Open: {
-        type: 'boolean',
-        group: 'General',
-        description: 'Allow new players to join. Set to false to only allow whitelisted players.',
-        default: true,
-    },
-    AutoCreateUserInWhiteList: {
-        type: 'boolean',
-        group: 'General',
-        description: 'Automatically store player credentials when they join. Required for web login sync.',
-        default: true,
-    },
-    PauseEmpty: {
-        type: 'boolean',
-        group: 'General',
-        description: 'Pause the server when no players are connected.',
-        default: true,
-    },
-    Password: {
-        type: 'string',
-        group: 'General',
-        description: 'Password required to join the server. Leave empty for no password.',
-        sensitive: true,
-    },
-    AdminPassword: {
-        type: 'string',
-        group: 'General',
-        description: 'Password for in-game admin access.',
-        sensitive: true,
-    },
+    PublicName: 'General',
+    PublicDescription: 'General',
+    ServerWelcomeMessage: 'General',
+    Open: 'General',
+    Public: 'General',
+    DenyLoginOnOverloadedServer: 'General',
+    SaveWorldEveryMinutes: 'General',
+    SpawnItems: 'General',
+    SpawnPoint: 'General',
+    MaxPlayers: 'General',
+    PauseEmpty: 'General',
+    AllowCoop: 'General',
+    AllowNonAsciiUsername: 'General',
+    AnnounceDeath: 'General',
+    BanKickGlobalSound: 'General',
+    Mods: 'General',
+    WorkshopItems: 'General',
+    Map: 'General',
+    DefaultPort: 'General',
+    UDPPort: 'General',
+    UPnP: 'General',
+    ClientCommandFilter: 'General',
+    ClientActionLogs: 'General',
+    PerkLogs: 'General',
 
-    // Network
-    DefaultPort: {
-        type: 'number',
-        group: 'Network',
-        description: 'Primary game server port (TCP/UDP).',
-        default: 16261,
-        min: 1024,
-        max: 65535,
-    },
-    UDPPort: {
-        type: 'number',
-        group: 'Network',
-        description: 'Secondary UDP port for game traffic.',
-        default: 16262,
-        min: 1024,
-        max: 65535,
-    },
-    RCONPort: {
-        type: 'number',
-        group: 'Network',
-        description: 'RCON (remote console) port for server management.',
-        default: 27015,
-        min: 1024,
-        max: 65535,
-    },
-    RCONPassword: {
-        type: 'string',
-        group: 'Network',
-        description: 'Password for RCON connections.',
-        sensitive: true,
-    },
+    // Gameplay & Mechanics
+    MinutesPerPage: 'Gameplay & Mechanics',
+    CarEngineAttractionModifier: 'Gameplay & Mechanics',
+    SpeedLimit: 'Gameplay & Mechanics',
+    ItemNumbersLimitPerContainer: 'Gameplay & Mechanics',
+    AllowDestructionBySledgehammer: 'Gameplay & Mechanics',
+    SledgehammerOnlyInSafehouse: 'Gameplay & Mechanics',
+    ConstructionPreventsLootRespawn: 'Gameplay & Mechanics',
+    HoursForLootRespawn: 'Gameplay & Mechanics',
+    MaxItemsForLootRespawn: 'Gameplay & Mechanics',
+    NoFire: 'Gameplay & Mechanics',
+    BloodSplatLifespanDays: 'Gameplay & Mechanics',
+    SleepAllowed: 'Gameplay & Mechanics',
+    SleepNeeded: 'Gameplay & Mechanics',
+    FastForwardMultiplier: 'Gameplay & Mechanics',
+    MapRemotePlayerVisibility: 'Gameplay & Mechanics',
+    HidePlayersBehindYou: 'Gameplay & Mechanics',
+    PlayerBumpPlayer: 'Gameplay & Mechanics',
+    KnockedDownAllowed: 'Gameplay & Mechanics',
+    SneakModeHideFromOtherPlayers: 'Gameplay & Mechanics',
+    PlayerRespawnWithOther: 'Gameplay & Mechanics',
+    PlayerRespawnWithSelf: 'Gameplay & Mechanics',
+    RemovePlayerCorpsesOnCorpseRemoval: 'Gameplay & Mechanics',
+    TrashDeleteAll: 'Gameplay & Mechanics',
 
-    // Players
-    MaxPlayers: {
-        type: 'number',
-        group: 'Players',
-        description: 'Maximum number of players allowed on the server.',
-        default: 16,
-        min: 1,
-        max: 100,
-    },
+    // Safehouse
+    PlayerSafehouse: 'Safehouse',
+    AdminSafehouse: 'Safehouse',
+    SafehouseDaySurvivedToClaim: 'Safehouse',
+    SafeHouseRemovalTime: 'Safehouse',
+    DisableSafehouseWhenPlayerConnected: 'Safehouse',
+    SafehouseAllowNonResidential: 'Safehouse',
+    SafehouseAllowRespawn: 'Safehouse',
+    SafehouseAllowFire: 'Safehouse',
+    SafehouseAllowTrepass: 'Safehouse',
+    SafehouseAllowLoot: 'Safehouse',
 
-    // Saves
-    AutoSave: {
-        type: 'boolean',
-        group: 'Saves',
-        description: 'Automatically save the world at regular intervals.',
-        default: true,
-    },
-    SaveWorldEveryMinutes: {
-        type: 'number',
-        group: 'Saves',
-        description: 'How often the world auto-saves, in minutes.',
-        default: 15,
-        min: 1,
-        max: 120,
-    },
-    ResetID: {
-        type: 'number',
-        group: 'Saves',
-        description: 'Reset counter — incrementing this forces a world wipe on next restart.',
-        default: 0,
-        min: 0,
-    },
+    // Faction
+    Faction: 'Faction',
+    FactionDaySurvivedToCreate: 'Faction',
+    FactionPlayersRequiredForTag: 'Faction',
 
-    // Security
-    SteamVAC: {
-        type: 'boolean',
-        group: 'Security',
-        description: 'Enable Valve Anti-Cheat (VAC) for the server.',
-        default: true,
-    },
+    // Player
+    DisplayUserName: 'Player',
+    ShowFirstAndLastName: 'Player',
+    MouseOverToSeeDisplayName: 'Player',
+    LoginQueueEnabled: 'Player',
+    LoginQueueConnectTimeout: 'Player',
+    AutoCreateUserInWhiteList: 'Player',
+    DropOffWhiteListAfterDeath: 'Player',
+    MaxAccountsPerUser: 'Player',
+    PingLimit: 'Player',
+    SteamScoreboard: 'Player',
+    Password: 'Player',
 
-    // Mods (read-only — managed on mods page)
-    Mods: {
-        type: 'list',
-        group: 'Mods',
-        description: 'Active mod IDs. Managed on the Mods page.',
-        readOnly: true,
-    },
-    WorkshopItems: {
-        type: 'list',
-        group: 'Mods',
-        description: 'Steam Workshop item IDs for active mods. Managed on the Mods page.',
-        readOnly: true,
-    },
+    // PVP
+    PVP: 'PVP',
+    SafetySystem: 'PVP',
+    ShowSafety: 'PVP',
+    SafetyCooldownTimer: 'PVP',
+    SafetyToggleTimer: 'PVP',
+    PVPFirearmDamageModifier: 'PVP',
+    PVPMeleeDamageModifier: 'PVP',
+    PVPMeleeWhileHitReaction: 'PVP',
+    PVPLogToolChat: 'PVP',
+    PVPLogToolFile: 'PVP',
 
-    // Map
-    Map: {
-        type: 'string',
-        group: 'Map',
-        description: 'Map name. PZ uses semicolons to separate multiple map entries.',
-        default: 'Muldraugh, KY',
-    },
+    // VOIP & Chat
+    GlobalChat: 'VOIP & Chat',
+    ChatStreams: 'VOIP & Chat',
+    DisableRadioInvisible: 'VOIP & Chat',
+    DisableRadioStaff: 'VOIP & Chat',
+    DisableRadioAdmin: 'VOIP & Chat',
+    DisableRadioModerator: 'VOIP & Chat',
+    DisableRadioOverseer: 'VOIP & Chat',
+    DisableRadioGM: 'VOIP & Chat',
+    VoiceEnable: 'VOIP & Chat',
+    Voice3D: 'VOIP & Chat',
+    VoiceMinDistance: 'VOIP & Chat',
+    VoiceMaxDistance: 'VOIP & Chat',
+
+    // Discord
+    DiscordEnable: 'Discord',
+    DiscordToken: 'Discord',
+    DiscordChannel: 'Discord',
+    DiscordChannelID: 'Discord',
+
+    // Backup
+    BackupsOnStart: 'Backup',
+    BackupsOnVersionChange: 'Backup',
+    BackupsPeriod: 'Backup',
+    BackupsCount: 'Backup',
+
+    // Anti-Cheat
+    SteamVAC: 'Anti-Cheat',
+    DoLuaChecksum: 'Anti-Cheat',
+    KickFastPlayers: 'Anti-Cheat',
+    AntiCheatProtectionType2ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType3ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType4ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType9ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType15ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType20ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType22ThresholdMultiplier: 'Anti-Cheat',
+    AntiCheatProtectionType24ThresholdMultiplier: 'Anti-Cheat',
+
+    // Miscellaneous
+    ResetID: 'Miscellaneous',
+    ServerPlayerID: 'Miscellaneous',
+    RCONPort: 'Miscellaneous',
+    RCONPassword: 'Miscellaneous',
 };
 
-export const SERVER_INI_GROUP_ORDER = [
+/**
+ * Stable display order for server.ini categories. Anything not listed
+ * falls under "Other" at the end.
+ */
+export const SERVER_INI_CATEGORY_ORDER: string[] = [
     'General',
-    'Network',
-    'Players',
-    'Saves',
-    'Security',
-    'Mods',
-    'Map',
+    'Player',
+    'PVP',
+    'Safehouse',
+    'Faction',
+    'Gameplay & Mechanics',
+    'VOIP & Chat',
+    'Anti-Cheat',
+    'Backup',
+    'Discord',
+    'Miscellaneous',
 ];
 
-// ── SandboxVars.lua settings ────────────────────────────────────────
+/**
+ * Returns the category a server.ini key belongs to. Numbered AntiCheat
+ * protections (1..24) collapse to the single "Anti-Cheat" category via
+ * regex so we don't have to enumerate all 24 by hand.
+ */
+export function inferServerCategory(key: string): string {
+    if (SERVER_INI_CATEGORY_MAP[key]) {
+        return SERVER_INI_CATEGORY_MAP[key];
+    }
+    if (/^AntiCheatProtectionType\d+/i.test(key)) {
+        return 'Anti-Cheat';
+    }
+    if (/Backup/i.test(key)) {
+        return 'Backup';
+    }
+    if (/^Discord/i.test(key)) {
+        return 'Discord';
+    }
+    if (/^Voice|^Chat|^Disable(Radio|GlobalChat)/i.test(key)) {
+        return 'VOIP & Chat';
+    }
+    if (/^Safehouse|Safehouse/i.test(key)) {
+        return 'Safehouse';
+    }
+    if (/^Faction/i.test(key)) {
+        return 'Faction';
+    }
+    if (/^PVP|Safety/i.test(key)) {
+        return 'PVP';
+    }
+    return 'Other';
+}
 
-export const SANDBOX_META: Record<string, SettingMeta> = {
-    // Zombie Lore
-    'ZombieLore.Speed': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'Zombie movement speed.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Sprinters' },
-            { value: '2', label: 'Fast Shamblers' },
-            { value: '3', label: 'Shamblers' },
-            { value: '4', label: 'Random' },
-        ],
-    },
-    'ZombieLore.Strength': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How strong zombies are in combat.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Superhuman' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Weak' },
-        ],
-    },
-    'ZombieLore.Toughness': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How tough zombies are (damage to kill).',
-        default: 2,
-        options: [
-            { value: '1', label: 'Tough' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Fragile' },
-        ],
-    },
-    'ZombieLore.Transmission': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How the zombie infection spreads.',
-        default: 1,
-        options: [
-            { value: '1', label: 'Blood + Saliva' },
-            { value: '2', label: 'Saliva Only' },
-            { value: '3', label: 'Everyone\'s Infected' },
-            { value: '4', label: 'None' },
-        ],
-    },
-    'ZombieLore.Mortality': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'Time from infection to death.',
-        default: 5,
-        options: [
-            { value: '1', label: '0-30 seconds' },
-            { value: '2', label: '0-1 minutes' },
-            { value: '3', label: '0-12 hours' },
-            { value: '4', label: '2-3 days' },
-            { value: '5', label: '1-2 weeks' },
-            { value: '6', label: 'Never' },
-        ],
-    },
-    'ZombieLore.Reanimate': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'Time for dead bodies to reanimate.',
-        default: 3,
-        options: [
-            { value: '1', label: '0-30 seconds' },
-            { value: '2', label: '0-1 minutes' },
-            { value: '3', label: '0-12 hours' },
-            { value: '4', label: '2-3 days' },
-            { value: '5', label: '1-2 weeks' },
-        ],
-    },
-    'ZombieLore.Cognition': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'Zombie navigation intelligence.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Navigate + Use Doors' },
-            { value: '2', label: 'Navigate' },
-            { value: '3', label: 'Basic Navigation' },
-        ],
-    },
-    'ZombieLore.Memory': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How long zombies remember seeing a player.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Long' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Short' },
-            { value: '4', label: 'None' },
-        ],
-    },
-    'ZombieLore.Decomp': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'Zombie decomposition over time — weakens them gradually.',
-        default: 1,
-        options: [
-            { value: '1', label: 'Slows + Weakens' },
-            { value: '2', label: 'Slows' },
-            { value: '3', label: 'Weakens' },
-            { value: '4', label: 'None' },
-        ],
-    },
-    'ZombieLore.Sight': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How far zombies can see players.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Eagle' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Poor' },
-        ],
-    },
-    'ZombieLore.Hearing': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How well zombies hear sounds.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Pinpoint' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Poor' },
-        ],
-    },
-    'ZombieLore.Smell': {
-        type: 'enum',
-        group: 'Zombie Lore',
-        description: 'How well zombies smell blood.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Bloodhound' },
-            { value: '2', label: 'Normal' },
-            { value: '3', label: 'Poor' },
-        ],
-    },
+/**
+ * Sandbox option categories. Same idea as `SERVER_INI_CATEGORY_MAP` —
+ * a hand-curated mapping of vanilla sandbox keys (top-level entries
+ * inside PZ's `SandboxVars` table) to UI groups. Taxonomy mirrors
+ * what pz-admin uses, so users coming from that tool see familiar
+ * sections. Unknown keys fall through to `inferSandboxCategory` regex
+ * heuristics or the catch-all "Other" bucket.
+ */
+export const SANDBOX_CATEGORY_MAP: Record<string, string> = {
+    // Time & Climate
+    DayLength: 'Time & Climate',
+    StartYear: 'Time & Climate',
+    StartMonth: 'Time & Climate',
+    StartDay: 'Time & Climate',
+    StartTime: 'Time & Climate',
+    TimeSinceApo: 'Time & Climate',
+    TemperatureShift: 'Time & Climate',
+    SnowOn: 'Time & Climate',
+    RainOn: 'Time & Climate',
+    ErosionSpeed: 'Time & Climate',
+    ErosionDays: 'Time & Climate',
 
     // Zombie Population
-    'ZombieConfig.PopulationMultiplier': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Overall zombie population multiplier.',
-        default: 1.0,
-        min: 0,
-        max: 4,
-    },
-    'ZombieConfig.PopulationStartMultiplier': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Zombie population at day 1 (multiplier).',
-        default: 1.0,
-        min: 0,
-        max: 4,
-    },
-    'ZombieConfig.PopulationPeakMultiplier': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Zombie population at peak day (multiplier).',
-        default: 1.5,
-        min: 0,
-        max: 4,
-    },
-    'ZombieConfig.PopulationPeakDay': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Day when zombie population reaches peak.',
-        default: 28,
-        min: 1,
-        max: 365,
-    },
-    'ZombieConfig.RespawnHours': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Hours before zombies can respawn in cleared areas.',
-        default: 72,
-        min: 0,
-        max: 8760,
-    },
-    'ZombieConfig.RespawnUnseenHours': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Hours a cell must be unseen before zombies respawn.',
-        default: 16,
-        min: 0,
-        max: 8760,
-    },
-    'ZombieConfig.RespawnMultiplier': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Fraction of original zombies that respawn.',
-        default: 0.1,
-        min: 0,
-        max: 1,
-    },
-    'ZombieConfig.RedistributeHours': {
-        type: 'number',
-        group: 'Zombie Population',
-        description: 'Hours between zombie redistribution across the map.',
-        default: 12,
-        min: 0,
-        max: 8760,
-    },
+    PopulationMultiplier: 'Zombie Population',
+    PopulationStartMultiplier: 'Zombie Population',
+    PopulationPeakMultiplier: 'Zombie Population',
+    PopulationPeakDay: 'Zombie Population',
+    RespawnHours: 'Zombie Population',
+    RespawnUnseenHours: 'Zombie Population',
+    RespawnMultiplier: 'Zombie Population',
+    RedistributeHours: 'Zombie Population',
 
-    // Time & Start
-    DayLength: {
-        type: 'enum',
-        group: 'Time & Start',
-        description: 'Length of an in-game day in real-time.',
-        default: 2,
-        options: [
-            { value: '1', label: '15 minutes' },
-            { value: '2', label: '30 minutes' },
-            { value: '3', label: '1 hour' },
-            { value: '4', label: '2 hours' },
-            { value: '5', label: '3 hours' },
-            { value: '6', label: '4 hours' },
-            { value: '7', label: '5 hours' },
-            { value: '8', label: '6 hours' },
-            { value: '9', label: '7 hours' },
-            { value: '10', label: '8 hours' },
-            { value: '11', label: '9 hours' },
-            { value: '12', label: '10 hours' },
-            { value: '13', label: '11 hours' },
-            { value: '14', label: '12 hours' },
-        ],
-    },
-    StartYear: {
-        type: 'number',
-        group: 'Time & Start',
-        description: 'Starting year of the game world.',
-        default: 1993,
-        min: 1,
-    },
-    StartMonth: {
-        type: 'number',
-        group: 'Time & Start',
-        description: 'Starting month (1 = January, 12 = December).',
-        default: 7,
-        min: 1,
-        max: 12,
-    },
-    StartDay: {
-        type: 'number',
-        group: 'Time & Start',
-        description: 'Starting day of the month.',
-        default: 9,
-        min: 1,
-        max: 31,
-    },
+    // Zombie Lore
+    Speed: 'Zombie Lore',
+    Strength: 'Zombie Lore',
+    Toughness: 'Zombie Lore',
+    Transmission: 'Zombie Lore',
+    Mortality: 'Zombie Lore',
+    Reanimate: 'Zombie Lore',
+    Cognition: 'Zombie Lore',
+    CrawlUnderVehicle: 'Zombie Lore',
+    Memory: 'Zombie Lore',
+    Sight: 'Zombie Lore',
+    Hearing: 'Zombie Lore',
+    ThumpNoChasing: 'Zombie Lore',
+    ThumpOnConstruction: 'Zombie Lore',
+    ActiveOnly: 'Zombie Lore',
+    TriggerHouseAlarm: 'Zombie Lore',
+    ZombiesDragDown: 'Zombie Lore',
+    ZombiesFenceLunge: 'Zombie Lore',
+    DisableFakeDead: 'Zombie Lore',
+
+    // Loot
+    DistributionBonus: 'Loot',
+    Loot: 'Loot',
+    LootRespawn: 'Loot',
+    SeenHoursPreventLootRespawn: 'Loot',
+    WorldItemRemovalList: 'Loot',
+    HoursForWorldItemRemoval: 'Loot',
+    ItemRemovalListIsBlacklist: 'Loot',
+    TimeBeforeRandomAttackSounds: 'Loot',
+
+    // Survival
+    NatureAbundance: 'Survival',
+    Nutrition: 'Survival',
+    FoodRotSpeed: 'Survival',
+    FridgeFactor: 'Survival',
+    Farming: 'Survival',
+    StatsDecrease: 'Survival',
+    InjurySeverity: 'Survival',
+    BoneFracture: 'Survival',
+    EnableVehicles: 'Survival',
+    CarSpawnRate: 'Survival',
+    ChanceHasGas: 'Survival',
+    InitialGas: 'Survival',
+    FuelConsumption: 'Survival',
+    LockedHouses: 'Survival',
+    StarterKit: 'Survival',
+    Nutritionist: 'Survival',
+    BuildingHealth: 'Survival',
+    SmokerEffect: 'Survival',
 
     // World
-    Temperature: {
-        type: 'enum',
-        group: 'World',
-        description: 'World temperature modifier.',
-        default: 3,
-        options: [
-            { value: '1', label: 'Very Cold' },
-            { value: '2', label: 'Cold' },
-            { value: '3', label: 'Normal' },
-            { value: '4', label: 'Hot' },
-            { value: '5', label: 'Very Hot' },
-        ],
-    },
-    Rain: {
-        type: 'enum',
-        group: 'World',
-        description: 'Amount of rain.',
-        default: 3,
-        options: [
-            { value: '1', label: 'Very Dry' },
-            { value: '2', label: 'Dry' },
-            { value: '3', label: 'Normal' },
-            { value: '4', label: 'Rainy' },
-            { value: '5', label: 'Very Rainy' },
-        ],
-    },
-    ErosionSpeed: {
-        type: 'enum',
-        group: 'World',
-        description: 'Speed of nature reclaiming the world.',
-        default: 3,
-        options: [
-            { value: '1', label: 'Very Fast (20 days)' },
-            { value: '2', label: 'Fast (50 days)' },
-            { value: '3', label: 'Normal (100 days)' },
-            { value: '4', label: 'Slow (200 days)' },
-            { value: '5', label: 'Very Slow (500 days)' },
-        ],
-    },
-    WaterShut: {
-        type: 'number',
-        group: 'World',
-        description: 'Day when water shuts off (0 = instant, -1 = never).',
-        default: 14,
-        min: -1,
-        max: 365,
-    },
-    ElecShut: {
-        type: 'number',
-        group: 'World',
-        description: 'Day when electricity shuts off (0 = instant, -1 = never).',
-        default: 14,
-        min: -1,
-        max: 365,
-    },
+    Electricity: 'World',
+    ElecShutModifier: 'World',
+    Water: 'World',
+    WaterShutModifier: 'World',
+    HouseAlarm: 'World',
+    GeneratorSpawning: 'World',
+    GeneratorFuelConsumption: 'World',
+    LightSwitches: 'World',
 
-    // Loot & Resources
-    LootRespawn: {
-        type: 'enum',
-        group: 'Loot & Resources',
-        description: 'Frequency of loot respawning.',
-        default: 1,
-        options: [
-            { value: '1', label: 'None' },
-            { value: '2', label: 'Every Day' },
-            { value: '3', label: 'Every Week' },
-            { value: '4', label: 'Every Month' },
-            { value: '5', label: 'Every 2 Months' },
-        ],
-    },
-    NatureAbundance: {
-        type: 'enum',
-        group: 'Loot & Resources',
-        description: 'Abundance of foraging, fishing, and trapping.',
-        default: 3,
-        options: [
-            { value: '1', label: 'Very Poor' },
-            { value: '2', label: 'Poor' },
-            { value: '3', label: 'Normal' },
-            { value: '4', label: 'Abundant' },
-            { value: '5', label: 'Very Abundant' },
-        ],
-    },
-    Farming: {
-        type: 'enum',
-        group: 'Loot & Resources',
-        description: 'Speed of farming growth.',
-        default: 2,
-        options: [
-            { value: '1', label: 'Very Fast' },
-            { value: '2', label: 'Fast' },
-            { value: '3', label: 'Normal' },
-            { value: '4', label: 'Slow' },
-            { value: '5', label: 'Very Slow' },
-        ],
-    },
-    Alarm: {
-        type: 'enum',
-        group: 'Loot & Resources',
-        description: 'Frequency of house alarms triggering.',
-        default: 6,
-        options: [
-            { value: '1', label: 'Never' },
-            { value: '2', label: 'Extremely Rare' },
-            { value: '3', label: 'Rare' },
-            { value: '4', label: 'Sometimes' },
-            { value: '5', label: 'Often' },
-            { value: '6', label: 'Very Often' },
-        ],
-    },
-    LockedHouses: {
-        type: 'enum',
-        group: 'Loot & Resources',
-        description: 'Frequency of houses being locked.',
-        default: 6,
-        options: [
-            { value: '1', label: 'Never' },
-            { value: '2', label: 'Extremely Rare' },
-            { value: '3', label: 'Rare' },
-            { value: '4', label: 'Sometimes' },
-            { value: '5', label: 'Often' },
-            { value: '6', label: 'Very Often' },
-        ],
-    },
+    // Building
+    BarricadeBoardingHealth: 'Building',
+    WoodWallHealth: 'Building',
+    MetalWallHealth: 'Building',
 
-    // Gameplay
-    Zombies: {
+    // Corpses & Gore
+    CorpseRemovalTime: 'Corpses & Gore',
+    DecayingCorpseHealthImpact: 'Corpses & Gore',
+    BloodLevel: 'Corpses & Gore',
+    ClothingDegradation: 'Corpses & Gore',
+
+    // Multipliers
+    XpMultiplier: 'Multipliers',
+    HealthMultiplier: 'Multipliers',
+    DamageMultiplier: 'Multipliers',
+};
+
+/**
+ * Stable display order for sandbox categories. Anything not listed
+ * gets appended after this list (eg vanilla nested groups picked up
+ * via `VANILLA_NESTED_LABELS`, or the "Other" catch-all).
+ */
+export const SANDBOX_CATEGORY_ORDER: string[] = [
+    'Zombie Lore',
+    'Zombie Population',
+    'Time & Climate',
+    'Loot',
+    'World',
+    'Survival',
+    'Building',
+    'Corpses & Gore',
+    'Multipliers',
+];
+
+/**
+ * Returns the category a sandbox key belongs to. Looks up an explicit
+ * mapping first; falls through to a few regex heuristics so keys we
+ * haven't enumerated still land somewhere sensible.
+ */
+export function inferSandboxCategory(key: string): string {
+    if (SANDBOX_CATEGORY_MAP[key]) {
+        return SANDBOX_CATEGORY_MAP[key];
+    }
+    if (/Zomb|Reanim|Crawler|Sprint|Shamb/i.test(key)) {
+        return 'Zombie Lore';
+    }
+    if (/Population|Respawn|Redistribute/i.test(key)) {
+        return 'Zombie Population';
+    }
+    if (/Loot|Item|Distribution/i.test(key)) {
+        return 'Loot';
+    }
+    if (/Multiplier|XP|Xp/.test(key)) {
+        return 'Multipliers';
+    }
+    if (/Wall|Barricade|Construction|Building/i.test(key)) {
+        return 'Building';
+    }
+    if (/Corpse|Blood|Decay|Wound/i.test(key)) {
+        return 'Corpses & Gore';
+    }
+    if (/Rain|Snow|Erosion|Time|Year|Month|Day|Temperature/i.test(key)) {
+        return 'Time & Climate';
+    }
+    if (/Electric|Water|Generator|Alarm|Light/i.test(key)) {
+        return 'World';
+    }
+    return 'Other';
+}
+
+/**
+ * Vanilla nested namespaces inside `SandboxVars` that PZ itself ships.
+ * These are not mods — they're sub-tables in the engine's SandboxVars
+ * structure (Basement, Map, ZombieLore, ...). Any sandbox namespace that
+ * is NOT in this whitelist gets surfaced under the "Mod Settings" tab.
+ * Add new entries here when PZ introduces additional vanilla sub-tables.
+ */
+export const VANILLA_NESTED_LABELS: Record<string, string> = {
+    Basement: 'Basements',
+    Map: 'World Map',
+    ZombieLore: 'Zombie Lore',
+    ZombieConfig: 'Zombie Population',
+    MultiplierConfig: 'Multipliers',
+    BarricadedWorld: 'Barricaded World',
+    // ZuperCarts, ReadWalking, CommonSense, FWOFitness, SOTO, ... = mods,
+    // *intentionally* not listed.
+};
+
+/**
+ * Shape of a single field's catalog entry produced by
+ * `php artisan zomboid:sync-config-catalog` (parsed from
+ * `<NAME>_SandboxVars.lua` comments).
+ */
+export type CatalogEntry = {
+    type?: 'boolean' | 'number' | 'string' | 'enum';
+    /** Human-readable name harvested from mod's `Sandbox_<LANG>.txt`. */
+    label?: string;
+    description?: string;
+    default?: boolean | number | string;
+    default_label?: string;
+    min?: number;
+    max?: number;
+    /** Set by the server-ini parser when the field accepts decimals. */
+    float?: boolean;
+    options?: { value: number; label: string }[];
+};
+
+/**
+ * Merge backend-supplied catalog metadata onto the hard-coded `SettingMeta`
+ * map. The hard-coded `type` and `group` stay authoritative (they drive UI
+ * dispatching and section placement); the catalog enriches description,
+ * min/max, default, and enum labels with values harvested directly from
+ * PZ-generated SandboxVars comments.
+ */
+export function mergeCatalog(
+    meta: Record<string, SettingMeta>,
+    catalog: Record<string, CatalogEntry> | undefined | null,
+): Record<string, SettingMeta> {
+    if (!catalog) return meta;
+
+    const merged: Record<string, SettingMeta> = { ...meta };
+
+    for (const [key, entry] of Object.entries(catalog)) {
+        const existing = meta[key];
+
+        if (existing) {
+            const next: SettingMeta = { ...existing };
+            if (entry.label) next.label = entry.label;
+            if (entry.description) next.description = entry.description;
+            if (typeof entry.default !== 'undefined') next.default = entry.default;
+            if (typeof entry.min === 'number') next.min = entry.min;
+            if (typeof entry.max === 'number') next.max = entry.max;
+            if (entry.float) next.float = true;
+            if (entry.options && entry.options.length > 0) {
+                next.options = entry.options.map((o) => ({
+                    value: String(o.value),
+                    label: o.label,
+                }));
+            }
+            merged[key] = next;
+            continue;
+        }
+
+        // Catalog-only key — synthesise from catalog. Leave `group`
+        // undefined so the caller's `inferGroup` callback can place it
+        // in the right tab.
+        const type: SettingMeta['type'] = entry.type === 'enum' ? 'enum'
+            : entry.type === 'boolean' ? 'boolean'
+            : entry.type === 'number' ? 'number'
+            : 'string';
+        merged[key] = {
+            type,
+            label: entry.label,
+            description: entry.description ?? '',
+            default: entry.default,
+            min: entry.min,
+            max: entry.max,
+            float: entry.float,
+            options: entry.options && entry.options.length > 0
+                ? entry.options.map((o) => ({ value: String(o.value), label: o.label }))
+                : undefined,
+        };
+    }
+
+    return merged;
+}
+
+// ── Server.ini overrides ────────────────────────────────────────────
+//
+// Type/description/min/max/default for server.ini fields now come from
+// the catalog (`storage/app/private/config-catalog/catalog.json`, built
+// by `php artisan zomboid:sync-config-catalog` from the live
+// `<NAME>.ini` template PZ writes after first boot). This map only
+// carries things the catalog can't know: which fields are secrets,
+// and which are owned by another page (Mods/WorkshopItems live on the
+// Mods admin page).
+export const SERVER_INI_META: Record<string, SettingMeta> = {
+    Password: { type: 'string', sensitive: true },
+    AdminPassword: { type: 'string', sensitive: true },
+    RCONPassword: { type: 'string', sensitive: true },
+    DiscordToken: { type: 'string', sensitive: true },
+    Mods: { type: 'list', readOnly: true },
+    WorkshopItems: { type: 'list', readOnly: true },
+    // PZ stores `MapRemotePlayerVisibility` as a numeric code (1-4) but
+    // the in-game UI exposes it as a four-choice dropdown. Force the
+    // enum type here so the dropdown wins over the catalog's `number`
+    // inference; labels mirror the live comment in
+    // `<NAME>.ini`: "1=Hidden 2=Friends 3=Friends and nearby players
+    // 4=Everyone".
+    MapRemotePlayerVisibility: {
         type: 'enum',
-        group: 'Gameplay',
-        description: 'Overall zombie count preset.',
-        default: 4,
         options: [
-            { value: '0', label: 'None' },
-            { value: '1', label: 'Insane' },
-            { value: '2', label: 'Very High' },
-            { value: '3', label: 'High' },
-            { value: '4', label: 'Normal' },
-            { value: '5', label: 'Low' },
+            { value: '1', label: 'Hidden' },
+            { value: '2', label: 'Friends' },
+            { value: '3', label: 'Friends and nearby players' },
+            { value: '4', label: 'Everyone' },
         ],
-    },
-    Distribution: {
-        type: 'enum',
-        group: 'Gameplay',
-        description: 'How zombies are distributed across the map.',
-        default: 1,
-        options: [
-            { value: '1', label: 'Urban Focused' },
-            { value: '2', label: 'Uniform' },
-        ],
-    },
-    XpMultiplier: {
-        type: 'number',
-        group: 'Gameplay',
-        description: 'Experience point gain multiplier.',
-        default: 1.0,
-        min: 0.01,
-        max: 1000,
     },
 };
 
-export const SANDBOX_GROUP_ORDER = [
-    'Zombie Lore',
-    'Zombie Population',
-    'Time & Start',
-    'World',
-    'Loot & Resources',
-    'Gameplay',
-];
+/**
+ * Sandbox overrides — see comment on `SERVER_INI_META`. Sandbox catalog
+ * is comprehensive on its own (every option in `<NAME>_SandboxVars.lua`
+ * carries description, Min/Max/Default, and enum labels), so this map
+ * stays empty until we discover an override we want to force.
+ */
+export const SANDBOX_META: Record<string, SettingMeta> = {};
+
+/** @deprecated Use SERVER_INI_CATEGORY_ORDER + inferServerCategory. */
+export const SERVER_INI_GROUP_ORDER = SERVER_INI_CATEGORY_ORDER;
+
+/** @deprecated Use SANDBOX_CATEGORY_ORDER + inferSandboxCategory. */
+export const SANDBOX_GROUP_ORDER = SANDBOX_CATEGORY_ORDER;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
@@ -602,24 +571,27 @@ export function groupSettings(
     settings: Record<string, string>,
     meta: Record<string, SettingMeta>,
     groupOrder: string[],
+    inferGroup?: (key: string) => string,
 ): { group: string; entries: { key: string; value: string; meta?: SettingMeta }[] }[] {
     const groups = new Map<string, { key: string; value: string; meta?: SettingMeta }[]>();
 
-    // Initialize ordered groups
     for (const g of groupOrder) {
         groups.set(g, []);
     }
 
     for (const [key, value] of Object.entries(settings)) {
         const m = meta[key];
-        const group = m?.group ?? 'Other';
+        // Resolution order: hard-coded `meta.group` -> caller-supplied
+        // inference (eg `inferServerCategory`) -> the catch-all "Other"
+        // bucket. This lets us drop hand-coded `group` fields from
+        // `SERVER_INI_META` and still land every key in the right tab.
+        const group = m?.group ?? inferGroup?.(key) ?? 'Other';
         if (!groups.has(group)) {
             groups.set(group, []);
         }
         groups.get(group)!.push({ key, value, meta: m });
     }
 
-    // Return in order, filtering empty groups
     const result: { group: string; entries: { key: string; value: string; meta?: SettingMeta }[] }[] = [];
     for (const g of groupOrder) {
         const entries = groups.get(g);
@@ -628,10 +600,11 @@ export function groupSettings(
         }
     }
 
-    // Append "Other" at the end if it has entries
-    const other = groups.get('Other');
-    if (other && other.length > 0) {
-        result.push({ group: 'Other', entries: other });
+    // Append any groups that landed outside the explicit order (eg "Other",
+    // or a fallback from `inferGroup` that the caller didn't list).
+    for (const [g, entries] of groups) {
+        if (groupOrder.includes(g) || entries.length === 0) continue;
+        result.push({ group: g, entries });
     }
 
     return result;

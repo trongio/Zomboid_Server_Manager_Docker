@@ -30,19 +30,20 @@ class SecurityHeaders
         $styleSrc = "'self' 'unsafe-inline' https://fonts.bunny.net";
         $fontSrc = "'self' https://fonts.bunny.net";
         // Workshop preview thumbnails come from Steam's user-content and static CDNs.
-        $imgSrc = "'self' data: https://*.steamusercontent.com https://*.steamstatic.com";
+        // Map tile DZI sources: map.projectzomboid.com (v41), b42map.com (v42).
+        $imgSrc = "'self' data: https://*.steamusercontent.com https://*.steamstatic.com https://map.projectzomboid.com https://b42map.com";
 
         if ($isLocal) {
             $scriptSrc .= " 'unsafe-eval'";
             $connectSrc .= ' ws://localhost:5173 http://localhost:5173';
         }
 
-        // Allow map tile images from the configured proxy (e.g. map.projectzomboid.com)
+        // Дополнительные DZI source'ы из конфига, если заданы.
         $mapProxyUrl = config('zomboid.map.proxy_url', '');
         if ($mapProxyUrl) {
             $scheme = parse_url($mapProxyUrl, PHP_URL_SCHEME);
             $host = parse_url($mapProxyUrl, PHP_URL_HOST);
-            if ($scheme && $host) {
+            if ($scheme && $host && ! str_contains($imgSrc, "{$scheme}://{$host}")) {
                 $imgSrc .= " {$scheme}://{$host}";
             }
         }

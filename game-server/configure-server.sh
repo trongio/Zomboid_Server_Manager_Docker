@@ -356,4 +356,9 @@ echo "  MaxPlayers: $(grep '^MaxPlayers=' "$INI_FILE" | sed 's/^MaxPlayers=//')"
 echo "  Public: $(grep '^Public=' "$INI_FILE" | sed 's/^Public=//')"
 echo "  Mods: $(grep '^Mods=' "$INI_FILE" | sed 's/^Mods=//')"
 echo "  WorkshopItems: $(grep '^WorkshopItems=' "$INI_FILE" | sed 's/^WorkshopItems=//')"
+# Mark the settings catalog as dirty so the scheduled
+# `zomboid:sync-config-catalog` task in the app container picks up any new
+# mod namespaces PZ added to `<NAME>_SandboxVars.lua` after this restart.
+touch "$INI_DIR/.settings_catalog_dirty" 2>/dev/null || true
+
 echo "[configure-server] Done."

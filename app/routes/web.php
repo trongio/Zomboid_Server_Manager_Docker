@@ -52,8 +52,45 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
         Route::post('players/{username}/inventory/remove', [Admin\InventoryController::class, 'removeItem'])->name('players.inventory.remove');
         Route::get('players/{username}/inventory/status', [Admin\InventoryController::class, 'deliveryStatus'])->name('players.inventory.status');
 
-        // Map Tiles
-        Route::get('map-tiles/{level}/{tile}', [Admin\PlayerMapController::class, 'tile'])->name('map.tile')->where('tile', '.*');
+        // Map Tiles — Leaflet pulls dozens of tiles per viewport, override the
+        // shared 60/min admin throttle with a much higher per-second limit so a
+        // pan/zoom burst doesn't trip a 429.
+        Route::get('map-tiles/{level}/{tile}', [Admin\PlayerMapController::class, 'tile'])
+            ->name('map.tile')
+            ->where('tile', '.*')
+            ->withoutMiddleware('throttle:admin')
+            ->middleware('throttle:600,1');
+
+        // WebGL renderer data API — sprite atlas (served by nginx alias for atlas/sprites,
+        // PHP only handles cell binary lookup which needs traversal protection).
+        // Cell endpoints get their own high-rate throttle: a single canvas tile
+        // fans out to ~10-20 cells × 2 binaries, and a fresh 5×5 viewport easily
+        // bursts 500+ requests in the first second. The shared 60/min admin
+        // limiter would 429 on the first pan. Browser cache (max-age=300/3600)
+        // absorbs repeated requests, so this limiter only catches the initial
+        // burst and a few cache misses per pan.
+        Route::prefix('api/pz-map')->name('api.pz-map.')->group(function () {
+            Route::get('manifest.json', [Admin\PzMapDataController::class, 'manifest'])->name('manifest');
+            Route::get('cells.json', [Admin\PzMapDataController::class, 'cellsManifest'])->name('cells');
+            Route::get('sprites.json', [Admin\PzMapDataController::class, 'spritesIndex'])->name('sprites');
+            Route::get('atlas/{page}.webp', [Admin\PzMapDataController::class, 'atlas'])->name('atlas')->where('page', '[A-Za-z0-9_.-]+');
+
+            Route::middleware(['throttle:1200,1'])->withoutMiddleware('throttle:admin')->group(function () {
+                Route::get('cell/{x}/{y}/header', [Admin\PzMapDataController::class, 'cellHeader'])->name('cell.header')->where(['x' => '\d+', 'y' => '\d+']);
+                Route::get('cell/{x}/{y}/lotpack', [Admin\PzMapDataController::class, 'cellLotpack'])->name('cell.lotpack')->where(['x' => '\d+', 'y' => '\d+']);
+                Route::get('cell/{x}/{y}/save', [Admin\PzMapDataController::class, 'saveCellData'])->name('cell.save')->where(['x' => '\d+', 'y' => '\d+']);
+                Route::get('cells/bulk', [Admin\PzMapDataController::class, 'cellsBulk'])->name('cells.bulk');
+                Route::get('save/noise-prefixes', [Admin\PzSaveFilterController::class, 'show'])->name('save.noise.show');
+                Route::post('save/noise-prefixes', [Admin\PzSaveFilterController::class, 'update'])->name('save.noise.update');
+            });
+        });
+
+        // Map Render schedule + quality (non-destructive)
+        Route::put('map/render/schedule', [Admin\MapRenderController::class, 'updateSchedule'])->name('map.render.schedule.update');
+        Route::put('map/render/quality', [Admin\MapRenderController::class, 'updateQuality'])->name('map.render.quality.update');
+        Route::get('map/render/atlas-status', [Admin\MapRenderController::class, 'atlasStatus'])->name('map.render.atlas.status');
+        Route::post('map/render/atlas/build', [Admin\MapRenderController::class, 'buildAtlas'])->name('map.render.atlas.build');
+        Route::post('map/render/atlas/build/cancel', [Admin\MapRenderController::class, 'cancelBuildAtlas'])->name('map.render.atlas.build.cancel');
 
         // Config
         Route::get('config', [Admin\ConfigController::class, 'index'])->name('config');
@@ -191,6 +228,18 @@ Route::middleware(['auth', 'admin', 'throttle:admin'])->group(function () {
             Route::post('server/restart', [Admin\ServerController::class, 'restart'])->name('server.restart');
             Route::post('server/save', [Admin\ServerController::class, 'save'])->name('server.save');
             Route::post('server/update', [Admin\ServerController::class, 'update'])->name('server.update');
+
+            // Map render engine
+            Route::post('map/render/engine/enable', [Admin\MapRenderController::class, 'enableEngine'])->name('map.render.engine.enable');
+            Route::post('map/render/engine/disable', [Admin\MapRenderController::class, 'disableEngine'])->name('map.render.engine.disable');
+            Route::post('map/render/start', [Admin\MapRenderController::class, 'startRender'])->name('map.render.start');
+            Route::post('map/render/cancel', [Admin\MapRenderController::class, 'cancelRender'])->name('map.render.cancel');
+            Route::post('map/render/pause', [Admin\MapRenderController::class, 'pauseRender'])->name('map.render.pause');
+            Route::post('map/render/resume', [Admin\MapRenderController::class, 'resumeRender'])->name('map.render.resume');
+            Route::post('map/render/texturepacks', [Admin\MapRenderController::class, 'uploadTexturepacks'])->name('map.render.texturepacks.upload');
+            Route::delete('map/render/texturepacks', [Admin\MapRenderController::class, 'deleteTexturepacks'])->name('map.render.texturepacks.delete');
+            Route::put('map/render/atlas-url', [Admin\MapRenderController::class, 'updateAtlasUrl'])->name('map.render.atlas.url.update');
+            Route::post('map/render/atlas/download', [Admin\MapRenderController::class, 'downloadAtlas'])->name('map.render.atlas.download');
         });
 
         // Destructive actions — very strict rate limit

@@ -43,11 +43,11 @@ class ModController
         }
 
         $workshopId = $request->validated('workshop_id');
-        $modId = $request->validated('mod_id');
+        $modIds = $request->validated('mod_ids');
         $mapFolder = $request->validated('map_folder');
 
         try {
-            $this->modManager->add($path, $workshopId, $modId, $mapFolder);
+            $this->modManager->add($path, $workshopId, $modIds, $mapFolder);
         } catch (RuntimeException $e) {
             Log::error('Failed to add mod', ['exception' => $e, 'workshop_id' => $workshopId]);
 
@@ -62,14 +62,14 @@ class ModController
             target: $workshopId,
             details: [
                 'workshop_id' => $workshopId,
-                'mod_id' => $modId,
+                'mod_ids' => $modIds,
                 'map_folder' => $mapFolder,
             ],
             ip: $request->ip(),
         );
 
         return response()->json([
-            'added' => ['workshop_id' => $workshopId, 'mod_id' => $modId],
+            'added' => ['workshop_id' => $workshopId, 'mod_ids' => $modIds],
             'restart_required' => true,
         ]);
     }
@@ -90,8 +90,11 @@ class ModController
             ], 422);
         }
 
+        $modId = request()->query('mod_id');
+        $modId = is_string($modId) && $modId !== '' ? $modId : null;
+
         try {
-            $removed = $this->modManager->remove($path, $workshopId);
+            $removed = $this->modManager->remove($path, $workshopId, $modId);
         } catch (RuntimeException $e) {
             Log::error('Failed to remove mod', ['exception' => $e, 'workshop_id' => $workshopId]);
 

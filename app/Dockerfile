@@ -8,6 +8,7 @@ RUN apk add --no-cache \
     libpq-dev \
     postgresql16-client \
     sqlite-dev \
+    libzip-dev \
     linux-headers \
     nodejs \
     npm \
@@ -21,7 +22,8 @@ RUN docker-php-ext-install \
     pdo_sqlite \
     sockets \
     pcntl \
-    opcache
+    opcache \
+    zip
 
 # Install Redis extension
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
@@ -38,10 +40,11 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 
-# Install pzmap2dzi for map tile generation (pyclipper needs C++ compiler)
+# Install pzmap2dzi for map tile generation (pyclipper needs C++ compiler).
+# kaitaistruct нужен для pzdataspec (B42 save .bin parsing в rebuild_save_cache.py).
 RUN apk add --no-cache --virtual .pzmap-build-deps g++ python3-dev \
     && git clone --depth 1 https://github.com/cff29546/pzmap2dzi.git /opt/pzmap2dzi \
-    && pip3 install --break-system-packages lupa pyclipper pillow pyyaml ruamel.yaml \
+    && pip3 install --break-system-packages lupa pyclipper pillow pyyaml ruamel.yaml requests rectpack kaitaistruct \
     && apk del .pzmap-build-deps
 
 # Copy package files and install + build frontend
@@ -69,8 +72,9 @@ RUN APP_KEY=base64:dGVtcG9yYXJ5LWJ1aWxkLWtleS1mb3ItZG9ja2VyMTIzNA== \
 RUN chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
 
-# Nginx configuration
-COPY docker/nginx.conf /etc/nginx/http.d/default.conf
+# Nginx configuration — copied as a template so the entrypoint can substitute
+# runtime env vars (map name, server name) before nginx starts.
+COPY docker/nginx.conf /etc/nginx/http.d/default.conf.template
 
 # Supervisor configuration
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

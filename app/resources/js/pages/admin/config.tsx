@@ -1,10 +1,11 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, Download, Eye, EyeOff, Loader2, Save, Search, Timer, Upload } from 'lucide-react';
+import { Download, Eye, EyeOff, Loader2, RotateCcw, Save, Search, Timer, Upload } from 'lucide-react';
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { ImportConfigDialog } from '@/components/import-config-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
     Dialog,
     DialogContent,
@@ -17,18 +18,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from '@/hooks/use-translation';
 import AppLayout from '@/layouts/app-layout';
 import {
     groupSettings,
-    SANDBOX_GROUP_ORDER,
+    humaniseKey,
+    inferSandboxCategory,
+    inferServerCategory,
+    mergeCatalog,
+    SANDBOX_CATEGORY_ORDER,
     SANDBOX_META,
-    SERVER_INI_GROUP_ORDER,
-    SERVER_INI_META
-    
+    SERVER_INI_CATEGORY_ORDER,
+    SERVER_INI_META,
+    VANILLA_NESTED_LABELS,
+
 } from '@/lib/config-metadata';
-import type {SettingMeta} from '@/lib/config-metadata';
-import { ImportConfigDialog } from '@/components/import-config-dialog';
+import type {CatalogEntry, SettingMeta} from '@/lib/config-metadata';
 import { fetchAction } from '@/lib/fetch-action';
 import type { BreadcrumbItem } from '@/types';
 
@@ -41,6 +47,16 @@ type ConfigProps = {
     server_config: Record<string, string>;
     sandbox_config: Record<string, unknown>;
     respawn_delay: RespawnDelayConfig;
+    /**
+     * Settings catalog produced by `php artisan zomboid:sync-config-catalog`
+     * from the PZ-generated SandboxVars comments. Enriches descriptions /
+     * min / max / default / enum labels on top of the hard-coded metadata.
+     */
+    catalog?: {
+        server?: Record<string, CatalogEntry>;
+        sandbox?: Record<string, CatalogEntry>;
+        mods?: Record<string, { label: string; options: Record<string, CatalogEntry> }>;
+    };
 };
 
 const COUNTDOWN_OPTIONS = [
@@ -61,11 +77,13 @@ function PasswordInput({
     value,
     onChange,
     className,
+    disabled = false,
 }: {
     id: string;
     value: string;
     onChange: (value: string) => void;
     className?: string;
+    disabled?: boolean;
 }) {
     const [visible, setVisible] = useState(false);
 
@@ -77,12 +95,14 @@ function PasswordInput({
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 className={className}
+                disabled={disabled}
             />
             <button
                 type="button"
                 onClick={() => setVisible(!visible)}
                 className="absolute top-1/2 right-2.5 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 tabIndex={-1}
+                disabled={disabled}
             >
                 {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -92,31 +112,141 @@ function PasswordInput({
 
 // ── Smart input renderer ────────────────────────────────────────────
 
+/**
+ * Native range slider + compact number input. Drags update a local
+ * draft so the parent doesn't mark the field dirty mid-drag — that
+ * would expand the sticky "save" footer and shift the slider out
+ * from under the cursor, dropping the pointer capture. The committed
+ * value is sent on release / Enter / blur instead.
+ */
+function RangeSliderInput({
+    id,
+    value,
+    min,
+    max,
+    step,
+    onChange,
+    disabled,
+    className,
+    settingKey,
+}: {
+    id: string;
+    value: string;
+    min: number;
+    max: number;
+    step: string;
+    onChange: (value: string) => void;
+    disabled: boolean;
+    className: string;
+    settingKey: string;
+}) {
+    const [draft, setDraft] = useState(value);
+
+    useEffect(() => {
+        setDraft(value);
+    }, [value]);
+
+    const commit = (next: string) => {
+        if (next !== value) {
+            onChange(next);
+        }
+    };
+
+    const numericDraft = Number(draft);
+    const sliderValue = Number.isFinite(numericDraft) ? numericDraft : min;
+
+    return (
+        <div className="flex items-center gap-3">
+            <input
+                id={id}
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={sliderValue}
+                onChange={(e) => setDraft(e.target.value)}
+                onPointerUp={(e) => commit((e.target as HTMLInputElement).value)}
+                onKeyUp={(e) => commit((e.target as HTMLInputElement).value)}
+                onBlur={(e) => commit(e.target.value)}
+                className={`h-2 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+                disabled={disabled}
+            />
+            <Input
+                type="number"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onBlur={(e) => commit(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        commit((e.target as HTMLInputElement).value);
+                    }
+                }}
+                min={min}
+                max={max}
+                step={step}
+                className={`w-24 text-right tabular-nums ${className}`}
+                disabled={disabled}
+                aria-label={settingKey}
+            />
+        </div>
+    );
+}
+
 function SettingInput({
     settingKey,
     value,
     meta,
     isDirty,
     onChange,
+    disabled = false,
+    disabledReason,
+    onRestoreDefault,
 }: {
     settingKey: string;
     value: string;
     meta?: SettingMeta;
     isDirty: boolean;
     onChange: (value: string) => void;
+    disabled?: boolean;
+    disabledReason?: string;
+    onRestoreDefault?: () => void;
 }) {
     const { t } = useTranslation();
     const inputId = `cfg-${settingKey}`;
     const dirtyClass = isDirty ? 'border-blue-500' : '';
 
+    const restoreButton = isDirty && onRestoreDefault && !disabled ? (
+        <button
+            type="button"
+            onClick={onRestoreDefault}
+            title={t('admin.config.restore_default_tooltip')}
+            aria-label={t('admin.config.restore_default_tooltip')}
+            className="ml-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            data-testid={`restore-default-${settingKey}`}
+        >
+            <RotateCcw className="size-3.5" />
+        </button>
+    ) : null;
+
+    const wrap = (node: ReactNode) =>
+        restoreButton ? (
+            <div className="flex items-center" title={disabled ? disabledReason : undefined}>
+                <div className="flex-1">{node}</div>
+                {restoreButton}
+            </div>
+        ) : (
+            <div title={disabled ? disabledReason : undefined}>{node}</div>
+        );
+
     if (!meta) {
-        return (
+        return wrap(
             <Input
                 id={inputId}
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 className={dirtyClass}
-            />
+                disabled={disabled}
+            />,
         );
     }
 
@@ -141,27 +271,36 @@ function SettingInput({
     }
 
     if (meta.sensitive) {
-        return <PasswordInput id={inputId} value={value} onChange={onChange} className={dirtyClass} />;
+        return wrap(
+            <PasswordInput
+                id={inputId}
+                value={value}
+                onChange={onChange}
+                className={dirtyClass}
+                disabled={disabled}
+            />,
+        );
     }
 
     if (meta.type === 'boolean') {
-        return (
+        return wrap(
             <div className="flex items-center gap-2">
                 <Switch
                     id={inputId}
                     checked={value === 'true'}
                     onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')}
+                    disabled={disabled}
                 />
                 <Label htmlFor={inputId} className="cursor-pointer text-sm font-normal">
                     {value === 'true' ? t('common.enabled') : t('common.disabled')}
                 </Label>
-            </div>
+            </div>,
         );
     }
 
     if (meta.type === 'enum' && meta.options) {
-        return (
-            <Select value={value} onValueChange={onChange}>
+        return wrap(
+            <Select value={value} onValueChange={onChange} disabled={disabled}>
                 <SelectTrigger id={inputId} className={dirtyClass}>
                     <SelectValue />
                 </SelectTrigger>
@@ -172,12 +311,50 @@ function SettingInput({
                         </SelectItem>
                     ))}
                 </SelectContent>
-            </Select>
+            </Select>,
         );
     }
 
     if (meta.type === 'number') {
-        return (
+        // Use 0.1 only when the catalog explicitly marks the field as
+        // float (the server-ini parser sets this when Min/Max/Default
+        // or the current value contained a decimal). Everything else
+        // gets the integer step — PZ's int fields refuse decimals.
+        const step = meta.float ? '0.1' : '1';
+        // Show a slider only when the range is small enough to scrub
+        // meaningfully. PZ uses `Max: 2147483647` (int32 max) as a
+        // sentinel for "no upper bound" on dozens of fields, port
+        // fields use Min:0/Max:65535, and even "small" PZ ranges like
+        // 0-1000 (cooldown timers) are too wide to click-target
+        // accurately. 200 keeps sliders for the cases they're
+        // actually useful for — percentages, player counts, hour
+        // limits, multiplier 0-100.
+        const SLIDER_MAX_RANGE = 200;
+        const hasRange = typeof meta.min === 'number'
+            && typeof meta.max === 'number'
+            && meta.max - meta.min <= SLIDER_MAX_RANGE;
+
+        // Render a native range slider with a compact text box on the
+        // right when we know the field's bounds (catalog `Min:`/`Max:`
+        // hints). Fall back to a plain number input for unbounded
+        // values so users can still type freely.
+        if (hasRange) {
+            return wrap(
+                <RangeSliderInput
+                    id={inputId}
+                    value={value}
+                    min={meta.min as number}
+                    max={meta.max as number}
+                    step={step}
+                    onChange={onChange}
+                    disabled={disabled}
+                    className={dirtyClass}
+                    settingKey={settingKey}
+                />,
+            );
+        }
+
+        return wrap(
             <Input
                 id={inputId}
                 type="number"
@@ -185,19 +362,21 @@ function SettingInput({
                 onChange={(e) => onChange(e.target.value)}
                 min={meta.min}
                 max={meta.max}
-                step={Number(value) % 1 !== 0 ? '0.1' : '1'}
+                step={step}
                 className={dirtyClass}
-            />
+                disabled={disabled}
+            />,
         );
     }
 
-    return (
+    return wrap(
         <Input
             id={inputId}
             value={value}
             onChange={(e) => onChange(e.target.value)}
             className={dirtyClass}
-        />
+            disabled={disabled}
+        />,
     );
 }
 
@@ -216,23 +395,65 @@ type ConfigSectionProps = {
     search: string;
     onSave: (settings: Record<string, string>) => Promise<boolean>;
     onDirtyChange: (count: number) => void;
+    /**
+     * Optional predicate restricting which `meta.group` values are visible.
+     * The section still owns every field's value + dirty state internally,
+     * so saves carry edits from outside the current filter (handy when the
+     * page splits the same logical section across multiple tabs).
+     */
+    groupFilter?: (group: string) => boolean;
+    /**
+     * Optional fallback that maps an unknown key to its category. Used by
+     * the Server tab to consume our `inferServerCategory()` taxonomy so
+     * that every server.ini key lands in a sensible tab without each one
+     * needing a hand-written `group` field on its SettingMeta.
+     */
+    inferGroup?: (key: string) => string;
+    /**
+     * Hide the section without unmounting (preserves internal state across
+     * tab switches). When false, the section renders nothing.
+     */
+    visible?: boolean;
+    /**
+     * Suppress the duplicate section title/description when the surrounding
+     * tab already provides a header.
+     */
+    hideHeader?: boolean;
 };
 
 const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(function ConfigSection(
-    { title, description, config, meta, groupOrder, search, onSave, onDirtyChange },
+    {
+        title,
+        description,
+        config,
+        meta,
+        groupOrder,
+        search,
+        onSave,
+        onDirtyChange,
+        groupFilter,
+        inferGroup,
+        visible = true,
+        hideHeader = false,
+    },
     ref,
 ) {
     const { t } = useTranslation();
     const [values, setValues] = useState<Record<string, string>>(config);
     const [dirty, setDirty] = useState<Set<string>>(new Set());
-    const [openGroups, setOpenGroups] = useState<Set<string>>(new Set(groupOrder));
+    const [activeSubTab, setActiveSubTab] = useState<string | null>(null);
 
-    const groups = useMemo(() => groupSettings(values, meta, groupOrder), [values, meta, groupOrder]);
+    const groups = useMemo(
+        () => groupSettings(values, meta, groupOrder, inferGroup),
+        [values, meta, groupOrder, inferGroup],
+    );
 
     const filteredGroups = useMemo(() => {
-        if (!search) return groups;
+        const passesGroup = (g: { group: string }) => (groupFilter ? groupFilter(g.group) : true);
+        if (!search) return groups.filter(passesGroup);
         const q = search.toLowerCase();
         return groups
+            .filter(passesGroup)
             .map((g) => ({
                 ...g,
                 entries: g.entries.filter(
@@ -242,7 +463,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
                 ),
             }))
             .filter((g) => g.entries.length > 0);
-    }, [groups, search]);
+    }, [groups, search, groupFilter]);
 
     useEffect(() => {
         onDirtyChange(dirty.size);
@@ -276,19 +497,24 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
 
     useImperativeHandle(ref, () => ({ save: handleSave }));
 
-    function toggleGroup(group: string) {
-        setOpenGroups((prev) => {
-            const next = new Set(prev);
-            if (next.has(group)) {
-                next.delete(group);
-            } else {
-                next.add(group);
-            }
-            return next;
-        });
-    }
+    // Pick the first visible group as the active sub-tab. Keeps the
+    // selection stable as long as it's still in `filteredGroups`; falls
+    // back to the first group when the previous selection got filtered
+    // out (eg. after typing in the search box).
+    const activeGroup = useMemo(() => {
+        if (filteredGroups.length === 0) return null;
+        const stillVisible = filteredGroups.some((g: { group: string }) => g.group === activeSubTab);
+        return stillVisible ? activeSubTab : filteredGroups[0].group;
+    }, [filteredGroups, activeSubTab]);
+
+    useEffect(() => {
+        if (activeGroup && activeGroup !== activeSubTab) {
+            setActiveSubTab(activeGroup);
+        }
+    }, [activeGroup, activeSubTab]);
 
     if (Object.keys(config).length === 0) {
+        if (!visible) return null;
         return (
             <div className="rounded-lg border p-8 text-center text-muted-foreground">
                 <p className="text-sm">{t('admin.config.config_not_available', { title })}</p>
@@ -297,57 +523,95 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
     }
 
     return (
-        <div className="space-y-3">
-            <div>
-                <h2 className="text-lg font-semibold">{title}</h2>
-                <p className="text-sm text-muted-foreground">{description}</p>
-            </div>
+        <div className="space-y-3" hidden={!visible}>
+            {!hideHeader && (
+                <div>
+                    <h2 className="text-lg font-semibold">{title}</h2>
+                    <p className="text-sm text-muted-foreground">{description}</p>
+                </div>
+            )}
 
-            {filteredGroups.map(({ group, entries }) => (
-                <Collapsible key={group} open={openGroups.has(group)} onOpenChange={() => toggleGroup(group)}>
-                    <CollapsibleTrigger className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-3 text-left hover:bg-accent/50 transition-colors">
-                        <div className="flex items-center gap-2">
-                            <span className="font-medium">{group}</span>
-                            <Badge variant="secondary" className="text-xs">
+            <Tabs value={activeGroup ?? ''} onValueChange={setActiveSubTab}>
+                <TabsList className="h-auto flex-wrap justify-start gap-1 bg-transparent p-0">
+                    {filteredGroups.map(({ group, entries }) => (
+                        <TabsTrigger
+                            key={group}
+                            value={group}
+                            className="h-7 gap-1.5 rounded-md border border-transparent bg-muted px-2.5 text-xs font-normal data-[state=active]:border-border data-[state=active]:bg-background"
+                        >
+                            <span>{group}</span>
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0">
                                 {entries.length}
                             </Badge>
-                        </div>
-                        <ChevronDown
-                            className={`size-4 text-muted-foreground transition-transform ${
-                                openGroups.has(group) ? 'rotate-180' : ''
-                            }`}
-                        />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                        <div className="mt-1 rounded-lg border bg-card p-4">
+                        </TabsTrigger>
+                    ))}
+                </TabsList>
+                {filteredGroups.map(({ group, entries }) => (
+                    <TabsContent key={group} value={group} className="mt-3">
+                        <div className="rounded-lg border bg-card p-4">
                             <div className="grid gap-5 sm:grid-cols-2">
-                                {entries.map(({ key, value, meta: settingMeta }) => (
-                                    <div key={key} className="space-y-1.5">
-                                        <Label
-                                            htmlFor={`cfg-${key}`}
-                                            className="text-xs font-medium"
-                                        >
-                                            {key}
-                                        </Label>
-                                        <SettingInput
-                                            settingKey={key}
-                                            value={value}
-                                            meta={settingMeta}
-                                            isDirty={dirty.has(key)}
-                                            onChange={(v) => handleChange(key, v)}
-                                        />
-                                        {settingMeta?.description && (
-                                            <p className="text-xs text-muted-foreground">
-                                                {settingMeta.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
+                                {entries.map(({ key, value, meta: settingMeta }) => {
+                                    // Conditional disable: a field with `requires` is only
+                                    // enabled when its referenced sibling currently holds
+                                    // the expected value.
+                                    let isDisabled = false;
+                                    let disabledReason: string | undefined;
+                                    if (settingMeta?.requires) {
+                                        const { key: reqKey, value: reqValue } = settingMeta.requires;
+                                        const current = values[reqKey];
+                                        if (String(current) !== String(reqValue)) {
+                                            isDisabled = true;
+                                            disabledReason = t('admin.config.requires_tooltip', {
+                                                key: reqKey,
+                                                value: String(reqValue),
+                                            });
+                                        }
+                                    }
+
+                                    const hasDefault = typeof settingMeta?.default !== 'undefined';
+                                    const defaultString = hasDefault
+                                        ? String(settingMeta!.default)
+                                        : undefined;
+                                    const restoreToDefault =
+                                        hasDefault && defaultString !== value
+                                            ? () => handleChange(key, defaultString!)
+                                            : undefined;
+
+                                    const displayLabel = settingMeta?.label
+                                        ?? (key.includes('.') ? humaniseKey(key) : key);
+
+                                    return (
+                                        <div key={key} className="space-y-1.5">
+                                            <Label
+                                                htmlFor={`cfg-${key}`}
+                                                className="text-xs font-medium"
+                                                title={settingMeta?.description || key}
+                                            >
+                                                {displayLabel}
+                                            </Label>
+                                            <SettingInput
+                                                settingKey={key}
+                                                value={value}
+                                                meta={settingMeta}
+                                                isDirty={dirty.has(key)}
+                                                onChange={(v) => handleChange(key, v)}
+                                                disabled={isDisabled}
+                                                disabledReason={disabledReason}
+                                                onRestoreDefault={restoreToDefault}
+                                            />
+                                            {settingMeta?.description && (
+                                                <p className="whitespace-pre-line text-xs text-muted-foreground">
+                                                    {settingMeta.description}
+                                                </p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
-                    </CollapsibleContent>
-                </Collapsible>
-            ))}
+                    </TabsContent>
+                ))}
+            </Tabs>
 
             {filteredGroups.length === 0 && search && (
                 <p className="py-4 text-center text-sm text-muted-foreground">
@@ -360,7 +624,7 @@ const ConfigSection = forwardRef<ConfigSectionHandle, ConfigSectionProps>(functi
 
 // ── Main config page ────────────────────────────────────────────────
 
-export default function Config({ server_config, sandbox_config, respawn_delay }: ConfigProps) {
+export default function Config({ server_config, sandbox_config, respawn_delay, catalog }: ConfigProps) {
     const { t } = useTranslation();
     const breadcrumbs: BreadcrumbItem[] = [
         { title: t('nav.dashboard'), href: '/dashboard' },
@@ -370,6 +634,8 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
     const [search, setSearch] = useState('');
     const [serverDirty, setServerDirty] = useState(0);
     const [sandboxDirty, setSandboxDirty] = useState(0);
+    const [modsDirty, setModsDirty] = useState(0);
+    const [activeTab, setActiveTab] = useState<'server' | 'sandbox' | 'mods'>('server');
 
     // Import dialog state
     const [showImportDialog, setShowImportDialog] = useState(false);
@@ -387,8 +653,108 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
 
     const serverRef = useRef<ConfigSectionHandle>(null);
     const sandboxRef = useRef<ConfigSectionHandle>(null);
+    const modsRef = useRef<ConfigSectionHandle>(null);
 
-    const totalDirty = serverDirty + sandboxDirty;
+    // Hydrate hard-coded metadata with PZ-supplied descriptions / min / max
+    // / enum labels. The catalog is regenerated by `zomboid:sync-config-catalog`
+    // every time mods change, so descriptions stay in sync with what the
+    // running game server actually loaded.
+    const serverMeta = useMemo(
+        () => mergeCatalog(SERVER_INI_META, catalog?.server),
+        [catalog?.server],
+    );
+    const sandboxMeta = useMemo(
+        () => {
+            const base = mergeCatalog(SANDBOX_META, catalog?.sandbox);
+
+            // The parser surfaces every nested table inside `SandboxVars` —
+            // both vanilla groups PZ ships (`ZombieLore`, `Basement`, `Map`,
+            // `ZombieConfig`, `MultiplierConfig`, ...) and actual mod
+            // namespaces. We pick the right bucket in two layers:
+            //   1. VANILLA_NESTED_LABELS — an explicit whitelist of known
+            //      vanilla sub-tables that get a friendly group label.
+            //   2. Inferred prefix: if SANDBOX_META already defines any
+            //      `<Namespace>.<Anything>` key, that namespace is vanilla
+            //      and the new option inherits its sibling's group.
+            //   3. Otherwise it's a mod and ends up under "Mod: <Label>".
+            const vanillaPrefixGroup: Record<string, string> = { ...VANILLA_NESTED_LABELS };
+            for (const [k, m] of Object.entries(SANDBOX_META)) {
+                const dot = k.indexOf('.');
+                if (dot > 0 && m.group) {
+                    const prefix = k.slice(0, dot);
+                    if (!vanillaPrefixGroup[prefix]) {
+                        vanillaPrefixGroup[prefix] = m.group;
+                    }
+                }
+            }
+
+            for (const [modKey, modBlock] of Object.entries(catalog?.mods ?? {})) {
+                const vanillaGroup = vanillaPrefixGroup[modKey];
+
+                for (const [optKey, entry] of Object.entries(modBlock.options ?? {})) {
+                    const flatKey = `${modKey}.${optKey}`;
+                    const existing = base[flatKey];
+                    const type: SettingMeta['type'] = entry.type === 'enum' ? 'enum'
+                        : entry.type === 'boolean' ? 'boolean'
+                        : entry.type === 'number' ? 'number'
+                        : 'string';
+
+                    if (existing) {
+                        // Exact match in hard-coded meta — enrich only.
+                        const enriched: SettingMeta = { ...existing };
+                        if (entry.label) enriched.label = entry.label;
+                        if (entry.description) enriched.description = entry.description;
+                        if (typeof entry.default !== 'undefined') enriched.default = entry.default;
+                        if (typeof entry.min === 'number') enriched.min = entry.min;
+                        if (typeof entry.max === 'number') enriched.max = entry.max;
+                        if (entry.options?.length) {
+                            enriched.options = entry.options.map((o) => ({
+                                value: String(o.value),
+                                label: o.label,
+                            }));
+                        }
+                        base[flatKey] = enriched;
+                        continue;
+                    }
+
+                    const group = vanillaGroup ?? `Mod: ${modBlock.label ?? modKey}`;
+                    base[flatKey] = {
+                        type,
+                        group,
+                        label: entry.label,
+                        description: entry.description ?? '',
+                        default: entry.default,
+                        min: entry.min,
+                        max: entry.max,
+                        options: entry.options?.map((o) => ({
+                            value: String(o.value),
+                            label: o.label,
+                        })),
+                    };
+                }
+            }
+
+            return base;
+        },
+        [catalog?.sandbox, catalog?.mods],
+    );
+
+    const totalDirty = serverDirty + sandboxDirty + modsDirty;
+
+    // Pre-compute the list of "Mod: <Label>" groups our sandboxMeta carries.
+    // The Mods tab needs both a count (for the tab badge) and an explicit
+    // group order so collapsibles open in a stable sequence.
+    const { modGroupOrder, modGroupCount } = useMemo(() => {
+        const seen = new Set<string>();
+        const order: string[] = [];
+        for (const m of Object.values(sandboxMeta) as SettingMeta[]) {
+            if (m.group && m.group.startsWith('Mod: ') && !seen.has(m.group)) {
+                seen.add(m.group);
+                order.push(m.group);
+            }
+        }
+        return { modGroupOrder: order, modGroupCount: order.length };
+    }, [sandboxMeta]);
 
     async function saveConfig(url: string, settings: Record<string, string>): Promise<boolean> {
         setSaving(true);
@@ -405,6 +771,7 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
         const results = await Promise.all([
             serverRef.current?.save() ?? Promise.resolve(true),
             sandboxRef.current?.save() ?? Promise.resolve(true),
+            modsRef.current?.save() ?? Promise.resolve(true),
         ]);
         if (results.every(Boolean)) {
             setShowRestartDialog(true);
@@ -487,10 +854,17 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                         <div className="relative w-full sm:w-72">
                             <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
                             <Input
+                                type="search"
                                 placeholder={t('admin.config.search_placeholder')}
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-9"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
+                                name="config-search"
+                                data-form-type="other"
                             />
                         </div>
                     </div>
@@ -556,29 +930,80 @@ export default function Config({ server_config, sandbox_config, respawn_delay }:
                     </CardContent>
                 </Card>
 
-                <ConfigSection
-                    ref={serverRef}
-                    title={t('admin.config.server_settings_title')}
-                    description={t('admin.config.server_settings_description')}
-                    config={server_config}
-                    meta={SERVER_INI_META}
-                    groupOrder={SERVER_INI_GROUP_ORDER}
-                    search={search}
-                    onSave={(settings) => saveConfig('/admin/config/server', settings)}
-                    onDirtyChange={setServerDirty}
-                />
+                {/* Diagnostic: show what the page actually got from the
+                    backend. Visible only while we are stabilising the catalog
+                    pipeline — flip to dev-only when this all settles. */}
+                <div
+                    className="rounded-md border border-dashed bg-muted/30 px-3 py-1.5 font-mono text-[11px] text-muted-foreground"
+                    data-testid="catalog-debug"
+                >
+                    catalog: sandbox={Object.keys(catalog?.sandbox ?? {}).length}{' '}
+                    mods={Object.keys(catalog?.mods ?? {}).length}{' '}
+                    serverMeta={Object.keys(serverMeta).length}{' '}
+                    sandboxMeta={Object.keys(sandboxMeta).length}
+                </div>
 
-                <ConfigSection
-                    ref={sandboxRef}
-                    title={t('admin.config.sandbox_settings_title')}
-                    description={t('admin.config.sandbox_settings_description')}
-                    config={flatSandbox}
-                    meta={SANDBOX_META}
-                    groupOrder={SANDBOX_GROUP_ORDER}
-                    search={search}
-                    onSave={(settings) => saveConfig('/admin/config/sandbox', settings)}
-                    onDirtyChange={setSandboxDirty}
-                />
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                    <TabsList>
+                        <TabsTrigger value="server">{t('admin.config.tab_server')}</TabsTrigger>
+                        <TabsTrigger value="sandbox">{t('admin.config.tab_sandbox')}</TabsTrigger>
+                        <TabsTrigger value="mods">
+                            {t('admin.config.tab_mods')}
+                            <span className="ml-2 rounded bg-muted-foreground/15 px-1.5 py-0.5 text-[10px] font-semibold">
+                                {modGroupCount}
+                            </span>
+                        </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="server">
+                        <ConfigSection
+                            ref={serverRef}
+                            title={t('admin.config.server_settings_title')}
+                            description={t('admin.config.server_settings_description')}
+                            config={server_config}
+                            meta={serverMeta}
+                            groupOrder={SERVER_INI_CATEGORY_ORDER}
+                            inferGroup={inferServerCategory}
+                            search={search}
+                            onSave={(settings) => saveConfig('/admin/config/server', settings)}
+                            onDirtyChange={setServerDirty}
+                            hideHeader
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="sandbox">
+                        <ConfigSection
+                            ref={sandboxRef}
+                            title={t('admin.config.sandbox_settings_title')}
+                            description={t('admin.config.sandbox_settings_description')}
+                            config={flatSandbox}
+                            meta={sandboxMeta}
+                            groupOrder={SANDBOX_CATEGORY_ORDER}
+                            inferGroup={inferSandboxCategory}
+                            search={search}
+                            onSave={(settings) => saveConfig('/admin/config/sandbox', settings)}
+                            onDirtyChange={setSandboxDirty}
+                            groupFilter={(g) => !g.startsWith('Mod: ')}
+                            hideHeader
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="mods">
+                        <ConfigSection
+                            ref={modsRef}
+                            title={t('admin.config.tab_mods')}
+                            description={t('admin.config.mods_tab_description')}
+                            config={flatSandbox}
+                            meta={sandboxMeta}
+                            groupOrder={modGroupOrder}
+                            search={search}
+                            onSave={(settings) => saveConfig('/admin/config/sandbox', settings)}
+                            onDirtyChange={setModsDirty}
+                            groupFilter={(g) => g.startsWith('Mod: ')}
+                            hideHeader
+                        />
+                    </TabsContent>
+                </Tabs>
             </div>
 
             {/* Floating save button */}

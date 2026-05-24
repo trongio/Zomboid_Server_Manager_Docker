@@ -282,11 +282,25 @@ export type PlayerMarker = {
 export type DziInfo = {
     width: number;
     height: number;
+    /** Pixel offset used by Leaflet's CRS (always 0 for local DZI). */
     x0: number;
     y0: number;
+    /**
+     * Real PZ world pixel offset from map_info.json.
+     * Different from x0/y0 because Leaflet's tile URLs require a 0-anchored
+     * image, but cell coordinates need the actual world offset to map back
+     * to the correct (cellX, cellY) on disk.
+     */
+    worldX0?: number;
+    worldY0?: number;
     sqr: number;
     maxNativeZoom: number;
     isometric: boolean;
+    /**
+     * Conversion from pzmap2dzi native pixels (sprite atlas, offsets) to
+     * effective pixel-space. = 1 / 2^skip.
+     */
+    nativeToEffective?: number;
 };
 
 export type MapConfig = {
@@ -297,6 +311,12 @@ export type MapConfig = {
     defaultZoom: number;
     center: { x: number; y: number };
     dzi: DziInfo | null;
+    /** Whether the server has built a WebGL sprite atlas (M1). */
+    useWebGL?: boolean;
+    /** Base URL where the atlas is hosted (default /pz-atlas). */
+    webGLAtlasUrl?: string;
+    /** URL for the cells manifest JSON (list of on-disk .lotheader cells). */
+    cellsManifestUrl?: string;
 };
 
 export type InventoryItem = {

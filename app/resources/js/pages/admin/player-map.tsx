@@ -4,9 +4,8 @@ import { useMemo, useState } from 'react';
 import PlayerActionDialogs from '@/components/player-action-dialogs';
 import PzMap from '@/components/pz-map';
 import { useTranslation } from '@/hooks/use-translation';
-import type { ZoneOverlay } from '@/components/pz-map';
+import type { PzMapDisplayMode, ZoneOverlay } from '@/components/pz-map';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import type { BreadcrumbItem } from '@/types';
 import type { MapConfig, PlayerMarker } from '@/types/server';
@@ -37,12 +36,6 @@ type Props = {
     safeZones: SafeZone[];
 };
 
-const statusDotColor: Record<PlayerMarker['status'], string> = {
-    online: 'fill-green-500 text-green-500',
-    offline: 'fill-muted text-muted',
-    dead: 'fill-red-500 text-red-500',
-};
-
 const ZONE_COLORS = ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfig, hasTiles, tileProgress, safeZones }: Props) {
@@ -57,6 +50,17 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
     const [kickTarget, setKickTarget] = useState<string | null>(null);
     const [banTarget, setBanTarget] = useState<string | null>(null);
     const [accessTarget, setAccessTarget] = useState<string | null>(null);
+    const [displayMode, setDisplayModeState] = useState<PzMapDisplayMode>(() => {
+        if (typeof window === 'undefined') return 'v41';
+        const stored = window.localStorage.getItem('pz-map-display-mode');
+        return stored === 'v41' || stored === 'v42' || stored === 'webgl' ? stored : 'v41';
+    });
+    const setDisplayMode = (m: PzMapDisplayMode) => {
+        setDisplayModeState(m);
+        if (typeof window !== 'undefined') {
+            window.localStorage.setItem('pz-map-display-mode', m);
+        }
+    };
 
     const counts = useMemo(() => {
         const online = Math.max(onlineCount, markers.filter((m) => m.status === 'online').length);
@@ -91,111 +95,94 @@ export default function PlayerMap({ markers, onlineCount, serverStatus, mapConfi
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={t('admin.player_map.title')} />
-            <div className="flex flex-1 flex-col gap-4 p-4 lg:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{t('admin.player_map.title')}</h1>
-                        <p className="text-muted-foreground">
-                            {t('admin.player_map.players_tracked', { count: String(counts.total) })}
-                        </p>
+            <div className="flex flex-1 flex-col">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-4 py-2">
+                    <div className="flex items-center gap-1 rounded-md border bg-muted/30 p-0.5">
+                        {(['v41', 'v42', 'webgl'] as const).map((m) => (
+                            <button
+                                key={m}
+                                type="button"
+                                onClick={() => setDisplayMode(m)}
+                                className={`rounded px-3 py-1 text-xs font-medium transition ${
+                                    displayMode === m
+                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                                }`}
+                            >
+                                {t(`admin.pz_map.display_mode.${m}`)}
+                            </button>
+                        ))}
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="text-sm">
+                        <Badge variant="outline" className="text-xs">
                             <Circle className="mr-1.5 size-2 fill-green-500 text-green-500" />
                             {t('admin.player_map.online_count', { count: String(counts.online) })}
                         </Badge>
-                        <Badge variant="outline" className="text-sm">
+                        <Badge variant="outline" className="text-xs">
                             <Circle className="mr-1.5 size-2 fill-muted text-muted" />
                             {t('admin.player_map.offline_count', { count: String(counts.offline) })}
                         </Badge>
                         {counts.dead > 0 && (
-                            <Badge variant="outline" className="text-sm">
+                            <Badge variant="outline" className="text-xs">
                                 <Circle className="mr-1.5 size-2 fill-red-500 text-red-500" />
                                 {t('admin.player_map.dead_count', { count: String(counts.dead) })}
                             </Badge>
                         )}
                     </div>
                 </div>
+                <div className="relative flex flex-1 flex-col">
 
-                {serverStatus === 'offline' && (
-                    <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                        <AlertTriangle className="size-4 shrink-0" />
-                        {t('admin.player_map.server_offline')}
-                    </div>
-                )}
-                {serverStatus === 'starting' && (
-                    <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
-                        <Loader2 className="size-4 shrink-0 animate-spin" />
-                        {t('admin.player_map.server_starting')}
-                    </div>
-                )}
-
-                <Card className="isolate flex-1">
-                    <CardContent className="relative h-[350px] p-0 sm:h-[500px] lg:h-[600px]">
-                        {!hasTiles && tileProgress?.generating && (
-                            <div className="absolute top-2 left-1/2 z-[1000] w-64 -translate-x-1/2 rounded-lg border bg-background/90 px-4 py-3 shadow-sm backdrop-blur-sm sm:w-72">
-                                <div className="flex items-center gap-2 text-sm font-medium">
-                                    <Loader2 className="size-4 animate-spin text-primary" />
-                                    {t('admin.player_map.generating_tiles')}
-                                </div>
-                                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                                    {tileProgress.completed > 0 ? (
-                                        <div
-                                            className="h-full rounded-full bg-primary transition-all duration-500"
-                                            style={{ width: `${Math.max(tileProgress.percent, 2)}%` }}
-                                        />
-                                    ) : (
-                                        <div className="h-full w-full animate-pulse rounded-full bg-primary/30" />
-                                    )}
-                                </div>
-                                <p className="text-muted-foreground mt-1 text-xs">
-                                    {tileProgress.completed > 0
-                                        ? t('admin.player_map.tiles_rendered', { count: tileProgress.completed.toLocaleString(), percent: String(tileProgress.percent) })
-                                        : t('admin.player_map.preparing_render')}
-                                </p>
+                {(serverStatus === 'offline' || serverStatus === 'starting') && (
+                    <div className="pointer-events-auto absolute top-20 left-1/2 z-[1000] -translate-x-1/2 max-w-md">
+                        {serverStatus === 'offline' && (
+                            <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/90 px-4 py-2 text-sm text-white shadow-sm">
+                                <AlertTriangle className="size-4 shrink-0" />
+                                {t('admin.player_map.server_offline')}
                             </div>
                         )}
-                        {!hasTiles && !tileProgress?.generating && (
-                            <div className="bg-muted/80 text-muted-foreground absolute top-2 left-1/2 z-[1000] -translate-x-1/2 rounded-md px-3 py-1.5 text-xs backdrop-blur-sm">
-                                {t('admin.player_map.no_tiles')} <code className="font-mono">{t('admin.player_map.no_tiles_command')}</code> {t('admin.player_map.no_tiles_suffix')}
+                        {serverStatus === 'starting' && (
+                            <div className="flex items-center gap-2 rounded-lg border border-yellow-500/30 bg-yellow-500/90 px-4 py-2 text-sm text-white shadow-sm">
+                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                                {t('admin.player_map.server_starting')}
                             </div>
                         )}
-                        <PzMap
-                            markers={markers}
-                            mapConfig={mapConfig}
-                            hasTiles={hasTiles}
-                            onMarkerAction={handleMarkerAction}
-                            zones={zoneOverlays}
-                            className="rounded-xl"
-                        />
-                    </CardContent>
-                </Card>
-
-                {markers.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('admin.player_map.player_positions')}</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                {markers.map((marker) => (
-                                    <div
-                                        key={marker.username}
-                                        className="flex items-center justify-between rounded-lg border border-border/50 px-3 py-2"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <Circle className={`size-2 ${statusDotColor[marker.status]}`} />
-                                            <span className="text-sm font-medium">{marker.name}</span>
-                                        </div>
-                                        <span className="font-mono text-xs text-muted-foreground">
-                                            {marker.x.toFixed(0)}, {marker.y.toFixed(0)}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    </div>
                 )}
+
+                {!hasTiles && tileProgress?.generating && (
+                    <div className="pointer-events-auto absolute bottom-3 left-1/2 z-[1000] w-72 -translate-x-1/2 rounded-lg border bg-background/90 px-4 py-3 shadow-sm backdrop-blur-sm">
+                        <div className="flex items-center gap-2 text-sm font-medium">
+                            <Loader2 className="size-4 animate-spin text-primary" />
+                            {t('admin.player_map.generating_tiles')}
+                        </div>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+                            {tileProgress.completed > 0 ? (
+                                <div
+                                    className="h-full rounded-full bg-primary transition-all duration-500"
+                                    style={{ width: `${Math.max(tileProgress.percent, 2)}%` }}
+                                />
+                            ) : (
+                                <div className="h-full w-full animate-pulse rounded-full bg-primary/30" />
+                            )}
+                        </div>
+                        <p className="text-muted-foreground mt-1 text-xs">
+                            {tileProgress.completed > 0
+                                ? t('admin.player_map.tiles_rendered', { count: tileProgress.completed.toLocaleString(), percent: String(tileProgress.percent) })
+                                : t('admin.player_map.preparing_render')}
+                        </p>
+                    </div>
+                )}
+
+                <PzMap
+                    markers={markers}
+                    mapConfig={mapConfig}
+                    hasTiles={hasTiles}
+                    onMarkerAction={handleMarkerAction}
+                    zones={zoneOverlays}
+                    displayMode={displayMode}
+                    className=""
+                />
+                </div>
             </div>
 
             <PlayerActionDialogs

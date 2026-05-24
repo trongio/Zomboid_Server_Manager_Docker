@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ImportConfigApplyRequest;
 use App\Http\Requests\Admin\ImportConfigPreviewRequest;
+use App\Http\Requests\Admin\UpdateSandboxConfigRequest;
 use App\Rules\SafeConfigValue;
 use App\Services\AuditLogger;
+use App\Services\ConfigCatalog;
 use App\Services\ConfigImporter;
 use App\Services\ConfigStateManager;
 use App\Services\RespawnDelayManager;
@@ -14,6 +16,7 @@ use App\Services\SandboxLuaParser;
 use App\Services\ServerIniParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\App;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -27,6 +30,7 @@ class ConfigController extends Controller
         private readonly RespawnDelayManager $respawnDelay,
         private readonly ConfigStateManager $configState,
         private readonly ConfigImporter $configImporter,
+        private readonly ConfigCatalog $catalog,
     ) {}
 
     public function index(): Response
@@ -46,10 +50,22 @@ class ConfigController extends Controller
             // File not available
         }
 
+        // Picks the right `i18n.<LOCALE>` overlay inside the catalog,
+        // falling back to the English baseline (which is always present)
+        // when the requested locale has no entry for a field. Server.ini
+        // descriptions stay EN — PZ writes those in English only.
+        $locale = App::getLocale();
+        $catalogPayload = [
+            'server' => $this->catalog->server(),
+            'sandbox' => $this->catalog->sandbox($locale),
+            'mods' => $this->catalog->mods($locale),
+        ];
+
         return Inertia::render('admin/config', [
             'server_config' => $serverConfig,
             'sandbox_config' => $sandboxConfig,
             'respawn_delay' => $this->respawnDelay->getConfig(),
+            'catalog' => $catalogPayload,
         ]);
     }
 
@@ -86,12 +102,9 @@ class ConfigController extends Controller
         ]);
     }
 
-    public function updateSandbox(Request $request): JsonResponse
+    public function updateSandbox(UpdateSandboxConfigRequest $request): JsonResponse
     {
-        $settings = $request->validate([
-            'settings' => 'required|array|min:1',
-            'settings.*' => ['required', new SafeConfigValue],
-        ])['settings'];
+        $settings = $request->validated('settings');
 
         $path = config('zomboid.paths.sandbox_lua');
         $before = $this->luaParser->read($path);

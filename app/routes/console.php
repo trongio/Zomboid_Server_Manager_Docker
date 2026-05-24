@@ -2,6 +2,7 @@
 
 use App\Enums\BackupType;
 use App\Jobs\CreateBackupJob;
+use App\Jobs\RebuildSaveCacheJob;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::job(new CreateBackupJob(BackupType::Scheduled))
@@ -20,6 +21,15 @@ Schedule::command('zomboid:sync-player-stats')->everyTenMinutes();
 
 Schedule::command('zomboid:auto-restart-check')->everyMinute();
 
+// Rebuild the JSON config catalog when ModManager / configure-server.sh
+// drops the dirty sentinel — mod changes can shift which namespaces
+// appear inside `_SandboxVars.lua`, and the admin UI hydrates from this
+// catalog for descriptions / min / max / enum labels.
+Schedule::command('zomboid:sync-config-catalog')
+    ->everyMinute()
+    ->when(fn () => is_file(rtrim(config('zomboid.paths.data', '/pz-data'), '/').'/Server/.settings_catalog_dirty')
+        || is_file(rtrim(config('zomboid.paths.data', '/pz-data'), '/').'/.settings_catalog_dirty'));
+
 Schedule::command('zomboid:import-pvp-violations')->everyFiveMinutes();
 
 Schedule::command('zomboid:import-pvp-kills')->everyFiveMinutes();
@@ -32,10 +42,20 @@ Schedule::command('zomboid:process-shop-deliveries')->everyMinute();
 
 Schedule::command('zomboid:process-money-deposits')->everyMinute();
 
-Schedule::command('zomboid:generate-map-tiles')
-    ->everyThirtyMinutes()
-    ->when(fn () => ! is_dir(config('zomboid.map.tiles_path').'/html/map_data/base/layer0_files'))
-    ->runInBackground();
+Schedule::command('zomboid:auto-render-map')->everyMinute()->runInBackground();
+
+/*
+ * Rebuild save-overlay packed Uint32Array files каждые 30 секунд.
+ * First run после старта — full rebuild (~50-100 сек на 65k chunks).
+ * Дальше — incremental (только cells затронутые новыми chunks), sub-second.
+ */
+Schedule::job(new RebuildSaveCacheJob)
+    ->everyThirtySeconds()
+    ->withoutOverlapping();
+
+// Bump manifest.json version when save-game .bin files change so the browser
+// poller (useAtlasVersionPoll) can invalidate its save-data cache automatically.
+Schedule::command('zomboid:bump-map-version')->everyFiveMinutes();
 
 Schedule::command('zomboid:download-item-icons')
     ->hourly()

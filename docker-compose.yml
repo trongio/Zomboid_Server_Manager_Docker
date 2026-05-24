@@ -82,7 +82,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: php artisan queue:work redis --tries=3 --timeout=600 --sleep=3
+    command: php artisan queue:work redis --tries=3 --timeout=14400 --sleep=3
     volumes:
       - ./app:/var/www/html
       - app-vendor:/var/www/html/vendor
@@ -173,6 +173,9 @@ services:
       CONTAINERS: 1
       POST: 1
       LOG: 1
+      # EXEC lets the app run `kill` inside the queue container to stop a
+      # runaway pzmap2dzi render — the "Cancel" button needs this.
+      EXEC: 1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:

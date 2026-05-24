@@ -2,6 +2,7 @@ import { AppContent } from '@/components/app-content';
 import { AppShell } from '@/components/app-shell';
 import { AppSidebar } from '@/components/app-sidebar';
 import { AppSidebarHeader } from '@/components/app-sidebar-header';
+import { BuildVersionBadge } from '@/components/build-version-badge';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { useFlashToast } from '@/hooks/use-flash-toast';
 import type { AppLayoutProps } from '@/types';
@@ -21,6 +22,7 @@ export default function AppSidebarLayout({
                 <ErrorBoundary>{children}</ErrorBoundary>
             </AppContent>
             <Toaster position="bottom-right" richColors closeButton />
+            <BuildVersionBadge />
         </AppShell>
     );
 }

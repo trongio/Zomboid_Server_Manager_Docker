@@ -10,6 +10,22 @@ for var in DB_PASSWORD PZ_RCON_PASSWORD ADMIN_PASSWORD PZ_ADMIN_PASSWORD; do
     fi
 done
 
+# ── Nginx config rendering ───────────────────────────────────────────
+# WebGL cell-binary endpoints bypass PHP via nginx alias, which needs the
+# actual PZ map name and server name baked into the config. PZ_MAP_NAMES can
+# carry several maps separated by ";"; we use the first one as the primary
+# (which is also the one cell binaries live under on disk).
+NGINX_TEMPLATE="/etc/nginx/http.d/default.conf.template"
+NGINX_CONF="/etc/nginx/http.d/default.conf"
+if [ -f "$NGINX_TEMPLATE" ]; then
+    PZ_MAP_NAME_PRIMARY=$(printf '%s' "${PZ_MAP_NAMES:-Muldraugh, KY}" | cut -d';' -f1)
+    PZ_SERVER_NAME_VAR="${PZ_SERVER_NAME:-ZomboidServer}"
+    sed -e "s|@@PZ_MAP_NAME@@|${PZ_MAP_NAME_PRIMARY}|g" \
+        -e "s|@@PZ_SERVER_NAME@@|${PZ_SERVER_NAME_VAR}|g" \
+        "$NGINX_TEMPLATE" > "$NGINX_CONF"
+    echo "[entrypoint] Rendered nginx config (map='$PZ_MAP_NAME_PRIMARY', server='$PZ_SERVER_NAME_VAR')."
+fi
+
 # ── Storage permissions ──────────────────────────────────────────────
 # Bind mounts override Dockerfile permissions — fix at runtime
 # Only target directories and runtime files, skip .gitignore to avoid git noise
@@ -35,6 +51,21 @@ for dir in "$PZ_DATA/Saves" "$PZ_DATA/db"; do
         chmod -R g+w "$dir" 2>/dev/null || true
     fi
 done
+
+# Texturepacks upload target — www-data must be able to write here from
+# the admin UI before any base map render can succeed.
+TEXTUREPACKS_DIR="${PZ_MAP_TEXTUREPACKS_PATH:-$PZ_DATA/texturepacks}"
+mkdir -p "$TEXTUREPACKS_DIR" 2>/dev/null || true
+chown -R www-data:www-data "$TEXTUREPACKS_DIR" 2>/dev/null || true
+
+# /map-tiles — shared volume для WebGL atlas (web/), pre-packed cell archives
+# (cell-data/), pzdataspec parser library (lib/), save cache (save-cache/),
+# pzmap2dzi output (html/). Все эти операции запускаются от www-data
+# (php-fpm) — нужны права на запись. Volume может быть owned by root по
+# default mount; делаем явный chown.
+TILES_DIR="${PZ_MAP_TILES_PATH:-/map-tiles}"
+mkdir -p "$TILES_DIR/web" "$TILES_DIR/cell-data" "$TILES_DIR/lib" "$TILES_DIR/save-cache" 2>/dev/null || true
+chown -R www-data:www-data "$TILES_DIR" 2>/dev/null || true
 
 # ── Lua bridge permissions ────────────────────────────────────────────
 # Shared volume between game server and app — both www-data and steam (UID 1001)
@@ -103,11 +134,41 @@ if echo "$@" | grep -q "supervisord"; then
         php artisan zomboid:create-admin --no-interaction 2>&1 || true
     fi
 
-    # Map tiles — generate in background if missing
-    if [ ! -d "${PZ_MAP_TILES_PATH:-/map-tiles}/html/map_data/base/layer0_files" ] && [ -d "${PZ_SERVER_PATH:-/pz-server}" ]; then
-        echo "[entrypoint] Map tiles not found — generating in background..."
-        php artisan zomboid:generate-map-tiles \
-            >> /var/www/html/storage/logs/map-tiles.log 2>&1 &
+    # Map tiles are no longer auto-generated. Admins opt in via the
+    # "Map render engine" panel on /admin/players/map, which dispatches
+    # a queued job after explicit confirmation.
+
+    # WebGL atlas — на fresh инсталляции скачиваем prebuilt tarball с
+    # GitHub releases (см. PZ_MAP_ATLAS_DOWNLOAD_URL в config). Без этого
+    # /pz-atlas/manifest.json возвращает 404 и карта не загружается.
+    # Если файл уже есть — skip. Download синхронный (~80 MB), но это
+    # one-time на первый старт; следующие boots — instant.
+    if [ ! -f /map-tiles/web/manifest.json ]; then
+        echo "[entrypoint] WebGL atlas missing — downloading prebuilt tarball..."
+        php artisan zomboid:download-atlas \
+            >> /var/www/html/storage/logs/atlas-download.log 2>&1 \
+            && echo "[entrypoint] Atlas downloaded successfully." \
+            || echo "[entrypoint] Atlas download failed — see logs/atlas-download.log. Admin может попробовать вручную через 'Map' страницу в UI."
+    fi
+
+    # Pre-packed cell archives — опционально, ускоряют первый load карты
+    # для админ-страницы. Если нет, frontend fallback на per-cell endpoint
+    # через PHP-FPM. Создание дёшево (~10s), делаем automatically.
+    if [ ! -f /map-tiles/cell-data/index.json ] && [ -f /pz-server/media/maps/Muldraugh,\ KY/0_0.lotheader ]; then
+        echo "[entrypoint] Building pre-packed cell archives in background..."
+        php artisan zomboid:build-cell-archives \
+            >> /var/www/html/storage/logs/cell-archives-build.log 2>&1 &
+    fi
+
+    # pzdataspec parser library — fetched once on first boot, kept in the
+    # shared /map-tiles/lib volume. Used by rebuild_save_cache.py to parse
+    # B42 save chunks into packed Uint32Array files for the WebGL renderer.
+    if [ ! -d "/map-tiles/lib/pzdataspec" ] && [ -f /opt/pzmap2dzi/main.py ]; then
+        echo "[entrypoint] Installing pzdataspec parser library..."
+        PZDATASPEC_LIB_PATH=/map-tiles/lib \
+            python3 /var/www/html/docker/scripts/install_pzdataspec.py \
+            >> /var/www/html/storage/logs/pzdataspec-install.log 2>&1 || \
+            echo "[entrypoint] pzdataspec install failed — see logs/pzdataspec-install.log"
     fi
 
     # Item icons — download in background if catalog exists but icons are missing

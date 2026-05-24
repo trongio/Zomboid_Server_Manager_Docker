@@ -51,3 +51,14 @@ workshop/ZomboidManager/Contents/mods/ZomboidManager/42/media/
 /app/.phpunit.result.cache
 /app/coverage/
 .playwright-mcp/
+.claude
+game-version.conf
+caddy/Caddyfile
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Reference clones (kept locally for research, not part of the product)
+pzmap2dzi_repo/
+atlas-release/

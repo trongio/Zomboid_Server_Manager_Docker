@@ -64,11 +64,11 @@ it('returns empty list when no mods', function () {
 it('adds a mod', function () {
     $this->postJson('/api/config/mods', [
         'workshop_id' => '1234567890',
-        'mod_id' => 'NewMod',
+        'mod_ids' => ['NewMod'],
     ], modApiHeaders())
         ->assertOk()
         ->assertJson([
-            'added' => ['workshop_id' => '1234567890', 'mod_id' => 'NewMod'],
+            'added' => ['workshop_id' => '1234567890', 'mod_ids' => ['NewMod']],
             'restart_required' => true,
         ]);
 
@@ -80,10 +80,34 @@ it('adds a mod', function () {
     expect(AuditLog::where('action', 'mod.add')->exists())->toBeTrue();
 });
 
+it('accepts legacy singular mod_id payload for backwards compatibility', function () {
+    $this->postJson('/api/config/mods', [
+        'workshop_id' => '1234567890',
+        'mod_id' => 'NewMod',
+    ], modApiHeaders())
+        ->assertOk()
+        ->assertJson([
+            'added' => ['workshop_id' => '1234567890', 'mod_ids' => ['NewMod']],
+        ]);
+});
+
+it('adds a modpack with multiple mod_ids for one workshop_id', function () {
+    $this->postJson('/api/config/mods', [
+        'workshop_id' => '9000000001',
+        'mod_ids' => ['PackCore', 'PackExtras'],
+    ], modApiHeaders())
+        ->assertOk();
+
+    $content = file_get_contents($this->iniPath);
+    expect($content)
+        ->toContain('Mods=SuperSurvivors;Hydrocraft;PackCore;PackExtras;ZomboidManager')
+        ->and($content)->toContain('WorkshopItems=2561774086;2286126274;9000000001;3685323705');
+});
+
 it('does not add duplicate workshop id', function () {
     $this->postJson('/api/config/mods', [
         'workshop_id' => '2561774086',
-        'mod_id' => 'SuperSurvivors',
+        'mod_ids' => ['SuperSurvivors'],
     ], modApiHeaders())
         ->assertOk();
 
@@ -94,7 +118,7 @@ it('does not add duplicate workshop id', function () {
 it('adds map mod with map folder', function () {
     $this->postJson('/api/config/mods', [
         'workshop_id' => '9999999999',
-        'mod_id' => 'MapMod',
+        'mod_ids' => ['MapMod'],
         'map_folder' => 'CustomMap',
     ], modApiHeaders())
         ->assertOk();
@@ -107,7 +131,7 @@ it('adds map mod with map folder', function () {
 it('validates required fields', function () {
     $this->postJson('/api/config/mods', [], modApiHeaders())
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['workshop_id', 'mod_id']);
+        ->assertJsonValidationErrors(['workshop_id', 'mod_ids']);
 });
 
 // ── DELETE /api/config/mods/{workshopId} ─────────────────────────────
