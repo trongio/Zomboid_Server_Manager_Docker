@@ -97,23 +97,30 @@ apply_setting_force() {
     fi
 }
 
-# Core settings — .config_state (web UI) takes priority over env var defaults
+# Core settings — .config_state (web UI) takes priority over env var defaults.
+#
+# Each value falls back through two env var names: the PZ_* names used by the
+# ARM64 (joyfui) image, then the bare names used by the AMD64 (renegademaster)
+# image. Without the AMD64 fallback this script runs last and overwrites the
+# values renegademaster already applied (e.g. MAX_PLAYERS) with these defaults,
+# so a user who picked 24 players on AMD64 silently ended up with 16. Same
+# both-names pattern the RCON section below already uses.
 STATE_VAL=$(read_config_state "DefaultPort")
-apply_setting "DefaultPort"          "${STATE_VAL:-${PZ_GAME_PORT:-16261}}"       "$INI_FILE"
+apply_setting "DefaultPort"          "${STATE_VAL:-${PZ_GAME_PORT:-${DEFAULT_PORT:-16261}}}"       "$INI_FILE"
 STATE_VAL=$(read_config_state "UDPPort")
-apply_setting "UDPPort"              "${STATE_VAL:-${PZ_DIRECT_PORT:-16262}}"     "$INI_FILE"
+apply_setting "UDPPort"              "${STATE_VAL:-${PZ_DIRECT_PORT:-${UDP_PORT:-16262}}}"     "$INI_FILE"
 STATE_VAL=$(read_config_state "MaxPlayers")
-apply_setting "MaxPlayers"           "${STATE_VAL:-${PZ_MAX_PLAYERS:-16}}"        "$INI_FILE"
+apply_setting "MaxPlayers"           "${STATE_VAL:-${PZ_MAX_PLAYERS:-${MAX_PLAYERS:-16}}}"        "$INI_FILE"
 STATE_VAL=$(read_config_state "Map")
-apply_setting "Map"                  "${STATE_VAL:-${PZ_MAP_NAMES:-Muldraugh, KY}}" "$INI_FILE"
+apply_setting "Map"                  "${STATE_VAL:-${PZ_MAP_NAMES:-${MAP_NAMES:-Muldraugh, KY}}}" "$INI_FILE"
 STATE_VAL=$(read_config_state "Public")
-apply_setting "Public"               "${STATE_VAL:-${PZ_PUBLIC_SERVER:-true}}"    "$INI_FILE"
+apply_setting "Public"               "${STATE_VAL:-${PZ_PUBLIC_SERVER:-${PUBLIC_SERVER:-true}}}"    "$INI_FILE"
 STATE_VAL=$(read_config_state "PauseEmpty")
-apply_setting "PauseEmpty"           "${STATE_VAL:-${PZ_PAUSE_ON_EMPTY:-true}}"   "$INI_FILE"
+apply_setting "PauseEmpty"           "${STATE_VAL:-${PZ_PAUSE_ON_EMPTY:-${PAUSE_ON_EMPTY:-true}}}"   "$INI_FILE"
 STATE_VAL=$(read_config_state "SaveWorldEveryMinutes")
-apply_setting "SaveWorldEveryMinutes" "${STATE_VAL:-${PZ_AUTOSAVE_INTERVAL:-15}}" "$INI_FILE"
+apply_setting "SaveWorldEveryMinutes" "${STATE_VAL:-${PZ_AUTOSAVE_INTERVAL:-${AUTOSAVE_INTERVAL:-15}}}" "$INI_FILE"
 STATE_VAL=$(read_config_state "SteamVAC")
-apply_setting "SteamVAC"             "${STATE_VAL:-${PZ_STEAM_VAC:-true}}"        "$INI_FILE"
+apply_setting "SteamVAC"             "${STATE_VAL:-${PZ_STEAM_VAC:-${STEAM_VAC:-true}}}"        "$INI_FILE"
 STATE_VAL=$(read_config_state "Open")
 apply_setting "Open"                 "${STATE_VAL:-${PZ_OPEN:-true}}"             "$INI_FILE"
 STATE_VAL=$(read_config_state "AutoCreateUserInWhiteList")
@@ -121,9 +128,9 @@ apply_setting "AutoCreateUserInWhiteList" "${STATE_VAL:-${PZ_AUTO_CREATE_WHITELI
 
 # Passwords — .config_state takes priority over env var defaults
 STATE_VAL=$(read_config_state "Password")
-apply_setting "Password"             "${STATE_VAL:-${PZ_SERVER_PASSWORD:-}}"      "$INI_FILE"
+apply_setting "Password"             "${STATE_VAL:-${PZ_SERVER_PASSWORD:-${SERVER_PASSWORD:-}}}"      "$INI_FILE"
 STATE_VAL=$(read_config_state "AdminPassword")
-apply_setting "AdminPassword"        "${STATE_VAL:-${PZ_ADMIN_PASSWORD:-admin}}"  "$INI_FILE"
+apply_setting "AdminPassword"        "${STATE_VAL:-${PZ_ADMIN_PASSWORD:-${ADMIN_PASSWORD:-admin}}}"  "$INI_FILE"
 
 if [ -r "$CONFIG_STATE_FILE" ]; then
     echo "[configure-server] Applied web UI overrides from .config_state"
