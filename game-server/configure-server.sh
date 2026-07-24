@@ -12,7 +12,14 @@ set -e
 # (or whatever PZ_SERVER_NAME the user picked), and no mod ever made it into
 # the live config.
 SERVER_NAME="${SERVERNAME:-${SERVER_NAME:-${PZ_SERVER_NAME:-ZomboidServer}}}"
-INI_DIR="/home/steam/Zomboid/Server"
+
+# Root directories. Overridable so the script can be exercised against a
+# temporary tree in tests; the defaults are the real in-container paths, so
+# production behaviour is unchanged (these vars are never set in the images).
+PZ_CONFIG_DIR="${PZ_CONFIG_DIR:-/home/steam/Zomboid}"
+PZ_INSTALL_DIR="${PZ_INSTALL_DIR:-/home/steam/ZomboidDedicatedServer}"
+
+INI_DIR="${PZ_CONFIG_DIR}/Server"
 INI_FILE="${INI_DIR}/${SERVER_NAME}.ini"
 SANDBOX_FILE="${INI_DIR}/${SERVER_NAME}_SandboxVars.lua"
 
@@ -50,7 +57,7 @@ echo "[configure-server] Applying configuration..."
 
 # Web UI persistence file — written by Laravel when config is saved via dashboard/API.
 # Values here take priority over env var defaults so web UI changes survive restarts.
-CONFIG_STATE_FILE="/home/steam/Zomboid/.config_state"
+CONFIG_STATE_FILE="${PZ_CONFIG_DIR}/.config_state"
 
 # Read a value from .config_state, or return empty string.
 read_config_state() {
@@ -180,7 +187,7 @@ fi
 # before start_server runs — otherwise PZ silently drops the mod and may
 # prune Mods= back to empty on its next ini rewrite.
 PZ_WORKSHOP_APP_ID="108600"
-WORKSHOP_CACHE_ROOT="/home/steam/ZomboidDedicatedServer/steamapps/workshop/content/${PZ_WORKSHOP_APP_ID}"
+WORKSHOP_CACHE_ROOT="${PZ_INSTALL_DIR}/steamapps/workshop/content/${PZ_WORKSHOP_APP_ID}"
 ZM_WORKSHOP_ID_EARLY="3685323705"
 
 # Re-read the final WorkshopItems= so we cover every restore path above.
@@ -202,7 +209,7 @@ fi
 if [ "${#MISSING_WORKSHOP_IDS[@]}" -gt 0 ]; then
     echo "[configure-server] Downloading ${#MISSING_WORKSHOP_IDS[@]} Workshop mod(s) via SteamCMD: ${MISSING_WORKSHOP_IDS[*]}"
     STEAMCMD_BIN="$(command -v steamcmd.sh || echo /home/root/.local/steamcmd/steamcmd.sh)"
-    SCMD_ARGS=("+force_install_dir" "/home/steam/ZomboidDedicatedServer" "+login" "anonymous")
+    SCMD_ARGS=("+force_install_dir" "$PZ_INSTALL_DIR" "+login" "anonymous")
     for wid in "${MISSING_WORKSHOP_IDS[@]}"; do
         SCMD_ARGS+=("+workshop_download_item" "$PZ_WORKSHOP_APP_ID" "$wid")
     done
@@ -243,7 +250,7 @@ fi
 # subscribed, so PZ silently wipes them from `Mods=`/`WorkshopItems=` in
 # the INI on startup. The `Zomboid/mods/` path is always scanned, so a
 # symlink there gives PZ a reliable, always-trusted local copy.
-ZOMBOID_MODS_DIR="/home/steam/Zomboid/mods"
+ZOMBOID_MODS_DIR="${PZ_CONFIG_DIR}/mods"
 mkdir -p "$ZOMBOID_MODS_DIR"
 if [ -d "$WORKSHOP_CACHE_ROOT" ]; then
     while IFS= read -r mod_dir; do
@@ -276,8 +283,8 @@ echo "[configure-server] Set DoLuaChecksum=false (required for ZomboidManager mo
 # Local mods in Zomboid/mods/ or ZomboidDedicatedServer/mods/ are NOT scanned.
 # We create a fake Workshop cache entry so PZ discovers our mod through its Workshop scanner.
 ZM_WORKSHOP_ID="3685323705"
-ZM_SOURCE="/home/steam/Zomboid/mods/ZomboidManager"
-WORKSHOP_MOD_DIR="/home/steam/ZomboidDedicatedServer/steamapps/workshop/content/108600/${ZM_WORKSHOP_ID}/mods/ZomboidManager"
+ZM_SOURCE="${PZ_CONFIG_DIR}/mods/ZomboidManager"
+WORKSHOP_MOD_DIR="${PZ_INSTALL_DIR}/steamapps/workshop/content/108600/${ZM_WORKSHOP_ID}/mods/ZomboidManager"
 
 if [ -f "$ZM_SOURCE/42/mod.info" ]; then
     # Create Workshop cache with both root-level and 42/ mod.info.
@@ -296,7 +303,7 @@ else
 fi
 
 # Remove any stale ZomboidManager from install dir (shadows Workshop version)
-rm -rf /home/steam/ZomboidDedicatedServer/mods/ZomboidManager
+rm -rf "${PZ_INSTALL_DIR}/mods/ZomboidManager"
 
 # Ensure ZomboidManager is in the Mods= list.
 CURRENT_MODS=$(grep -m1 "^Mods=" "$INI_FILE" | sed 's/^Mods=//' || true)
@@ -345,8 +352,8 @@ if printf 'Mods=%s\nWorkshopItems=%s\n' "$APPLIED_MODS" "$APPLIED_WORKSHOP" > "$
 fi
 
 # Pre-create Lua bridge directories for inventory exports
-mkdir -p /home/steam/Zomboid/Lua/inventory 2>/dev/null || echo "[configure-server] WARNING: Cannot create Lua/inventory directory (permission denied)"
-if [ -d /home/steam/Zomboid/Lua/inventory ]; then
+mkdir -p "${PZ_CONFIG_DIR}/Lua/inventory" 2>/dev/null || echo "[configure-server] WARNING: Cannot create Lua/inventory directory (permission denied)"
+if [ -d "${PZ_CONFIG_DIR}/Lua/inventory" ]; then
     echo "[configure-server] Lua bridge directories created"
 fi
 

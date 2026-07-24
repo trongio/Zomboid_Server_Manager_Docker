@@ -17,7 +17,7 @@ CADDY_HTTPS_PORT ?= 443
 
 FW_DISPATCH := bash scripts/firewall/dispatch.sh
 
-.PHONY: up down build restart logs ps stop pull migrate test exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version update \
+.PHONY: up down build restart logs ps stop pull migrate test test-game-server exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version update \
 	admin-expose admin-hide expose hide info
 
 # ── First-run setup ──────────────────────────────────────────────────
@@ -199,6 +199,11 @@ test:
 	@$(COMPOSE) exec -T db psql -U zomboid -tc "SELECT 1 FROM pg_database WHERE datname='zomboid_test'" | grep -q 1 \
 		|| $(COMPOSE) exec -T db psql -U zomboid -c "CREATE DATABASE zomboid_test OWNER zomboid" 2>/dev/null || true
 	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=pgsql -e DB_DATABASE=zomboid_test app php artisan test --compact
+
+# Runs on the host (no containers needed) — exercises configure-server.sh
+# against a throwaway config tree to verify env-var precedence.
+test-game-server:
+	@bash game-server/tests/configure-server.test.sh
 
 exec:
 	$(COMPOSE) exec app $(CMD)
