@@ -1,6 +1,8 @@
 <?php
 
+use App\Enums\UserRole;
 use App\Models\AuditLog;
+use App\Models\User;
 use App\Services\RconClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -201,6 +203,36 @@ it('validates access level enum', function () {
     ], playerApiHeaders())
         ->assertUnprocessable()
         ->assertJsonValidationErrors('level');
+});
+
+it('syncs the registered user web role when setting access level', function () {
+    $player = User::factory()->create([
+        'username' => 'Player1',
+        'role' => UserRole::Player,
+    ]);
+    mockPlayerRcon();
+
+    $this->postJson('/api/players/Player1/setaccess', [
+        'level' => 'admin',
+    ], playerApiHeaders())
+        ->assertOk();
+
+    expect($player->fresh()->role)->toBe(UserRole::Admin);
+});
+
+it('does not change the web role when the access command fails', function () {
+    $player = User::factory()->create([
+        'username' => 'Player1',
+        'role' => UserRole::Player,
+    ]);
+    mockPlayerRconOffline();
+
+    $this->postJson('/api/players/Player1/setaccess', [
+        'level' => 'admin',
+    ], playerApiHeaders())
+        ->assertStatus(503);
+
+    expect($player->fresh()->role)->toBe(UserRole::Player);
 });
 
 // ── POST /api/players/{name}/teleport ────────────────────────────────

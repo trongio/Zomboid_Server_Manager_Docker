@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AdminSetPasswordRequest;
 use App\Http\Requests\Admin\BanPlayerRequest;
@@ -152,6 +153,8 @@ class PlayerController extends Controller
             return response()->json(['error' => 'Failed: '.$e->getMessage()], 503);
         }
 
+        $this->syncRoleFromAccessLevel($name, $level);
+
         $this->auditLogger->log(
             actor: $request->user()->name ?? 'admin',
             action: 'player.setaccess',
@@ -161,6 +164,27 @@ class PlayerController extends Controller
         );
 
         return response()->json(['message' => "Set {$name} access to {$level}"]);
+    }
+
+    /**
+     * Mirror a PZ access-level change onto the registered user's web role so the
+     * players page reflects it immediately instead of only after a container
+     * restart. Unregistered (online-only) players have no row to update, and the
+     * primary super admin is never demoted to avoid locking out the dashboard.
+     */
+    private function syncRoleFromAccessLevel(string $name, string $level): void
+    {
+        $user = User::query()->where('username', $name)->first();
+
+        if ($user === null || $user->role === UserRole::SuperAdmin) {
+            return;
+        }
+
+        $newRole = UserRole::fromPzAccessLevel($level);
+
+        if ($user->role !== $newRole) {
+            $user->update(['role' => $newRole]);
+        }
     }
 
     public function setPassword(AdminSetPasswordRequest $request, string $name): JsonResponse

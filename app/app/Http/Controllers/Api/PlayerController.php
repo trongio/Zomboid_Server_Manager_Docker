@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\UserRole;
 use App\Http\Requests\Api\AddItemRequest;
 use App\Http\Requests\Api\AddXpRequest;
 use App\Http\Requests\Api\BanPlayerRequest;
 use App\Http\Requests\Api\KickPlayerRequest;
 use App\Http\Requests\Api\SetAccessLevelRequest;
 use App\Http\Requests\Api\TeleportPlayerRequest;
+use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\OnlinePlayersReader;
 use App\Services\RconClient;
@@ -112,7 +114,7 @@ class PlayerController
         $name = RconSanitizer::playerName($name);
         $level = RconSanitizer::accessLevel($request->validated('level'));
 
-        return $this->executePlayerCommand(
+        $response = $this->executePlayerCommand(
             name: $name,
             command: "setaccesslevel \"{$name}\" \"{$level}\"",
             action: 'player.setaccess',
@@ -120,6 +122,33 @@ class PlayerController
             ip: $request->ip(),
             successMessage: "Access level for '{$name}' set to '{$level}'",
         );
+
+        if ($response->getStatusCode() === 200) {
+            $this->syncRoleFromAccessLevel($name, $level);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Mirror a PZ access-level change onto the registered user's web role so the
+     * dashboard reflects it immediately. Unregistered (online-only) players have
+     * no row to update, and the primary super admin is never demoted to avoid
+     * locking out the dashboard.
+     */
+    private function syncRoleFromAccessLevel(string $name, string $level): void
+    {
+        $user = User::query()->where('username', $name)->first();
+
+        if ($user === null || $user->role === UserRole::SuperAdmin) {
+            return;
+        }
+
+        $newRole = UserRole::fromPzAccessLevel($level);
+
+        if ($user->role !== $newRole) {
+            $user->update(['role' => $newRole]);
+        }
     }
 
     public function teleport(string $name, TeleportPlayerRequest $request): JsonResponse
@@ -226,5 +255,4 @@ class PlayerController
 
         return response()->json(['message' => $successMessage]);
     }
-
 }

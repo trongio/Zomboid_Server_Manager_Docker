@@ -193,6 +193,72 @@ it('can set access level via admin', function () {
     $response->assertJson(['message' => 'Set TestPlayer access to admin']);
 });
 
+it('syncs the web role when an access level is set so the players page updates immediately', function () {
+    mockAdminRcon();
+    $player = User::factory()->create([
+        'username' => 'TestPlayer',
+        'role' => \App\Enums\UserRole::Player,
+    ]);
+
+    $this->actingAs(adminUser())
+        ->postJson('/admin/players/TestPlayer/access', ['level' => 'admin'])
+        ->assertOk();
+
+    expect($player->fresh()->role)->toBe(\App\Enums\UserRole::Admin);
+});
+
+it('demotes the web role to player when access level is set to none', function () {
+    mockAdminRcon();
+    $player = User::factory()->create([
+        'username' => 'ExMod',
+        'role' => \App\Enums\UserRole::Moderator,
+    ]);
+
+    $this->actingAs(adminUser())
+        ->postJson('/admin/players/ExMod/access', ['level' => 'none'])
+        ->assertOk();
+
+    expect($player->fresh()->role)->toBe(\App\Enums\UserRole::Player);
+});
+
+it('collapses elevated PZ staff levels onto the moderator web role', function () {
+    mockAdminRcon();
+    $player = User::factory()->create([
+        'username' => 'Overseer1',
+        'role' => \App\Enums\UserRole::Player,
+    ]);
+
+    $this->actingAs(adminUser())
+        ->postJson('/admin/players/Overseer1/access', ['level' => 'overseer'])
+        ->assertOk();
+
+    expect($player->fresh()->role)->toBe(\App\Enums\UserRole::Moderator);
+});
+
+it('never demotes the super admin when their access level is changed', function () {
+    mockAdminRcon();
+    $super = User::factory()->create([
+        'username' => 'BossMan',
+        'role' => \App\Enums\UserRole::SuperAdmin,
+    ]);
+
+    $this->actingAs(adminUser())
+        ->postJson('/admin/players/BossMan/access', ['level' => 'none'])
+        ->assertOk();
+
+    expect($super->fresh()->role)->toBe(\App\Enums\UserRole::SuperAdmin);
+});
+
+it('does not error when setting access level for an unregistered player', function () {
+    mockAdminRcon();
+
+    $this->actingAs(adminUser())
+        ->postJson('/admin/players/GhostPlayer/access', ['level' => 'admin'])
+        ->assertOk();
+
+    expect(User::where('username', 'GhostPlayer')->exists())->toBeFalse();
+});
+
 // --- Config Management ---
 
 it('renders the config page', function () {
