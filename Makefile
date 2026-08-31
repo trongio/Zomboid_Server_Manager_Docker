@@ -17,7 +17,7 @@ CADDY_HTTPS_PORT ?= 443
 
 FW_DISPATCH := bash scripts/firewall/dispatch.sh
 
-.PHONY: up down build restart logs ps stop pull migrate test test-game-server exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version update \
+.PHONY: up down build restart logs ps stop pull migrate test test-fast test-mods test-game-server exec arch init setup db-check db-init db-reset db-backup db-restore nuke workshop-package update-version update \
 	admin-expose admin-hide expose hide info
 
 # ── First-run setup ──────────────────────────────────────────────────
@@ -200,6 +200,24 @@ test:
 		|| $(COMPOSE) exec -T db psql -U zomboid -c "CREATE DATABASE zomboid_test OWNER zomboid" 2>/dev/null || true
 	$(COMPOSE) exec -e APP_ENV=testing -e APP_CONFIG_CACHE=/tmp/laravel-test-config.php -e DB_CONNECTION=pgsql -e DB_DATABASE=zomboid_test app php artisan test --compact
 
+# Runs on the host against in-memory SQLite — no containers, sub-second on a
+# focused run, for iterating on a service. `make test` is still the run that
+# decides whether the work is done; this one only shortens the loop.
+#   make test-fast                       — whole suite
+#   make test-fast ARGS="tests/Unit"     — a directory, file, or Pest flags
+test-fast:
+	@bash scripts/test-fast.sh --compact $(ARGS)
+
+# Everything covering mod list handling: pairing of Mods=/WorkshopItems=,
+# removal, bulk import, and the Workshop lookup.
+test-mods:
+	@bash scripts/test-fast.sh --compact \
+		tests/Unit/ModManagerTest.php \
+		tests/Feature/Admin/RemoveModTest.php \
+		tests/Feature/Admin/ImportModsTest.php \
+		tests/Feature/Admin/ModLookupTest.php \
+		tests/Feature/Api/ModTest.php $(ARGS)
+
 # Runs on the host (no containers needed) — exercises configure-server.sh
 # against a throwaway config tree to verify env-var precedence.
 test-game-server:
@@ -373,6 +391,8 @@ help:
 	@echo "  App:"
 	@echo "    migrate        - Run database migrations"
 	@echo "    test           - Run tests in the app container"
+	@echo "    test-fast      - Run tests on the host (SQLite, no containers)"
+	@echo "    test-mods      - Run the mod management tests (fast lane)"
 	@echo "    exec CMD=...   - Run a command in the app container"
 	@echo ""
 	@echo "  Other:"

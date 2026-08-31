@@ -3,7 +3,7 @@ import type {DragEndEvent} from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle2, Clock, FileUp, GripVertical, Loader2, Package, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, FileUp, GripVertical, Link2, Loader2, Package, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +50,17 @@ type LookupState =
     | { status: 'not_found' }
     | { status: 'no_mod_ids'; title: string; previewUrl: string | null; mapFolders: string[] }
     | { status: 'error' };
+
+/**
+ * Stable identity for a list row.
+ *
+ * Rows are not keyed by Workshop ID alone: one Workshop item can provide several mods
+ * (so the ID repeats) and a mod may have no Workshop item at all (so it is empty), and
+ * either case collapses React keys and drag-and-drop IDs onto each other.
+ */
+function rowKey(mod: ModEntry): string {
+    return `${mod.workshop_id}|${mod.mod_id}`;
+}
 
 function StatusBadge({ status }: { status: ModEntry['status'] }) {
     const { t } = useTranslation();
@@ -102,7 +113,7 @@ function SortableModRow({
 }) {
     const { t } = useTranslation();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-        id: mod.workshop_id,
+        id: rowKey(mod),
         disabled: isDragDisabled,
     });
 
@@ -131,7 +142,7 @@ function SortableModRow({
             </TableCell>
             <TableCell className="font-medium">
                 <span className="flex items-center gap-2">
-                    {mod.mod_id}
+                    {mod.mod_id || <span className="text-muted-foreground">{t('admin.mods.unknown_mod_id')}</span>}
                     {isProtected && (
                         <Badge variant="outline" className="text-xs">
                             {t('admin.mods.required_badge')}
@@ -140,9 +151,15 @@ function SortableModRow({
                 </span>
             </TableCell>
             <TableCell className="hidden sm:table-cell">
-                <Badge variant="secondary" className="text-xs">
-                    {mod.workshop_id}
-                </Badge>
+                {mod.workshop_id ? (
+                    <Badge variant="secondary" className="text-xs">
+                        {mod.workshop_id}
+                    </Badge>
+                ) : (
+                    <span className="text-xs text-muted-foreground" title={t('admin.mods.unlinked_hint')}>
+                        {t('admin.mods.unlinked')}
+                    </span>
+                )}
             </TableCell>
             <TableCell>
                 <StatusBadge status={mod.status} />
@@ -206,10 +223,14 @@ export default function Mods({
     const [bulkModIds, setBulkModIds] = useState<string[]>([]);
     const [bulkMapFolders, setBulkMapFolders] = useState<string[]>([]);
     const [bulkUnresolved, setBulkUnresolved] = useState<string[]>([]);
+    const [bulkLinks, setBulkLinks] = useState<Record<string, string[]>>({});
     const [importing, setImporting] = useState(false);
     const bulkCancelled = useRef(false);
+    const [relinking, setRelinking] = useState(false);
+    const [relinkProgress, setRelinkProgress] = useState({ done: 0, total: 0 });
 
     const isFiltering = search.length > 0;
+    const unlinkedCount = useMemo(() => mods.filter((m) => m.workshop_id === '' || m.mod_id === '').length, [mods]);
 
     const bulkNewMods = bulkModIds.filter((m) => !existingModIds.has(m)).length;
     const bulkNewWorkshop = bulkWorkshopIds.filter((w) => !existingWorkshopIds.has(w)).length;
@@ -224,6 +245,7 @@ export default function Mods({
         setBulkModIds([]);
         setBulkMapFolders([]);
         setBulkUnresolved([]);
+        setBulkLinks({});
         setShowBulk(true);
     }
 
@@ -232,11 +254,74 @@ export default function Mods({
         setShowBulk(false);
     }
 
+    /**
+     * Ask the backend for the mod IDs each Workshop item provides.
+     *
+     * Reports progress through `onProgress` and stops early once `cancelled` returns
+     * true. Workshop items Steam could not resolve are returned separately so the
+     * caller can surface them.
+     */
+    async function resolveWorkshopIds(
+        ids: string[],
+        onProgress: (done: number, total: number) => void,
+        cancelled: () => boolean,
+    ): Promise<{ links: Record<string, string[]>; mapFolders: string[]; unresolved: string[] }> {
+        const links: Record<string, string[]> = {};
+        const mapFolders: string[] = [];
+        const unresolved: string[] = [];
+
+        for (let i = 0; i < ids.length; i++) {
+            if (cancelled()) {
+                break;
+            }
+            const id = ids[i];
+            const json = (await fetchAction('/admin/mods/lookup', {
+                data: { workshop_id: id },
+                silent: true,
+            })) as { found?: boolean; mod_ids?: string[]; map_folders?: string[] } | null;
+
+            const modIds = json?.mod_ids ?? [];
+            if (json && json.found !== false && modIds.length > 0) {
+                links[id] = modIds;
+                if (json.map_folders) {
+                    mapFolders.push(...json.map_folders);
+                }
+            } else {
+                unresolved.push(id);
+            }
+            onProgress(i + 1, ids.length);
+        }
+
+        return { links, mapFolders, unresolved };
+    }
+
     async function prepareBulk() {
         const parsed = parseModImport(bulkText);
         setBulkMapFolders(parsed.mapFolders);
 
+        // Both paste formats resolve their Workshop IDs: the IDs-only format needs the
+        // mod IDs to import at all, and the INI format needs them to know which mod
+        // belongs to which Workshop item — a pasted `Mods=` line says nothing about that,
+        // and without the pairing the list cannot show or remove entries by Workshop ID.
+        bulkCancelled.current = false;
+        setBulkPhase('resolving');
+        setBulkProgress({ done: 0, total: parsed.workshopIds.length });
+
+        const { links, mapFolders, unresolved } = await resolveWorkshopIds(
+            parsed.workshopIds,
+            (done, total) => setBulkProgress({ done, total }),
+            () => bulkCancelled.current,
+        );
+
+        if (bulkCancelled.current) {
+            return;
+        }
+
+        setBulkLinks(links);
+
         if (parsed.mode === 'ini') {
+            // The paste is authoritative for what gets installed; the lookup only
+            // supplies the pairing, so unresolved items are not held against it.
             setBulkWorkshopIds(parsed.workshopIds);
             setBulkModIds(parsed.modIds);
             setBulkUnresolved([]);
@@ -244,46 +329,9 @@ export default function Mods({
             return;
         }
 
-        // IDs-only: resolve each Workshop ID's mod IDs via the Steam lookup endpoint.
-        // A single Workshop item can provide several mods, so collect them all.
-        bulkCancelled.current = false;
-        setBulkPhase('resolving');
-        setBulkProgress({ done: 0, total: parsed.workshopIds.length });
-
-        const workshopIds: string[] = [];
-        const modIds: string[] = [];
-        const mapFolders: string[] = [...parsed.mapFolders];
-        const unresolved: string[] = [];
-
-        for (let i = 0; i < parsed.workshopIds.length; i++) {
-            if (bulkCancelled.current) {
-                return;
-            }
-            const id = parsed.workshopIds[i];
-            const json = (await fetchAction('/admin/mods/lookup', {
-                data: { workshop_id: id },
-                silent: true,
-            })) as { found?: boolean; mod_ids?: string[]; map_folders?: string[] } | null;
-
-            const ids = json?.mod_ids ?? [];
-            if (json && json.found !== false && ids.length > 0) {
-                workshopIds.push(id);
-                modIds.push(...ids);
-                if (json.map_folders) {
-                    mapFolders.push(...json.map_folders);
-                }
-            } else {
-                unresolved.push(id);
-            }
-            setBulkProgress({ done: i + 1, total: parsed.workshopIds.length });
-        }
-
-        if (bulkCancelled.current) {
-            return;
-        }
-        setBulkWorkshopIds(workshopIds);
-        setBulkModIds(modIds);
-        setBulkMapFolders(mapFolders);
+        setBulkWorkshopIds(Object.keys(links));
+        setBulkModIds(Object.values(links).flat());
+        setBulkMapFolders([...parsed.mapFolders, ...mapFolders]);
         setBulkUnresolved(unresolved);
         setBulkPhase('ready');
     }
@@ -295,6 +343,7 @@ export default function Mods({
                 workshop_ids: bulkWorkshopIds,
                 mod_ids: bulkModIds,
                 map: bulkMapFolders,
+                links: bulkLinks,
             },
             successMessage: t('admin.mods.bulk_toast_imported', {
                 count: String(bulkModIds.length || bulkWorkshopIds.length),
@@ -411,8 +460,8 @@ export default function Mods({
         const { active, over } = event;
         if (!over || active.id === over.id) return;
 
-        const oldIndex = orderedMods.findIndex((m) => m.workshop_id === active.id);
-        const newIndex = orderedMods.findIndex((m) => m.workshop_id === over.id);
+        const oldIndex = orderedMods.findIndex((m) => rowKey(m) === active.id);
+        const newIndex = orderedMods.findIndex((m) => rowKey(m) === over.id);
         const reordered = arrayMove(orderedMods, oldIndex, newIndex);
 
         setOrderedMods(reordered);
@@ -438,6 +487,36 @@ export default function Mods({
         router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
     }
 
+    /**
+     * Re-derive the Workshop-item-to-mod pairing for a list that was imported before
+     * pairings were recorded. Only the pairing is written — no mod is added or removed.
+     */
+    async function repairLinks() {
+        const ids = Array.from(new Set(orderedMods.map((m) => m.workshop_id).filter(Boolean)));
+        if (ids.length === 0) {
+            return;
+        }
+
+        setRelinking(true);
+        setRelinkProgress({ done: 0, total: ids.length });
+
+        const { links } = await resolveWorkshopIds(
+            ids,
+            (done, total) => setRelinkProgress({ done, total }),
+            () => false,
+        );
+
+        if (Object.keys(links).length > 0) {
+            await fetchAction('/admin/mods/relink', {
+                data: { links },
+                successMessage: t('admin.mods.toast_relinked', { count: String(Object.keys(links).length) }),
+            });
+        }
+
+        setRelinking(false);
+        router.reload({ only: ['mods', 'pendingRestart', 'serverRunning'] });
+    }
+
     function closeAddDialog() {
         setShowAdd(false);
         setWorkshopId('');
@@ -457,9 +536,15 @@ export default function Mods({
 
     async function removeMod(mod: ModEntry) {
         setLoading(true);
-        await fetchAction(`/admin/mods/${mod.workshop_id}`, {
+        // Sent to the collection endpoint with both identifiers in the body: a row
+        // without a Workshop ID has no URL segment to put in `/admin/mods/{id}`.
+        await fetchAction('/admin/mods/entry', {
             method: 'DELETE',
-            successMessage: t('admin.mods.toast_removed', { mod_id: mod.mod_id }),
+            data: {
+                workshop_id: mod.workshop_id || null,
+                mod_id: mod.mod_id || null,
+            },
+            successMessage: t('admin.mods.toast_removed', { mod_id: mod.mod_id || mod.workshop_id }),
         });
         setLoading(false);
         setDeleteTarget(null);
@@ -513,6 +598,27 @@ export default function Mods({
                         </div>
                     </CardHeader>
                     <CardContent>
+                        {unlinkedCount > 0 && (
+                            <Alert className="mb-4" data-testid="unlinked-mods-banner">
+                                <AlertTriangle className="size-4" />
+                                <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <span>
+                                        {t('admin.mods.unlinked_banner', { count: String(unlinkedCount) })}
+                                        {relinking && ` (${relinkProgress.done}/${relinkProgress.total})`}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={relinking}
+                                        onClick={repairLinks}
+                                        data-testid="repair-links-button"
+                                    >
+                                        <Link2 className={`mr-1.5 size-4 ${relinking ? 'animate-pulse' : ''}`} />
+                                        {relinking ? t('admin.mods.repairing_links') : t('admin.mods.repair_links')}
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
                         {pendingRestart && (
                             <Alert
                                 className="mb-4 border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 [&>svg]:text-amber-600"
@@ -547,13 +653,13 @@ export default function Mods({
                                         </TableRow>
                                     </TableHeader>
                                     <SortableContext
-                                        items={filteredMods.map((m) => m.workshop_id)}
+                                        items={filteredMods.map(rowKey)}
                                         strategy={verticalListSortingStrategy}
                                     >
                                         <TableBody>
                                             {filteredMods.map((mod, index) => (
                                                 <SortableModRow
-                                                    key={mod.workshop_id}
+                                                    key={rowKey(mod)}
                                                     mod={mod}
                                                     index={index}
                                                     onDelete={setDeleteTarget}

@@ -18,7 +18,7 @@ afterEach(function () {
     if (file_exists($this->iniPath)) {
         unlink($this->iniPath);
     }
-    foreach (['.mod_state', '.mod_state_applied', '.config_state', '.config_state.lock'] as $sidecar) {
+    foreach (['.mod_state', '.mod_state_applied', '.mod_links.json', '.config_state', '.config_state.lock'] as $sidecar) {
         $path = $this->tempDir.'/Server/'.$sidecar;
         if (file_exists($path)) {
             unlink($path);
@@ -31,6 +31,16 @@ afterEach(function () {
         rmdir($this->tempDir);
     }
 });
+
+/**
+ * Seed the Workshop-item-to-mod-IDs map the manager reads for pairing.
+ *
+ * @param  array<string, list<string>>  $links
+ */
+function writeLinks(string $tempDir, array $links): void
+{
+    file_put_contents($tempDir.'/Server/.mod_links.json', json_encode($links));
+}
 
 it('lists mods from ini file', function () {
     $mods = $this->manager->list($this->iniPath);
@@ -497,4 +507,232 @@ it('bulk import with only already-present mods and no maps writes nothing new', 
     expect($summary['workshop_added'])->toBe(0)
         ->and($summary['mods_added'])->toBe(0)
         ->and(file_exists($this->tempDir.'/Server/.mod_state'))->toBeFalse();
+});
+
+/**
+ * The two INI lists are independent: `WorkshopItems=` and `Mods=` have no positional
+ * relationship once a Workshop item ships more than one mod, which is what broke
+ * pairing, removal and the restart badge for imported modpacks.
+ */
+describe('workshop-to-mod pairing', function () {
+    it('pairs every mod a workshop item provides with that workshop id', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2561774086;2286126274',
+            'Mods' => 'SuperSurvivors;HydroA;HydroB',
+        ]);
+        writeLinks($this->tempDir, [
+            '2561774086' => ['SuperSurvivors'],
+            '2286126274' => ['HydroA', 'HydroB'],
+        ]);
+
+        $mods = $this->manager->list($this->iniPath);
+
+        expect($mods)->toHaveCount(3)
+            ->and($mods[0])->toMatchArray(['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'])
+            ->and($mods[1])->toMatchArray(['workshop_id' => '2286126274', 'mod_id' => 'HydroA'])
+            ->and($mods[2])->toMatchArray(['workshop_id' => '2286126274', 'mod_id' => 'HydroB']);
+    });
+
+    it('does not pair by position when the lists have different lengths', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2561774086',
+            'Mods' => 'SuperSurvivors;Excavation;BicycleMod',
+        ]);
+
+        $mods = $this->manager->list($this->iniPath);
+
+        expect(collect($mods)->pluck('workshop_id')->all())->toBe(['', '', '', '2561774086']);
+    });
+
+    it('lists a workshop item with no known mod id as its own row', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2561774086;9999999999',
+            'Mods' => 'SuperSurvivors',
+        ]);
+        writeLinks($this->tempDir, ['2561774086' => ['SuperSurvivors']]);
+
+        $mods = $this->manager->list($this->iniPath);
+
+        expect($mods)->toHaveCount(2)
+            ->and($mods[1])->toMatchArray(['workshop_id' => '9999999999', 'mod_id' => '']);
+    });
+
+    it('keeps positional pairing for a link-free list of equal length', function () {
+        $mods = $this->manager->list($this->iniPath);
+
+        expect($mods[0])->toMatchArray(['workshop_id' => '2561774086', 'mod_id' => 'SuperSurvivors'])
+            ->and($mods[1])->toMatchArray(['workshop_id' => '2286126274', 'mod_id' => 'Hydrocraft']);
+    });
+
+    it('records the pairing of every imported workshop item, including installed ones', function () {
+        $this->manager->bulkImport($this->iniPath, ['2561774086', '7777777777'], ['SuperSurvivors', 'Fresh'], [], [
+            '2561774086' => ['SuperSurvivors'],
+            '7777777777' => ['Fresh'],
+        ]);
+
+        $links = json_decode(file_get_contents($this->tempDir.'/Server/.mod_links.json'), true);
+
+        expect($links)->toBe(['2561774086' => ['SuperSurvivors'], '7777777777' => ['Fresh']]);
+    });
+
+    it('repairs pairing for an already-installed list without touching the lists', function () {
+        $before = $this->parser->read($this->iniPath);
+
+        $this->manager->recordWorkshopLinks($this->iniPath, ['2286126274' => ['Hydrocraft']]);
+
+        $after = $this->parser->read($this->iniPath);
+
+        expect($after['Mods'])->toBe($before['Mods'])
+            ->and($after['WorkshopItems'])->toBe($before['WorkshopItems']);
+
+        $byMod = collect($this->manager->list($this->iniPath))->keyBy('mod_id');
+        expect($byMod['Hydrocraft']['workshop_id'])->toBe('2286126274');
+    });
+});
+
+describe('removing unpaired rows', function () {
+    it('removes a mod that has no workshop id of its own', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2561774086',
+            'Mods' => 'SuperSurvivors;Excavation',
+        ]);
+
+        $removed = $this->manager->removeEntry($this->iniPath, null, 'Excavation');
+
+        expect($removed)->toBe(['workshop_id' => '', 'mod_id' => 'Excavation'])
+            ->and($this->parser->read($this->iniPath)['Mods'])->not->toContain('Excavation');
+    });
+
+    it('keeps a workshop item while any of its other mods are still installed', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2286126274',
+            'Mods' => 'HydroA;HydroB',
+        ]);
+        writeLinks($this->tempDir, ['2286126274' => ['HydroA', 'HydroB']]);
+
+        $this->manager->removeEntry($this->iniPath, '2286126274', 'HydroA');
+
+        $config = $this->parser->read($this->iniPath);
+
+        expect($config['Mods'])->toContain('HydroB')
+            ->and($config['Mods'])->not->toContain('HydroA')
+            ->and($config['WorkshopItems'])->toContain('2286126274');
+    });
+
+    it('drops the workshop item once its last mod is removed', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2286126274',
+            'Mods' => 'HydroA;HydroB',
+        ]);
+        writeLinks($this->tempDir, ['2286126274' => ['HydroA', 'HydroB']]);
+
+        $this->manager->removeEntry($this->iniPath, '2286126274', 'HydroA');
+        $removed = $this->manager->removeEntry($this->iniPath, '2286126274', 'HydroB');
+
+        expect($removed)->toBe(['workshop_id' => '2286126274', 'mod_id' => 'HydroB'])
+            ->and($this->parser->read($this->iniPath)['WorkshopItems'])->not->toContain('2286126274');
+    });
+
+    it('removes a workshop item that has no mod id listed against it', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '2561774086;9999999999',
+            'Mods' => 'SuperSurvivors',
+        ]);
+
+        $removed = $this->manager->removeEntry($this->iniPath, '9999999999', null);
+
+        expect($removed)->toBe(['workshop_id' => '9999999999', 'mod_id' => ''])
+            ->and($this->parser->read($this->iniPath)['WorkshopItems'])->not->toContain('9999999999');
+    });
+
+    it('drops the workshop item when a mod is removed by mod id alone', function () {
+        writeLinks($this->tempDir, ['2561774086' => ['SuperSurvivors']]);
+
+        $this->manager->removeEntry($this->iniPath, null, 'SuperSurvivors');
+
+        $config = $this->parser->read($this->iniPath);
+
+        expect($config['WorkshopItems'])->not->toContain('2561774086')
+            ->and($config['Mods'])->not->toContain('SuperSurvivors');
+    });
+
+    it('returns null when neither identifier matches anything', function () {
+        expect($this->manager->removeEntry($this->iniPath, '0000000000', 'Nope'))->toBeNull()
+            ->and($this->manager->removeEntry($this->iniPath, null, null))->toBeNull();
+    });
+
+    it('forgets the pairing of a removed mod', function () {
+        writeLinks($this->tempDir, ['2561774086' => ['SuperSurvivors']]);
+
+        $this->manager->removeEntry($this->iniPath, null, 'SuperSurvivors');
+
+        expect(file_exists($this->tempDir.'/Server/.mod_links.json'))->toBeFalse();
+    });
+});
+
+describe('load status of unpaired rows', function () {
+    it('marks an unpaired mod active once the server has loaded it', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '',
+            'Mods' => 'Excavation;BicycleMod',
+        ]);
+        file_put_contents(
+            $this->tempDir.'/Server/.mod_state_applied',
+            "Mods=Excavation;BicycleMod\nWorkshopItems=\n"
+        );
+
+        $result = $this->manager->listWithStatus($this->iniPath, serverRunning: true);
+
+        expect($result['pending_restart'])->toBeFalse()
+            ->and(collect($result['mods'])->pluck('status')->all())->each->toBe('active');
+    });
+
+    it('still flags a mod the running server has not loaded', function () {
+        $this->parser->write($this->iniPath, [
+            'WorkshopItems' => '',
+            'Mods' => 'Excavation;BicycleMod',
+        ]);
+        file_put_contents(
+            $this->tempDir.'/Server/.mod_state_applied',
+            "Mods=Excavation\nWorkshopItems=\n"
+        );
+
+        $result = $this->manager->listWithStatus($this->iniPath, serverRunning: true);
+
+        $byMod = collect($result['mods'])->keyBy('mod_id');
+
+        expect($result['pending_restart'])->toBeTrue()
+            ->and($byMod['Excavation']['status'])->toBe('active')
+            ->and($byMod['BicycleMod']['status'])->toBe('pending_restart');
+    });
+
+    it('flags a workshop item whose mod is not in the applied mod list', function () {
+        file_put_contents(
+            $this->tempDir.'/Server/.mod_state_applied',
+            "Mods=SuperSurvivors\nWorkshopItems=2561774086;2286126274\n"
+        );
+
+        $result = $this->manager->listWithStatus($this->iniPath, serverRunning: true);
+
+        $byMod = collect($result['mods'])->keyBy('mod_id');
+
+        expect($byMod['SuperSurvivors']['status'])->toBe('active')
+            ->and($byMod['Hydrocraft']['status'])->toBe('pending_restart');
+    });
+});
+
+describe('reordering a partially paired list', function () {
+    it('drops blanks and repeats from the rebuilt lines', function () {
+        $this->manager->reorder($this->iniPath, [
+            ['workshop_id' => '2286126274', 'mod_id' => 'HydroA'],
+            ['workshop_id' => '2286126274', 'mod_id' => 'HydroB'],
+            ['workshop_id' => '', 'mod_id' => 'Excavation'],
+            ['workshop_id' => '2561774086', 'mod_id' => ''],
+        ]);
+
+        $config = $this->parser->read($this->iniPath);
+
+        expect($config['WorkshopItems'])->toBe('2286126274;2561774086;3685323705')
+            ->and($config['Mods'])->toBe('HydroA;HydroB;Excavation;ZomboidManager');
+    });
 });

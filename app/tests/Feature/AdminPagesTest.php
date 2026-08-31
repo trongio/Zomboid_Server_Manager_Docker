@@ -61,6 +61,8 @@ function mockAdminModManager(array $mods = []): void
     ])->byDefault();
     $modManager->shouldReceive('add')->byDefault();
     $modManager->shouldReceive('remove')->andReturn(['workshop_id' => '123', 'mod_id' => 'Test'])->byDefault();
+    $modManager->shouldReceive('removeEntry')->andReturn(['workshop_id' => '123', 'mod_id' => 'Test'])->byDefault();
+    $modManager->shouldReceive('recordWorkshopLinks')->byDefault();
     $modManager->shouldReceive('reorder')->byDefault();
 
     app()->instance(ModManager::class, $modManager);
@@ -426,6 +428,16 @@ it('can remove a mod via admin', function () {
 
     $response = $this->actingAs(adminUser())
         ->deleteJson('/admin/mods/123');
+
+    $response->assertOk();
+    $response->assertJson(['restart_required' => true]);
+});
+
+it('can remove a mod the list holds without a workshop id', function () {
+    mockAdminModManager();
+
+    $response = $this->actingAs(adminUser())
+        ->deleteJson('/admin/mods/entry', ['mod_id' => 'Excavation']);
 
     $response->assertOk();
     $response->assertJson(['restart_required' => true]);

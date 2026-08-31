@@ -12,6 +12,10 @@ function mockRconConsole(array $commands = []): void
     $rcon = Mockery::mock(RconClient::class);
     $rcon->shouldReceive('connect')->byDefault();
     $rcon->shouldReceive('command')->andReturn('')->byDefault();
+    // Start and restart queue WaitForServerReady, which the sync queue runs inside the
+    // request. Without this the job's reconnect() has no expectation, every attempt
+    // throws, and the test sits through the job's full five-minute poll window.
+    $rcon->shouldReceive('reconnect')->byDefault();
 
     foreach ($commands as $command => $response) {
         $rcon->shouldReceive('command')

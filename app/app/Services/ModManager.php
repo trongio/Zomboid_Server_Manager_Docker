@@ -26,6 +26,11 @@ class ModManager
         return array_key_exists($workshopId, self::PROTECTED_MODS);
     }
 
+    public static function isProtectedModId(string $modId): bool
+    {
+        return in_array($modId, self::PROTECTED_MODS, true);
+    }
+
     /**
      * Get the current mod list.
      *
@@ -38,25 +43,83 @@ class ModManager
      */
     public function list(string $iniPath): array
     {
-        $state = $this->parseStateFile(dirname($iniPath).'/.mod_state');
+        $current = $this->readCurrentLists($iniPath);
 
-        if ($state !== null) {
-            $workshopIds = $this->splitList($state['WorkshopItems']);
-            $modIds = $this->splitList($state['Mods']);
-        } else {
-            $config = $this->iniParser->read($iniPath);
-            $workshopIds = $this->splitList($config['WorkshopItems'] ?? '');
-            $modIds = $this->splitList($config['Mods'] ?? '');
+        return $this->pairEntries(
+            $current['workshop_ids'],
+            $current['mod_ids'],
+            $this->readLinks($iniPath),
+        );
+    }
+
+    /**
+     * Pair the two independent INI lists into displayable rows.
+     *
+     * PZ keeps `Mods=` and `WorkshopItems=` as separate ordered lists: one Workshop
+     * item can ship several mod IDs, and a mod can exist without a Workshop item, so
+     * the lists routinely differ in length and position N of one has nothing to do
+     * with position N of the other. Pairing is therefore driven by `.mod_links.json`
+     * (written whenever a mod is added or imported), which records which mod IDs each
+     * Workshop item provides.
+     *
+     * Rows are emitted one per mod ID, in `Mods=` order, carrying the Workshop ID that
+     * provides them (empty when unknown). Workshop IDs that no listed mod claims are
+     * appended as their own rows so they stay visible and removable.
+     *
+     * Whatever the link file does not account for is then matched positionally, but only
+     * when the leftovers on both sides come out to the same count — the reading that is
+     * correct for the common one-mod-per-Workshop-item setup, and the only one available
+     * for lists installed before pairings were recorded. Leftovers of differing counts
+     * are genuinely ambiguous, so those rows are left unpaired rather than guessed at.
+     *
+     * @param  list<string>  $workshopIds
+     * @param  list<string>  $modIds
+     * @param  array<string, list<string>>  $links
+     * @return array<int, array{workshop_id: string, mod_id: string, position: int}>
+     */
+    private function pairEntries(array $workshopIds, array $modIds, array $links): array
+    {
+        $owner = [];
+        $claimed = [];
+
+        foreach ($workshopIds as $workshopId) {
+            foreach ($links[$workshopId] ?? [] as $modId) {
+                if (in_array($modId, $modIds, true) && ! isset($owner[$modId])) {
+                    $owner[$modId] = $workshopId;
+                    $claimed[$workshopId] = true;
+                }
+            }
+        }
+
+        $unowned = array_values(array_filter($modIds, fn ($modId) => ! isset($owner[$modId])));
+        $unclaimed = array_values(array_filter($workshopIds, fn ($id) => ! isset($claimed[$id])));
+
+        if (count($unowned) === count($unclaimed)) {
+            foreach ($unowned as $i => $modId) {
+                $owner[$modId] = $unclaimed[$i];
+                $claimed[$unclaimed[$i]] = true;
+            }
         }
 
         $mods = [];
-        $count = max(count($workshopIds), count($modIds));
 
-        for ($i = 0; $i < $count; $i++) {
+        foreach ($modIds as $modId) {
             $mods[] = [
-                'workshop_id' => $workshopIds[$i] ?? '',
-                'mod_id' => $modIds[$i] ?? '',
-                'position' => $i,
+                'workshop_id' => $owner[$modId] ?? '',
+                'mod_id' => $modId,
+                'position' => count($mods),
+            ];
+        }
+
+        foreach ($workshopIds as $workshopId) {
+            if (isset($claimed[$workshopId])) {
+                continue;
+            }
+
+            $mods[] = [
+                'workshop_id' => $workshopId,
+                'mod_id' => '',
+                'position' => count($mods),
             ];
         }
 
@@ -75,6 +138,13 @@ class ModManager
      *  - 'stopped'         — game server is not running; load state unknown
      *  - 'pending_restart' — mod is in user intent but not in the running config
      *  - 'active'          — mod is in user intent and was applied at last start
+     *
+     * A row is only 'active' when BOTH of its identifiers were in the applied
+     * snapshot — the mod ID in `Mods=` and the Workshop ID in `WorkshopItems=`.
+     * Rows carry only one of the two when the pairing is unknown, so each side is
+     * checked independently and an empty identifier is simply not checked; without
+     * that, an unpaired row (no Workshop ID) would report 'pending_restart' forever,
+     * no matter how many times the server was restarted.
      *
      * When `.mod_state_applied` is missing (legacy containers from before this
      * file was written), every mod returned by `list()` is treated as 'active' if
@@ -95,15 +165,18 @@ class ModManager
         $appliedWorkshopIds = $applied !== null
             ? $this->splitList($applied['WorkshopItems'])
             : null;
+        $appliedModIds = $applied !== null
+            ? $this->splitList($applied['Mods'])
+            : null;
 
         $pendingRestart = false;
 
         foreach ($mods as $i => $mod) {
             if (! $serverRunning) {
                 $status = 'stopped';
-            } elseif ($appliedWorkshopIds === null) {
+            } elseif ($applied === null) {
                 $status = 'active';
-            } elseif (in_array($mod['workshop_id'], $appliedWorkshopIds, true)) {
+            } elseif ($this->isApplied($mod, $appliedWorkshopIds, $appliedModIds)) {
                 $status = 'active';
             } else {
                 $status = 'pending_restart';
@@ -114,9 +187,11 @@ class ModManager
         }
 
         if ($serverRunning && $applied !== null) {
-            $intentWorkshopIds = array_column($mods, 'workshop_id');
-            $removedSinceStart = array_diff($appliedWorkshopIds, $intentWorkshopIds);
-            if (! empty($removedSinceStart)) {
+            $intentWorkshopIds = array_filter(array_column($mods, 'workshop_id'));
+            $intentModIds = array_filter(array_column($mods, 'mod_id'));
+
+            if (array_diff($appliedWorkshopIds, $intentWorkshopIds) !== []
+                || array_diff($appliedModIds, $intentModIds) !== []) {
                 $pendingRestart = true;
             }
         }
@@ -127,6 +202,30 @@ class ModManager
             'server_running' => $serverRunning,
             'applied_snapshot_present' => $applied !== null,
         ];
+    }
+
+    /**
+     * Was this row's mod already loaded by the running server?
+     *
+     * Each identifier is checked only when the row actually carries it, so a row
+     * known by mod ID alone is judged on `Mods=` and one known by Workshop ID
+     * alone on `WorkshopItems=`.
+     *
+     * @param  array{workshop_id: string, mod_id: string}  $mod
+     * @param  list<string>  $appliedWorkshopIds
+     * @param  list<string>  $appliedModIds
+     */
+    private function isApplied(array $mod, array $appliedWorkshopIds, array $appliedModIds): bool
+    {
+        if ($mod['workshop_id'] !== '' && ! in_array($mod['workshop_id'], $appliedWorkshopIds, true)) {
+            return false;
+        }
+
+        if ($mod['mod_id'] !== '' && ! in_array($mod['mod_id'], $appliedModIds, true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -192,6 +291,8 @@ class ModManager
         }
 
         $this->writeIniAndState($iniPath, $updates);
+
+        $this->recordLinks($iniPath, [$workshopId => [$modId]]);
     }
 
     /**
@@ -201,23 +302,65 @@ class ModManager
      */
     public function remove(string $iniPath, string $workshopId, ?string $mapFolder = null): ?array
     {
-        $current = $this->readCurrentLists($iniPath);
-        $workshopIds = $current['workshop_ids'];
-        $modIds = $current['mod_ids'];
+        return $this->removeEntry($iniPath, $workshopId, null, $mapFolder);
+    }
 
-        $index = array_search($workshopId, $workshopIds, true);
+    /**
+     * Remove a single list row, identified by its Workshop ID, its mod ID, or both.
+     *
+     * Rows are not always paired: a Workshop item can be listed with no mod ID of its
+     * own, and a mod ID can be listed with no Workshop item behind it, so removal has
+     * to work from whichever identifier the row actually carries. Removing by mod ID
+     * drops that entry from `Mods=` and drops its Workshop item too, but only once no
+     * other installed mod comes from that same Workshop item — otherwise removing one
+     * mod of a multi-mod Workshop item would silently break its siblings.
+     *
+     * @return array{workshop_id: string, mod_id: string}|null The removed row, or null if nothing matched.
+     */
+    public function removeEntry(string $iniPath, ?string $workshopId, ?string $modId, ?string $mapFolder = null): ?array
+    {
+        $workshopId = $workshopId !== null ? trim($workshopId) : '';
+        $modId = $modId !== null ? trim($modId) : '';
 
-        if ($index === false) {
+        if ($workshopId === '' && $modId === '') {
             return null;
         }
 
-        $removed = [
-            'workshop_id' => $workshopIds[$index],
-            'mod_id' => $modIds[$index] ?? '',
-        ];
+        $current = $this->readCurrentLists($iniPath);
+        $workshopIds = $current['workshop_ids'];
+        $modIds = $current['mod_ids'];
+        $links = $this->readLinks($iniPath);
 
-        array_splice($workshopIds, $index, 1);
-        array_splice($modIds, $index, 1);
+        $targetModIds = $this->modIdsToRemove($workshopId, $modId, $workshopIds, $modIds, $links);
+
+        $workshopIndex = $workshopId !== '' ? array_search($workshopId, $workshopIds, true) : false;
+
+        if ($targetModIds === [] && $workshopIndex === false) {
+            return null;
+        }
+
+        $modIds = array_values(array_filter($modIds, fn ($id) => ! in_array($id, $targetModIds, true)));
+
+        $removedWorkshopId = '';
+
+        if ($workshopId === '' && $modId !== '') {
+            $workshopId = $this->ownerOf($modId, $workshopIds, $links);
+            $workshopIndex = $workshopId !== '' ? array_search($workshopId, $workshopIds, true) : false;
+        }
+
+        if ($workshopIndex !== false) {
+            $stillProvided = array_intersect($links[$workshopId] ?? [], $modIds);
+
+            if ($stillProvided === []) {
+                array_splice($workshopIds, $workshopIndex, 1);
+                $removedWorkshopId = $workshopId;
+                unset($links[$workshopId]);
+            }
+        }
+
+        foreach ($links as $id => $provided) {
+            $links[$id] = array_values(array_diff($provided, $targetModIds));
+        }
 
         $updates = [
             'WorkshopItems' => implode(';', $workshopIds),
@@ -233,18 +376,78 @@ class ModManager
 
         $this->writeIniAndState($iniPath, $updates);
 
-        return $removed;
+        $this->writeLinks($iniPath, array_filter($links));
+
+        return [
+            'workshop_id' => $removedWorkshopId,
+            'mod_id' => $targetModIds[0] ?? '',
+        ];
+    }
+
+    /**
+     * Work out which mod IDs a removal should drop.
+     *
+     * An explicit mod ID removes just that one. A Workshop-ID-only removal takes every
+     * installed mod that Workshop item is known to provide, falling back to the
+     * positionally paired mod when no link data exists and the two lists line up —
+     * the pre-`.mod_links.json` reading, kept so old installs still remove cleanly.
+     *
+     * @param  list<string>  $workshopIds
+     * @param  list<string>  $modIds
+     * @param  array<string, list<string>>  $links
+     * @return list<string>
+     */
+    private function modIdsToRemove(string $workshopId, string $modId, array $workshopIds, array $modIds, array $links): array
+    {
+        if ($modId !== '') {
+            return in_array($modId, $modIds, true) ? [$modId] : [];
+        }
+
+        $provided = array_values(array_intersect($links[$workshopId] ?? [], $modIds));
+
+        if ($provided !== []) {
+            return $provided;
+        }
+
+        if ($links !== [] || count($workshopIds) !== count($modIds)) {
+            return [];
+        }
+
+        $index = array_search($workshopId, $workshopIds, true);
+
+        return $index !== false && isset($modIds[$index]) ? [$modIds[$index]] : [];
+    }
+
+    /**
+     * Find the installed Workshop item that provides the given mod ID.
+     *
+     * @param  list<string>  $workshopIds
+     * @param  array<string, list<string>>  $links
+     */
+    private function ownerOf(string $modId, array $workshopIds, array $links): string
+    {
+        foreach ($workshopIds as $workshopId) {
+            if (in_array($modId, $links[$workshopId] ?? [], true)) {
+                return $workshopId;
+            }
+        }
+
+        return '';
     }
 
     /**
      * Reorder mods by replacing both lines with the given ordered list.
      *
+     * Rows may carry only one of the two identifiers (an unpaired mod, or a Workshop
+     * item whose mods are unknown), and one Workshop item may appear on several rows,
+     * so each line is rebuilt from the row order with blanks and repeats dropped.
+     *
      * @param  array<int, array{workshop_id: string, mod_id: string}>  $orderedMods
      */
     public function reorder(string $iniPath, array $orderedMods): void
     {
-        $workshopIds = array_column($orderedMods, 'workshop_id');
-        $modIds = array_column($orderedMods, 'mod_id');
+        $workshopIds = $this->uniqueNonEmpty(array_column($orderedMods, 'workshop_id'));
+        $modIds = $this->uniqueNonEmpty(array_column($orderedMods, 'mod_id'));
 
         $existing = $this->readCurrentLists($iniPath)['workshop_ids'];
         foreach (array_keys(self::PROTECTED_MODS) as $required) {
@@ -278,14 +481,22 @@ class ModManager
      * `.mod_state` (authoritative across reboots), ZomboidManager is re-attached, and
      * any Map change is persisted to `.config_state`.
      *
+     * `$links` records which mod IDs each Workshop item provides. It is persisted
+     * for every entry in the payload, including entries that were already installed,
+     * so re-pasting a modpack repairs the pairing of a list imported before the link
+     * file existed.
+     *
      * @param  list<string>  $workshopIds
      * @param  list<string>  $modIds
      * @param  list<string>  $mapFolders
+     * @param  array<string, list<string>>  $links
      * @return array{workshop_added: int, mods_added: int, maps_added: int}
      */
-    public function bulkImport(string $iniPath, array $workshopIds, array $modIds, array $mapFolders = []): array
+    public function bulkImport(string $iniPath, array $workshopIds, array $modIds, array $mapFolders = [], array $links = []): array
     {
         $current = $this->readCurrentLists($iniPath);
+
+        $this->recordLinks($iniPath, $links);
 
         [$mergedWorkshop, $workshopAdded] = $this->mergeList($current['workshop_ids'], $workshopIds);
         [$mergedMods, $modsAdded] = $this->mergeList($current['mod_ids'], $modIds);
@@ -333,7 +544,7 @@ class ModManager
      *
      * @param  list<string>  $current
      * @param  list<string>  $incoming
-     * @return array{0: list<string>, 1: int}  The merged list and the number added.
+     * @return array{0: list<string>, 1: int} The merged list and the number added.
      */
     private function mergeList(array $current, array $incoming): array
     {
@@ -487,6 +698,155 @@ class ModManager
                 @unlink($tempFile);
             }
         }
+    }
+
+    /**
+     * Record which mod IDs each Workshop item provides, merging into what is stored.
+     *
+     * @param  array<string, list<string>>  $links
+     */
+    public function recordWorkshopLinks(string $iniPath, array $links): void
+    {
+        $this->recordLinks($iniPath, $links);
+    }
+
+    /**
+     * Read the Workshop-item-to-mod-IDs map from `.mod_links.json`.
+     *
+     * The file only records pairing; the installed lists themselves stay in the INI
+     * and `.mod_state`. A missing or malformed file is not an error — pairing simply
+     * falls back to positional, exactly as it did before this file existed.
+     *
+     * @return array<string, list<string>>
+     */
+    private function readLinks(string $iniPath): array
+    {
+        $linkFile = dirname($iniPath).'/.mod_links.json';
+
+        if (! is_readable($linkFile)) {
+            return [];
+        }
+
+        $contents = @file_get_contents($linkFile);
+
+        if ($contents === false) {
+            return [];
+        }
+
+        $decoded = json_decode($contents, true);
+
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $links = [];
+
+        foreach ($decoded as $workshopId => $modIds) {
+            if (! is_array($modIds)) {
+                continue;
+            }
+
+            $clean = $this->uniqueNonEmpty(array_map(fn ($id) => is_scalar($id) ? (string) $id : '', $modIds));
+
+            if ($clean !== []) {
+                $links[(string) $workshopId] = $clean;
+            }
+        }
+
+        return $links;
+    }
+
+    /**
+     * Merge new pairings into `.mod_links.json`.
+     *
+     * @param  array<string, list<string>>  $links
+     */
+    private function recordLinks(string $iniPath, array $links): void
+    {
+        if ($links === []) {
+            return;
+        }
+
+        $merged = $this->readLinks($iniPath);
+
+        foreach ($links as $workshopId => $modIds) {
+            $workshopId = trim((string) $workshopId);
+
+            if ($workshopId === '' || ! is_array($modIds)) {
+                continue;
+            }
+
+            $clean = $this->uniqueNonEmpty(array_map(fn ($id) => is_scalar($id) ? (string) $id : '', $modIds));
+
+            if ($clean !== []) {
+                $merged[$workshopId] = $clean;
+            }
+        }
+
+        $this->writeLinks($iniPath, $merged);
+    }
+
+    /**
+     * Write `.mod_links.json` atomically.
+     *
+     * Pairing is a display and bookkeeping aid, never something PZ reads, so a failed
+     * write is swallowed: losing it degrades the UI to positional pairing rather than
+     * failing the mod change the caller actually asked for.
+     *
+     * @param  array<string, list<string>>  $links
+     */
+    private function writeLinks(string $iniPath, array $links): void
+    {
+        $linkFile = dirname($iniPath).'/.mod_links.json';
+
+        if ($links === []) {
+            @unlink($linkFile);
+
+            return;
+        }
+
+        $encoded = json_encode($links, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        if ($encoded === false) {
+            return;
+        }
+
+        $tempFile = @tempnam(dirname($linkFile), '.mod_links.');
+
+        if ($tempFile === false) {
+            return;
+        }
+
+        if (@file_put_contents($tempFile, $encoded."\n") === false || ! @rename($tempFile, $linkFile)) {
+            @unlink($tempFile);
+
+            return;
+        }
+
+        @chmod($linkFile, 0644);
+    }
+
+    /**
+     * @param  array<int, string>  $values
+     * @return list<string>
+     */
+    private function uniqueNonEmpty(array $values): array
+    {
+        $seen = [];
+        $unique = [];
+
+        foreach ($values as $value) {
+            $value = trim($value);
+
+            if ($value === '' || isset($seen[$value])) {
+                continue;
+            }
+
+            $seen[$value] = true;
+            $unique[] = $value;
+        }
+
+        return $unique;
     }
 
     /**

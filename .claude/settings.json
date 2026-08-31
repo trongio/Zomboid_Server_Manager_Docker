@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(make test-fast:*)",
+      "Bash(make test-mods:*)",
+      "Bash(make test-game-server:*)",
+      "Bash(bash scripts/test-fast.sh:*)",
+      "Bash(app/vendor/bin/pint --dirty --format agent)"
+    ]
+  }
+}

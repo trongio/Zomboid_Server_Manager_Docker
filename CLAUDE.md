@@ -38,6 +38,12 @@ make test
 make exec CMD="php artisan test --filter=UnitTest"
 make exec CMD="php artisan test --group=rcon"
 
+# Fast test lane — host + in-memory SQLite, no containers (see note below)
+make test-fast
+make test-fast ARGS="tests/Unit"
+make test-fast ARGS="--filter=ModManager"
+make test-mods
+
 # Queue & Scheduler
 make exec CMD="php artisan queue:work --tries=3"
 make exec CMD="php artisan schedule:run"
@@ -65,6 +71,8 @@ make update-version
 ```
 
 **Important:** All PHP/artisan commands must run inside the Docker container via `make exec CMD="..."`. Never run them directly on the host.
+
+The one exception is `make test-fast` / `make test-mods` (`scripts/test-fast.sh`), which run Pest on the host against in-memory SQLite: the whole suite in under a minute, a focused run in well under a second. It redirects `storage/`, `/pz-data` and `/backups` to a scratch tree and stubs out the Vite manifest, so it is for iterating only. `make test` in the container is what decides whether a change is done — it is the run that exercises PostgreSQL, the production PHP build, the real volume layout, and the built frontend assets.
 
 ## Architecture
 

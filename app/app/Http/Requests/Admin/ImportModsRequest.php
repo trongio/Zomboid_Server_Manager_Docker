@@ -28,7 +28,33 @@ class ImportModsRequest extends FormRequest
             'mod_ids.*' => ['string', 'max:255', self::SAFE_TOKEN],
             'map' => ['sometimes', 'array', 'max:64'],
             'map.*' => ['string', 'max:255', self::SAFE_TOKEN],
+            'links' => ['sometimes', 'array', 'max:1000'],
+            'links.*' => ['array', 'max:100'],
+            'links.*.*' => ['string', 'max:255', self::SAFE_TOKEN],
         ];
+    }
+
+    /**
+     * Drop link entries whose key is not a Workshop ID.
+     *
+     * The keys of `links` are Workshop IDs, which dot-notation rules cannot reach, so
+     * they are filtered here rather than failing an otherwise valid import.
+     */
+    protected function prepareForValidation(): void
+    {
+        $links = $this->input('links');
+
+        if (! is_array($links)) {
+            return;
+        }
+
+        $this->merge([
+            'links' => array_filter(
+                $links,
+                fn ($key) => preg_match('/^\d{1,20}$/', (string) $key) === 1,
+                ARRAY_FILTER_USE_KEY,
+            ),
+        ]);
     }
 
     /**

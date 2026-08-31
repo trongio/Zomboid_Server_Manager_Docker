@@ -27,8 +27,19 @@ abstract class TestCase extends BaseTestCase
             ThrottleRequests::class,
             ValidateCsrfToken::class,
         ]);
+
+        if (filter_var(env('TEST_WITHOUT_VITE', false), FILTER_VALIDATE_BOOLEAN)) {
+            $this->withoutVite();
+        }
     }
 
+    /**
+     * Rendering an Inertia page resolves its entry point through the Vite manifest, so
+     * every page test needs freshly built assets. `TEST_WITHOUT_VITE=1` stubs the
+     * manifest out for runs that are not about the frontend — the host fast lane
+     * (`make test-fast`) sets it. The containerised run leaves it off and keeps
+     * asserting that each page's entry point is actually built.
+     */
     protected function assertSafeTestingDatabase(Application $app): void
     {
         $connection = (string) $app['config']->get('database.default');
